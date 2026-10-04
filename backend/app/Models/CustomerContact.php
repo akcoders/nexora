@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CustomerContact extends Model
 {
@@ -18,5 +19,15 @@ class CustomerContact extends Model
             'is_billing' => 'boolean',
             'is_escalation' => 'boolean',
         ];
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(CustomerBranch::class, 'customer_branch_id');
     }
 }

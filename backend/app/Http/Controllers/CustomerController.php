@@ -41,31 +41,92 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'customer_group_id' => ['nullable', 'exists:customer_groups,id'],
             'types' => ['required', 'array', 'min:1'],
             'types.*' => [Rule::in(['individual', 'corporate', 'architect', 'consultant', 'agent', 'dealer', 'government'])],
             'segments' => ['nullable', 'array'],
+            'segments.*' => [Rule::in(['healthcare', 'education', 'industrials', 'builder', 'hospitality', 'office'])],
             'priority' => ['required', Rule::in(['normal', 'high', 'very_high'])],
             'status' => ['required', Rule::in(['active', 'inactive', 'blacklisted'])],
             'branch_type' => ['required', Rule::in(['single', 'multi'])],
-            'pin_code' => ['nullable', 'regex:/^[0-9]{6}$/'],
+            'address_line_1' => ['required', 'string', 'max:255'],
+            'address_line_2' => ['nullable', 'string', 'max:255'],
+            'landmark' => ['nullable', 'string', 'max:255'],
+            'area' => ['nullable', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:120'],
+            'district' => ['nullable', 'string', 'max:120'],
+            'state' => ['required', 'string', 'max:120'],
+            'pin_code' => ['required', 'regex:/^[0-9]{6}$/'],
+            'country' => ['required', 'string', 'max:120'],
             'email_1' => ['required_without:email_2', 'nullable', 'email'],
             'email_2' => ['nullable', 'email'],
-            'gstin' => ['nullable', 'size:15'],
-            'pan' => ['nullable', 'size:10'],
+            'gstin' => ['nullable', 'regex:/^[0-9A-Za-z]{15}$/'],
+            'pan' => ['nullable', 'regex:/^[0-9A-Za-z]{10}$/'],
             'contact_no_1' => ['required_without:contact_no_2', 'nullable', 'string', 'max:20'],
             'contact_no_2' => ['nullable', 'string', 'max:20'],
             'contacts' => ['required', 'array', 'min:1'],
             'contacts.*.name' => ['required', 'string', 'max:255'],
+            'contacts.*.designation' => ['nullable', 'string', 'max:120'],
+            'contacts.*.department' => ['nullable', 'string', 'max:120'],
             'contacts.*.email' => ['nullable', 'email'],
             'contacts.*.phone' => ['nullable', 'string', 'max:20'],
-            'branches' => [Rule::requiredIf($request->input('branch_type') === 'multi'), 'array'],
+            'contacts.*.whatsapp' => ['nullable', 'string', 'max:20'],
+            'contacts.*.is_primary' => ['nullable', 'boolean'],
+            'contacts.*.is_service' => ['nullable', 'boolean'],
+            'contacts.*.is_billing' => ['nullable', 'boolean'],
+            'contacts.*.is_escalation' => ['nullable', 'boolean'],
+            'branches' => [Rule::requiredIf($request->input('branch_type') === 'multi'), 'nullable', 'array', 'min:1'],
             'branches.*.name' => ['required_with:branches', 'string', 'max:255'],
+            'branches.*.gstin' => ['nullable', 'regex:/^[0-9A-Za-z]{15}$/'],
+            'branches.*.gst_registration_type' => ['nullable', Rule::in(['regular', 'composition', 'unregistered'])],
+            'branches.*.address_line_1' => ['required_with:branches', 'string', 'max:255'],
+            'branches.*.address_line_2' => ['nullable', 'string', 'max:255'],
+            'branches.*.landmark' => ['nullable', 'string', 'max:255'],
+            'branches.*.area' => ['nullable', 'string', 'max:255'],
+            'branches.*.city' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.district' => ['nullable', 'string', 'max:120'],
+            'branches.*.state' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.pin_code' => ['required_with:branches', 'regex:/^[0-9]{6}$/'],
+            'branches.*.country' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.contact_no_1' => ['nullable', 'string', 'max:20'],
+            'branches.*.contact_no_2' => ['nullable', 'string', 'max:20'],
+            'branches.*.email_1' => ['nullable', 'email'],
+            'branches.*.email_2' => ['nullable', 'email'],
+            'branches.*.billing_address' => ['nullable', 'string', 'max:2000'],
+            'branches.*.site_access_instructions' => ['nullable', 'string', 'max:2000'],
+            'branches.*.contacts' => ['nullable', 'array'],
+            'branches.*.contacts.*.name' => ['nullable', 'string', 'max:255'],
+            'branches.*.contacts.*.designation' => ['nullable', 'string', 'max:120'],
+            'branches.*.contacts.*.department' => ['nullable', 'string', 'max:120'],
+            'branches.*.contacts.*.phone' => ['nullable', 'string', 'max:20'],
+            'branches.*.contacts.*.whatsapp' => ['nullable', 'string', 'max:20'],
+            'branches.*.contacts.*.email' => ['nullable', 'email'],
+            'branches.*.contacts.*.is_primary' => ['nullable', 'boolean'],
+            'branches.*.contacts.*.is_service' => ['nullable', 'boolean'],
+            'branches.*.contacts.*.is_billing' => ['nullable', 'boolean'],
+            'branches.*.contacts.*.is_escalation' => ['nullable', 'boolean'],
             'documents.*' => ['nullable', 'file', 'max:10240'],
         ]);
 
         $primaryCount = collect($request->input('contacts', []))->filter(fn ($contact) => ! empty($contact['is_primary']))->count();
         if ($primaryCount > 1) {
             return back()->withInput()->withErrors(['contacts' => 'Only one primary contact is allowed.']);
+        }
+
+        foreach ($validated['branches'] ?? [] as $branchIndex => $branch) {
+            $contacts = collect($branch['contacts'] ?? [])->filter(fn ($contact) => collect($contact)->filter()->isNotEmpty());
+            foreach ($contacts as $contactIndex => $contact) {
+                if (blank($contact['name'] ?? null)) {
+                    return back()->withInput()->withErrors([
+                        "branches.$branchIndex.contacts.$contactIndex.name" => 'A contact name is required when branch contact details are entered.',
+                    ]);
+                }
+            }
+            if ($contacts->filter(fn ($contact) => ! empty($contact['is_primary']))->count() > 1) {
+                return back()->withInput()->withErrors([
+                    "branches.$branchIndex.contacts" => 'Only one primary contact is allowed per branch.',
+                ]);
+            }
         }
 
         $duplicate = Customer::where('name', $validated['name'])
@@ -75,7 +136,7 @@ class CustomerController extends Controller
             return back()->withInput()->withErrors(['name' => 'A customer with the same name and city already exists. Confirm duplicate to continue.']);
         }
 
-        $customer = DB::transaction(function () use ($request) {
+        $customer = DB::transaction(function () use ($request, $validated) {
             $nextId = (Customer::withTrashed()->max('id') ?? 0) + 1;
             $customer = Customer::create(array_merge(
                 $request->only([
@@ -90,14 +151,27 @@ class CustomerController extends Controller
                 ['code' => 'CUST'.str_pad((string) $nextId, 5, '0', STR_PAD_LEFT), 'created_by' => $request->user()->id]
             ));
 
-            foreach ($request->input('contacts', []) as $order => $contact) {
+            foreach ($validated['contacts'] as $order => $contact) {
                 $customer->contacts()->create(array_merge($contact, ['sort_order' => $order]));
             }
 
-            foreach ($request->input('branches', []) as $index => $branch) {
-                $customer->branches()->create(array_merge($branch, [
+            $branches = $request->input('branch_type') === 'multi' ? ($validated['branches'] ?? []) : [];
+            foreach ($branches as $index => $branch) {
+                $branchContacts = $branch['contacts'] ?? [];
+                unset($branch['contacts']);
+                $branchModel = $customer->branches()->create(array_merge($branch, [
                     'code' => $customer->code.'-B'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
                 ]));
+
+                foreach ($branchContacts as $order => $contact) {
+                    if (collect($contact)->filter()->isEmpty()) {
+                        continue;
+                    }
+                    $customer->contacts()->create(array_merge($contact, [
+                        'customer_branch_id' => $branchModel->id,
+                        'sort_order' => $order,
+                    ]));
+                }
             }
 
             $customer->creditTerms()->create($request->input('credit', []));

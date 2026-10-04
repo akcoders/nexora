@@ -12,7 +12,8 @@ window.bootstrap = bootstrap;
 window.$ = window.jQuery = $;
 window.Swal = Swal;
 window.ApexCharts = ApexCharts;
+window.refreshIcons = () => createIcons({ icons });
 
 Alpine.start();
 
-document.addEventListener('DOMContentLoaded', () => createIcons({ icons }));
+document.addEventListener('DOMContentLoaded', window.refreshIcons);
