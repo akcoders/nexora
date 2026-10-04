@@ -20,7 +20,7 @@ class AttendanceRulesTest extends TestCase
             'attendance_check_in_grace_minutes' => '15',
             'attendance_checkout_time' => '18:00',
             'attendance_checkout_grace_minutes' => '15',
-        ])->each(fn ($value, $key) => Setting::create(['key' => $key, 'value' => $value]));
+        ])->each(fn ($value, $key) => Setting::updateOrCreate(['key' => $key], ['value' => $value]));
 
         $policy = app(AttendancePolicy::class);
 
