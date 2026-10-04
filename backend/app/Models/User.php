@@ -36,6 +36,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Premises::class);
     }
 
+    public function assignedServiceJobs(): HasMany
+    {
+        return $this->hasMany(ServiceJob::class, 'assigned_to');
+    }
+
     /**
      * Get the attributes that should be cast.
      *

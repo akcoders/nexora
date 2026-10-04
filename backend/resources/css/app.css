@@ -100,6 +100,19 @@ a { text-decoration: none; }
 .nx-review-box { padding: 16px; border: 1px solid var(--nx-border); border-radius: 12px; background: #f8fafc; }
 .nx-wizard-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; margin-top: 26px; border-top: 1px solid var(--nx-border); }
 .nx-wizard-actions > div { display: inline-flex; align-items: center; gap: 10px; }
+.nx-service-progress { display: grid; grid-template-columns: repeat(6, 1fr); position: relative; }
+.nx-service-progress::before { content: ''; position: absolute; left: 7%; right: 7%; top: 18px; height: 2px; background: #e2e8f0; }
+.nx-service-stage { position: relative; z-index: 1; display: grid; justify-items: center; gap: 7px; color: #94a3b8; font-size: 11px; text-align: center; }
+.nx-service-stage span { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #e2e8f0; background: #fff; font-weight: 700; }
+.nx-service-stage.done { color: #15803d; }
+.nx-service-stage.done span { color: #fff; border-color: #16a34a; background: #16a34a; }
+.nx-service-stage.active { color: var(--nx-primary); }
+.nx-service-stage.active span { color: #fff; border-color: var(--nx-primary); background: var(--nx-primary); box-shadow: 0 0 0 5px #dbeafe; }
+.nx-timeline { position: relative; padding-left: 24px; }
+.nx-timeline::before { content: ''; position: absolute; top: 4px; bottom: 5px; left: 6px; width: 2px; background: #dbeafe; }
+.nx-timeline-item { position: relative; padding: 0 0 24px 9px; }
+.nx-timeline-item:last-child { padding-bottom: 0; }
+.nx-timeline-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; left: -23px; top: 4px; background: var(--nx-primary); box-shadow: 0 0 0 4px #dbeafe; }
 .nx-summary { position: sticky; top: 95px; }
 @media (max-width: 991.98px) {
     .nx-sidebar { transform: translateX(-100%); }
@@ -119,4 +132,5 @@ a { text-decoration: none; }
     .nx-repeat-card { padding: 14px; }
     .nx-wizard-actions { gap: 8px; }
     .nx-wizard-actions .btn { padding-inline: 12px; }
+    .nx-service-progress { overflow-x: auto; grid-template-columns: repeat(6, minmax(76px, 1fr)); padding-bottom: 6px; }
 }

@@ -1,6 +1,6 @@
 # Nexora Technician
 
-Android field application for attendance and task workflows.
+Android field application for attendance, internal tasks, notifications, and the complete HVAC service-job workflow.
 
 ## Run locally
 
@@ -25,4 +25,4 @@ flutter build apk --release --split-per-abi
 Builds use `https://nexora.webignitors.in/api/v1/` unless `NEXORA_API_URL` is
 explicitly provided. Configure a production signing keystore before distribution.
 
-Camera and precise location permissions are required for attendance. Custom Android notification audio is at `android/app/src/main/res/raw/notification_sound.mp3`.
+Camera and precise location permissions are required for attendance, arrival evidence, service photos, and customer signatures. Custom Android notification audio is at `android/app/src/main/res/raw/notification_sound.mp3`.

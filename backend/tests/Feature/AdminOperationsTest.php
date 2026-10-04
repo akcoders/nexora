@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ProductCategory;
+use App\Models\ServiceChecklist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -28,7 +29,7 @@ class AdminOperationsTest extends TestCase
             'items' => "Pressure test\nVacuum test\nCommission controller",
         ])->assertRedirect();
         $this->assertDatabaseHas('service_checklists', ['name' => 'VRV Commissioning']);
-        $this->assertDatabaseCount('checklist_items', 8);
+        $this->assertSame(3, ServiceChecklist::where('name', 'VRV Commissioning')->firstOrFail()->items()->count());
 
         $this->actingAs($admin)->post(route('products.store'), [
             'name' => 'VRV Outdoor Unit',

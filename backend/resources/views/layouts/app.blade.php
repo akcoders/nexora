@@ -19,6 +19,8 @@
                     <a class="nx-nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}"><i data-lucide="building-2"></i>Customers</a>
                     <a class="nx-nav-link {{ request()->routeIs('products.*') || request()->routeIs('product-categories.*') ? 'active' : '' }}" href="{{ route('products.index') }}"><i data-lucide="package"></i>Products</a>
                     <a class="nx-nav-link {{ request()->routeIs('checklists.*') ? 'active' : '' }}" href="{{ route('checklists.index') }}"><i data-lucide="clipboard-check"></i>Service Checklists</a>
+                    @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan
+                    <a class="nx-nav-link {{ request()->routeIs('service-jobs.*') ? 'active' : '' }}" href="{{ route('service-jobs.index') }}"><i data-lucide="wrench"></i>Service Jobs</a>
                     <a class="nx-nav-link {{ request()->routeIs('attendance.*') || request()->routeIs('premises.*') ? 'active' : '' }}" href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance <span class="badge bg-warning text-dark ms-auto">{{ \App\Models\Attendance::where('status', 'pending')->count() }}</span></a>
                     <a class="nx-nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}"><i data-lucide="list-checks"></i>Tasks & Workflow</a>
                     <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>

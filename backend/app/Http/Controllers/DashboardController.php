@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Attendance;
+use App\Models\ServiceJob;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -26,6 +27,8 @@ class DashboardController extends Controller
                 'pendingTasks' => Task::where('status', 'pending')->count(),
                 'closedTasks' => Task::where('status', 'closed')->count(),
                 'overdueTasks' => Task::where('status', 'pending')->where('due_at', '<', now())->count(),
+                'serviceJobsToday' => ServiceJob::whereDate('scheduled_at', $today)->count(),
+                'serviceJobsInProgress' => ServiceJob::whereIn('status', ['on_the_way', 'arrived', 'inspection_in_progress', 'service_in_progress'])->count(),
             ],
             'recentTasks' => Task::with(['assignee', 'customer'])->latest()->limit(6)->get(),
             'activities' => ActivityLog::latest()->limit(6)->get(),

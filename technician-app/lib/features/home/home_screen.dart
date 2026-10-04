@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
+import '../service_jobs/service_job_detail_screen.dart';
+import '../service_jobs/service_jobs_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -26,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? today;
   List<dynamic> pendingTasks = [];
+  List<dynamic> todayServiceJobs = [];
   int closedCount = 0;
   bool loading = true;
   bool checkingOut = false;
@@ -50,12 +53,14 @@ class _HomeScreenState extends State<HomeScreen> {
         api.get('attendance/today'),
         api.get('tasks', queryParameters: {'status': 'pending'}),
         api.get('tasks', queryParameters: {'status': 'closed'}),
+        api.get('service-jobs', queryParameters: {'scope': 'today'}),
       ]);
       today = responses[0].data['attendance'];
       pendingTasks = List<dynamic>.from(responses[1].data['data'] ?? []);
       closedCount =
           (responses[2].data['total'] as num?)?.toInt() ??
           List<dynamic>.from(responses[2].data['data'] ?? []).length;
+      todayServiceJobs = List<dynamic>.from(responses[3].data['data'] ?? []);
     } catch (_) {
       // Keep the dashboard usable and allow a manual refresh.
     }
@@ -301,6 +306,84 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
+                  'Today’s service visits',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ServiceJobsScreen(),
+                      ),
+                    );
+                    await load();
+                  },
+                  child: Text(
+                    todayServiceJobs.isEmpty
+                        ? 'View jobs'
+                        : '${todayServiceJobs.length} jobs',
+                  ),
+                ),
+              ],
+            ),
+            if (todayServiceJobs.isEmpty)
+              Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ServiceJobsScreen(),
+                      ),
+                    );
+                    await load();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Icon(
+                          LucideIcons.briefcaseBusiness,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No service visit scheduled today. Open all assigned jobs.',
+                            style: TextStyle(color: AppColors.muted),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: AppColors.primary),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              _TodayServiceJob(
+                job: Map<String, dynamic>.from(todayServiceJobs.first),
+                remaining: todayServiceJobs.length - 1,
+                onTap: () async {
+                  await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ServiceJobDetailScreen(
+                        serviceJobId: todayServiceJobs.first['id'] as int,
+                      ),
+                    ),
+                  );
+                  await load();
+                },
+              ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
                   'Priority task',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -343,6 +426,84 @@ class _HomeScreenState extends State<HomeScreen> {
   static String _time(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '');
     return date == null ? '—' : DateFormat('hh:mm a').format(date.toLocal());
+  }
+}
+
+class _TodayServiceJob extends StatelessWidget {
+  const _TodayServiceJob({
+    required this.job,
+    required this.remaining,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> job;
+  final int remaining;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheduledAt = DateTime.tryParse(
+      job['scheduled_at']?.toString() ?? '',
+    )?.toLocal();
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  LucideIcons.airVent,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      job['customer']?['name']?.toString() ?? 'Customer',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      scheduledAt == null
+                          ? job['status_label']?.toString() ?? 'Assigned'
+                          : '${DateFormat('hh:mm a').format(scheduledAt)} · ${job['status_label'] ?? 'Assigned'}',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (remaining > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '+$remaining more visit${remaining == 1 ? '' : 's'} today',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.primary),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
