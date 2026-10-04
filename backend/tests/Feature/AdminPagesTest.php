@@ -20,6 +20,7 @@ class AdminPagesTest extends TestCase
         $routes = [
             route('dashboard'),
             route('customers.index'),
+            route('customer-groups.index'),
             route('products.index'),
             route('checklists.index'),
             route('attendance.index'),

@@ -243,5 +243,7 @@ class DatabaseSeeder extends Seeder
         if ($technician->notifications()->doesntExist()) {
             $technician->notify(new TaskAssignedNotification($task));
         }
+
+        $this->call(DemoDataSeeder::class);
     }
 }

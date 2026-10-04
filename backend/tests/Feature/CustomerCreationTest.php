@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -11,12 +12,27 @@ class CustomerCreationTest extends TestCase
 {
     use RefreshDatabase;
 
+    private CustomerGroup $group;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->group = CustomerGroup::create([
+            'code' => 'GRP-TEST',
+            'name' => 'Test Customers',
+            'status' => 'active',
+        ]);
+    }
+
     public function test_authenticated_user_can_create_a_single_branch_customer(): void
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->post('/customers', [
             'name' => 'Acme Cooling Limited',
+            'customer_group_id' => $this->group->id,
+            'mother_tongue' => 'Hindi',
             'types' => ['corporate'],
             'priority' => 'high',
             'status' => 'active',
@@ -28,7 +44,7 @@ class CustomerCreationTest extends TestCase
             'contact_no_1' => '9876543210',
             'email_1' => 'facility@acme.test',
             'country' => 'India',
-            'contacts' => [['name' => 'Priya Shah', 'email' => 'priya@acme.test', 'is_primary' => '1']],
+            'contacts' => [['name' => 'Priya Shah', 'email' => 'priya@acme.test', 'mother_tongue' => 'Marathi', 'is_primary' => '1']],
             'credit' => ['credit_days' => 30, 'credit_limit' => 100000],
         ]);
 
@@ -36,6 +52,8 @@ class CustomerCreationTest extends TestCase
         $customer = Customer::where('name', 'Acme Cooling Limited')->firstOrFail();
         $this->assertSame('CUST00001', $customer->code);
         $this->assertCount(1, $customer->contacts);
+        $this->assertSame('Hindi', $customer->mother_tongue);
+        $this->assertSame('Marathi', $customer->contacts->first()->mother_tongue);
         $this->assertSame(30, $customer->creditTerms->credit_days);
     }
 
@@ -45,6 +63,7 @@ class CustomerCreationTest extends TestCase
 
         $this->actingAs($user)->post('/customers', [
             'name' => 'Branchless Limited',
+            'customer_group_id' => $this->group->id,
             'types' => ['corporate'],
             'priority' => 'normal',
             'status' => 'active',
@@ -66,6 +85,7 @@ class CustomerCreationTest extends TestCase
 
         $response = $this->actingAs($user)->post('/customers', [
             'name' => 'Northstar Facilities',
+            'customer_group_id' => $this->group->id,
             'types' => ['corporate'],
             'priority' => 'normal',
             'status' => 'active',

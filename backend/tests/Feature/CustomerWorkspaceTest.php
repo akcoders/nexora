@@ -77,7 +77,7 @@ class CustomerWorkspaceTest extends TestCase
 
         $this->actingAs($admin)->from(route('customers.show', $customer))->post(route('customers.equipment.store', $customer), [
             'equipment_type' => 'Split AC',
-            'location' => 'Server Room',
+            'location' => 'Invalid Cross-Customer Unit',
             'customer_branch_id' => $otherBranch->id,
             'customer_floor_plan_id' => $otherFloorPlan->id,
             'plan_x' => 50,
@@ -86,7 +86,7 @@ class CustomerWorkspaceTest extends TestCase
 
         $this->assertDatabaseMissing('customer_equipments', [
             'customer_id' => $customer->id,
-            'location' => 'Server Room',
+            'location' => 'Invalid Cross-Customer Unit',
         ]);
     }
 }

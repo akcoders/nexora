@@ -20,7 +20,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request): View
     {
-        $customers = Customer::withCount(['contacts', 'branches'])
+        $customers = Customer::with('group')->withCount(['contacts', 'branches', 'equipments'])
             ->when($request->filled('search'), fn ($query) => $query->where(function ($query) use ($request) {
                 $query->where('name', 'like', '%'.$request->string('search').'%')
                     ->orWhere('code', 'like', '%'.$request->string('search').'%')
@@ -107,7 +107,8 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'customer_group_id' => ['nullable', 'exists:customer_groups,id'],
+            'customer_group_id' => ['required', Rule::exists('customer_groups', 'id')->where('status', 'active')],
+            'mother_tongue' => ['nullable', 'string', 'max:50'],
             'types' => ['required', 'array', 'min:1'],
             'types.*' => [Rule::in(['individual', 'corporate', 'architect', 'consultant', 'agent', 'dealer', 'government'])],
             'segments' => ['nullable', 'array'],
@@ -135,6 +136,7 @@ class CustomerController extends Controller
             'contacts.*.designation' => ['nullable', 'string', 'max:120'],
             'contacts.*.department' => ['nullable', 'string', 'max:120'],
             'contacts.*.email' => ['nullable', 'email'],
+            'contacts.*.mother_tongue' => ['nullable', 'string', 'max:50'],
             'contacts.*.phone' => ['nullable', 'string', 'max:20'],
             'contacts.*.whatsapp' => ['nullable', 'string', 'max:20'],
             'contacts.*.is_primary' => ['nullable', 'boolean'],
@@ -167,6 +169,7 @@ class CustomerController extends Controller
             'branches.*.contacts.*.phone' => ['nullable', 'string', 'max:20'],
             'branches.*.contacts.*.whatsapp' => ['nullable', 'string', 'max:20'],
             'branches.*.contacts.*.email' => ['nullable', 'email'],
+            'branches.*.contacts.*.mother_tongue' => ['nullable', 'string', 'max:50'],
             'branches.*.contacts.*.is_primary' => ['nullable', 'boolean'],
             'branches.*.contacts.*.is_service' => ['nullable', 'boolean'],
             'branches.*.contacts.*.is_billing' => ['nullable', 'boolean'],
@@ -206,7 +209,7 @@ class CustomerController extends Controller
             $nextId = (Customer::withTrashed()->max('id') ?? 0) + 1;
             $customer = Customer::create(array_merge(
                 $request->only([
-                    'customer_group_id', 'name', 'types', 'segments', 'priority', 'status', 'branch_type',
+                    'customer_group_id', 'name', 'mother_tongue', 'types', 'segments', 'priority', 'status', 'branch_type',
                     'classification', 'sources', 'business_potential', 'address_line_1', 'address_line_2',
                     'landmark', 'area', 'city', 'district', 'state', 'pin_code', 'country', 'latitude',
                     'longitude', 'contact_no_1', 'contact_no_2', 'email_1', 'email_2',

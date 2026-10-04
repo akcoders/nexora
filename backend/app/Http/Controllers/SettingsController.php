@@ -3,15 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Services\DemoDataService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
 {
-    public function index(): View
+    public function index(DemoDataService $demoData): View
     {
-        return view('settings.index', ['settings' => Setting::pluck('value', 'key')]);
+        return view('settings.index', [
+            'settings' => Setting::pluck('value', 'key'),
+            'demoStats' => $demoData->stats(),
+        ]);
     }
 
     public function update(Request $request): RedirectResponse

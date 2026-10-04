@@ -18,14 +18,14 @@
         </div>
         <div class="table-responsive">
             <table class="table nx-table mb-0">
-                <thead><tr><th class="ps-4">Customer</th><th>Type</th><th>Location</th><th>Contacts</th><th>Branches</th><th>Priority</th><th>Status</th><th class="text-end pe-4">Action</th></tr></thead>
+                <thead><tr><th class="ps-4">Customer</th><th>Type</th><th>Location</th><th>Contacts</th><th>Assets</th><th>Priority</th><th>Status</th><th class="text-end pe-4">Action</th></tr></thead>
                 <tbody>
                 @forelse($customers as $customer)
                     <tr>
-                        <td class="ps-4"><a href="{{ route('customers.show', $customer) }}" class="d-flex align-items-center gap-3 text-dark"><span class="nx-avatar">{{ strtoupper(substr($customer->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $customer->name }}</div><div class="small text-secondary">{{ $customer->code }}</div></div></a></td>
+                        <td class="ps-4"><a href="{{ route('customers.show', $customer) }}" class="d-flex align-items-center gap-3 text-dark"><span class="nx-avatar">{{ strtoupper(substr($customer->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $customer->name }}</div><div class="d-flex flex-wrap align-items-center gap-1 mt-1"><span class="small text-secondary">{{ $customer->code }}</span>@if($customer->group)<span class="nx-group-badge nx-group-badge-sm"><i data-lucide="tag"></i>{{ $customer->group->name }}</span>@endif</div></div></a></td>
                         <td><span class="small">{{ collect($customer->types)->map(fn($type) => str($type)->headline())->join(', ') }}</span></td>
                         <td><div>{{ $customer->city ?: '—' }}</div><div class="small text-secondary">{{ $customer->state }}</div></td>
-                        <td>{{ $customer->contacts_count }}</td><td>{{ $customer->branches_count }}</td>
+                        <td>{{ $customer->contacts_count }} contacts<br><small class="text-secondary">{{ $customer->branches_count }} branches</small></td><td>{{ $customer->equipments_count }} AC units</td>
                         <td><span class="badge rounded-pill {{ $customer->priority === 'very_high' ? 'badge-soft-danger' : ($customer->priority === 'high' ? 'badge-soft-warning' : 'badge-soft-primary') }}">{{ str($customer->priority)->headline() }}</span></td>
                         <td><span class="badge rounded-pill {{ $customer->status === 'active' ? 'badge-soft-success' : ($customer->status === 'blacklisted' ? 'badge-soft-danger' : 'bg-light text-secondary') }}">{{ ucfirst($customer->status) }}</span></td>
                         <td class="text-end pe-4"><a class="nx-icon-btn ms-auto" href="{{ route('customers.show', $customer) }}" aria-label="Open {{ $customer->name }}"><i data-lucide="arrow-right" style="width:18px"></i></a></td>

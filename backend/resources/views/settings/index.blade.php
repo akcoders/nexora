@@ -49,4 +49,13 @@
             </div>
         </div>
     </form>
+
+    @can('settings.update')
+        <section class="nx-card p-4 mt-4 nx-demo-data-card">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                <div class="d-flex gap-3"><span class="nx-metric-icon" style="--metric:#7c3aed;--metric-soft:#ede9fe"><i data-lucide="flask-conical"></i></span><div><h2 class="h6 fw-bold mb-1">Demo data control</h2><div class="small text-secondary">Generate 10 linked scenarios covering customers, groups, contacts, branches, AC units, technicians, attendance, workflow tasks and service-job stages.</div><div class="d-flex flex-wrap gap-2 mt-3"><span class="badge rounded-pill badge-soft-primary">{{ $demoStats['scenarios'] }} scenarios</span><span class="badge rounded-pill badge-soft-success">{{ $demoStats['customers'] }} customers</span><span class="badge rounded-pill badge-soft-warning">{{ $demoStats['service_jobs'] }} service jobs</span><span class="badge rounded-pill bg-light text-secondary">{{ $demoStats['tasks'] }} tasks</span></div></div></div>
+                <div class="d-flex flex-wrap align-items-start gap-2 flex-shrink-0"><form method="POST" action="{{ route('settings.demo-data.store') }}" onsubmit="return confirm('Existing generated demo scenarios will be reset. Continue?')">@csrf<button class="btn btn-outline-primary"><i data-lucide="refresh-cw" style="width:17px"></i>Create / reset 10 demos</button></form><form method="POST" action="{{ route('settings.demo-data.destroy') }}" onsubmit="return confirm('Clear all generated demo records? Real records will not be touched.')">@csrf @method('DELETE')<button class="btn btn-outline-danger" @disabled($demoStats['scenarios'] === 0)><i data-lucide="trash-2" style="width:17px"></i>Clear demo data</button></form></div>
+            </div>
+        </section>
+    @endcan
 </x-app-layout>

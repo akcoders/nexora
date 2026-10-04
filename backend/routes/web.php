@@ -3,7 +3,9 @@
 use App\Http\Controllers\AdminAttendanceController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDraftController;
+use App\Http\Controllers\CustomerGroupController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoDataController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PremisesController;
 use App\Http\Controllers\ProductController;
@@ -31,6 +33,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('/customers/{customer}/floor-plans', [CustomerController::class, 'storeFloorPlan'])->name('customers.floor-plans.store');
     Route::post('/customers/{customer}/equipment', [CustomerController::class, 'storeEquipment'])->name('customers.equipment.store');
+    Route::resource('customer-groups', CustomerGroupController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('/customers/draft', [CustomerDraftController::class, 'store'])->name('customers.draft.store');
     Route::put('/customers/draft/{uuid}', [CustomerDraftController::class, 'update'])->name('customers.draft.update');
     Route::get('/customers/draft/{uuid}', [CustomerDraftController::class, 'show'])->name('customers.draft.show');
@@ -65,6 +68,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/notifications/read', [NotificationController::class, 'markAllRead'])->name('notifications.read');
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/demo-data', [DemoDataController::class, 'store'])->name('settings.demo-data.store');
+    Route::delete('/settings/demo-data', [DemoDataController::class, 'destroy'])->name('settings.demo-data.destroy');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

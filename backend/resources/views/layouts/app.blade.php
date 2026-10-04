@@ -17,6 +17,7 @@
                     <a class="nx-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
                     <div class="nx-nav-label">Operations</div>
                     <a class="nx-nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}"><i data-lucide="building-2"></i>Customers</a>
+                    <a class="nx-nav-link {{ request()->routeIs('customer-groups.*') ? 'active' : '' }}" href="{{ route('customer-groups.index') }}"><i data-lucide="tags"></i>Customer Groups</a>
                     <a class="nx-nav-link {{ request()->routeIs('products.*') || request()->routeIs('product-categories.*') ? 'active' : '' }}" href="{{ route('products.index') }}"><i data-lucide="package"></i>Products</a>
                     <a class="nx-nav-link {{ request()->routeIs('checklists.*') ? 'active' : '' }}" href="{{ route('checklists.index') }}"><i data-lucide="clipboard-check"></i>Service Checklists</a>
                     @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan

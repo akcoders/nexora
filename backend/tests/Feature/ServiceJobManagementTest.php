@@ -38,9 +38,9 @@ class ServiceJobManagementTest extends TestCase
             'assigned_to' => $technician->id,
         ]);
 
-        $serviceJob = ServiceJob::firstOrFail();
+        $serviceJob = ServiceJob::where('complaint', 'AC is not cooling.')->firstOrFail();
         $response->assertRedirect(route('service-jobs.show', $serviceJob));
-        $this->assertSame('SRV-000001', $serviceJob->job_no);
+        $this->assertSame('SRV-'.str_pad((string) $serviceJob->id, 6, '0', STR_PAD_LEFT), $serviceJob->job_no);
         $this->assertDatabaseHas('service_job_status_histories', [
             'service_job_id' => $serviceJob->id,
             'to_status' => 'assigned',
@@ -70,7 +70,7 @@ class ServiceJobManagementTest extends TestCase
             'assigned_to' => $technician->id,
         ])->assertSessionHasErrors('customer_branch_id');
 
-        $this->assertDatabaseCount('service_jobs', 0);
+        $this->assertDatabaseCount('service_jobs', 10);
     }
 
     public function test_technician_cannot_create_an_admin_service_job(): void
