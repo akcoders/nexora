@@ -5,5 +5,6 @@ void main() {
   test('production API URL is HTTPS and versioned', () {
     expect(Env.prodUrl, startsWith('https://'));
     expect(Env.prodUrl, endsWith('/api/v1/'));
+    expect(Env.baseUrl, Env.prodUrl);
   });
 }

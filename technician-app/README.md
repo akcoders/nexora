@@ -4,6 +4,9 @@ Android field application for attendance and task workflows.
 
 ## Run locally
 
+All builds use the production API by default. Override it when developing against
+a local backend:
+
 ```bash
 flutter pub get
 flutter run --dart-define=NEXORA_API_URL=http://10.0.2.2:8000/api/v1/
@@ -19,6 +22,7 @@ flutter test
 flutter build apk --release --split-per-abi
 ```
 
-Release builds use `https://nexora.webignitors.in/api/v1/`. Configure a production signing keystore before distribution.
+Builds use `https://nexora.webignitors.in/api/v1/` unless `NEXORA_API_URL` is
+explicitly provided. Configure a production signing keystore before distribution.
 
 Camera and precise location permissions are required for attendance. Custom Android notification audio is at `android/app/src/main/res/raw/notification_sound.mp3`.
