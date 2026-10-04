@@ -11,44 +11,54 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('service_inspections', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('service_job_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('technician_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('service_checklist_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('phase', 20)->default('pre');
-            $table->string('status', 20)->default('in_progress');
-            $table->dateTime('started_at');
-            $table->dateTime('completed_at')->nullable();
-            $table->timestamps();
-            $table->unique(['service_job_id', 'phase']);
-        });
+        if (! Schema::hasTable('service_inspections')) {
+            Schema::create('service_inspections', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('service_job_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('technician_id')->nullable()->constrained('users')->nullOnDelete();
+                $table->foreignId('service_checklist_id')->nullable()->constrained()->nullOnDelete();
+                $table->string('phase', 20)->default('pre');
+                $table->string('status', 20)->default('in_progress');
+                $table->dateTime('started_at');
+                $table->dateTime('completed_at')->nullable();
+                $table->timestamps();
+                $table->unique(['service_job_id', 'phase'], 'svc_inspections_job_phase_uq');
+            });
+        }
 
-        Schema::create('service_inspection_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('service_inspection_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('checklist_item_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('inspection_condition_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('label');
-            $table->string('response_value')->nullable();
-            $table->text('remark')->nullable();
-            $table->dateTime('completed_at')->nullable();
-            $table->timestamps();
-            $table->unique(['service_inspection_id', 'checklist_item_id']);
-        });
+        if (! Schema::hasTable('service_inspection_items')) {
+            Schema::create('service_inspection_items', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('service_inspection_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('checklist_item_id')->nullable()->constrained()->nullOnDelete();
+                $table->foreignId('inspection_condition_id')->nullable()->constrained()->nullOnDelete();
+                $table->string('label');
+                $table->string('response_value')->nullable();
+                $table->text('remark')->nullable();
+                $table->dateTime('completed_at')->nullable();
+                $table->timestamps();
+                $table->unique(['service_inspection_id', 'checklist_item_id'], 'svc_insp_items_check_uq');
+            });
+        } elseif (! Schema::hasIndex('service_inspection_items', ['service_inspection_id', 'checklist_item_id'], 'unique')) {
+            Schema::table('service_inspection_items', function (Blueprint $table) {
+                $table->unique(['service_inspection_id', 'checklist_item_id'], 'svc_insp_items_check_uq');
+            });
+        }
 
-        Schema::create('service_job_photos', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('service_job_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('service_inspection_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('service_inspection_item_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('category', 20);
-            $table->string('path');
-            $table->string('caption')->nullable();
-            $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamps();
-            $table->index(['service_job_id', 'category']);
-        });
+        if (! Schema::hasTable('service_job_photos')) {
+            Schema::create('service_job_photos', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('service_job_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('service_inspection_id')->nullable()->constrained()->nullOnDelete();
+                $table->foreignId('service_inspection_item_id')->nullable()->constrained()->nullOnDelete();
+                $table->string('category', 20);
+                $table->string('path');
+                $table->string('caption')->nullable();
+                $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
+                $table->index(['service_job_id', 'category'], 'svc_job_photos_job_category_idx');
+            });
+        }
     }
 
     /**
