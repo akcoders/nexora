@@ -21,6 +21,10 @@ class SettingsController extends Controller
             'company_email' => ['nullable', 'email'],
             'company_phone' => ['nullable', 'string', 'max:30'],
             'default_geofence_radius' => ['required', 'integer', 'min:25', 'max:5000'],
+            'attendance_check_in_time' => ['required', 'date_format:H:i'],
+            'attendance_check_in_grace_minutes' => ['required', 'integer', 'min:0', 'max:180'],
+            'attendance_checkout_time' => ['required', 'date_format:H:i'],
+            'attendance_checkout_grace_minutes' => ['required', 'integer', 'min:0', 'max:180'],
             'auto_checkout_time' => ['required', 'date_format:H:i'],
             'require_attendance_for_tasks' => ['nullable', 'boolean'],
         ]);

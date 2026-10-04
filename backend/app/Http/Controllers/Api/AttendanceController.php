@@ -5,24 +5,42 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Attendance;
+use App\Services\AttendancePolicy;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, AttendancePolicy $policy): JsonResponse
     {
-        return response()->json($request->user()->attendances()->with('premises')->latest('attendance_date')->paginate(31));
+        $month = $request->validate(['month' => ['nullable', 'date_format:Y-m']])['month'] ?? now()->format('Y-m');
+        $start = Carbon::createFromFormat('Y-m-d', $month.'-01')->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        $attendances = $request->user()->attendances()
+            ->with('premises')
+            ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
+            ->latest('attendance_date')
+            ->get()
+            ->each(fn (Attendance $attendance) => $attendance->setAttribute('display_status', $policy->displayStatus($attendance)));
+
+        return response()->json([
+            'data' => $attendances,
+            'month' => $month,
+            'today' => today()->toDateString(),
+            'rules' => $policy->rules(),
+        ]);
     }
 
-    public function today(Request $request): JsonResponse
+    public function today(Request $request, AttendancePolicy $policy): JsonResponse
     {
         $attendance = $request->user()->attendances()->with('premises')->whereDate('attendance_date', today())->first();
+        $attendance?->setAttribute('display_status', $policy->displayStatus($attendance));
 
-        return response()->json(['attendance' => $attendance]);
+        return response()->json(['attendance' => $attendance, 'rules' => $policy->rules()]);
     }
 
-    public function checkIn(Request $request): JsonResponse
+    public function checkIn(Request $request, AttendancePolicy $policy): JsonResponse
     {
         $validated = $request->validate([
             'premises_id' => ['required', 'exists:premises,id'],
@@ -39,11 +57,12 @@ class AttendanceController extends Controller
         $inside = $distance <= $premises->radius_meters;
         abort_if(! $inside && blank($validated['remark'] ?? null), 422, 'A remark is required outside the premises.');
 
+        $checkedInAt = now();
         $attendance = Attendance::create([
             'user_id' => $request->user()->id,
             'premises_id' => $premises->id,
             'attendance_date' => today(),
-            'checked_in_at' => now(),
+            'checked_in_at' => $checkedInAt,
             'check_in_latitude' => $validated['latitude'],
             'check_in_longitude' => $validated['longitude'],
             'distance_meters' => round($distance),
@@ -51,14 +70,17 @@ class AttendanceController extends Controller
             'selfie_path' => $request->file('selfie')->store('attendance/'.today()->format('Y/m'), 'public'),
             'remark' => $validated['remark'] ?? null,
             'status' => $inside ? 'approved' : 'pending',
+            'day_status' => $policy->checkInDayStatus($checkedInAt),
         ]);
 
         ActivityLog::create(['user_id' => $request->user()->id, 'event' => 'attendance.checked_in', 'subject_type' => Attendance::class, 'subject_id' => $attendance->id, 'properties' => ['inside' => $inside, 'distance' => round($distance)], 'ip_address' => $request->ip()]);
 
+        $attendance->setAttribute('display_status', $policy->displayStatus($attendance));
+
         return response()->json(['message' => 'Check-in recorded.', 'attendance' => $attendance->load('premises')], 201);
     }
 
-    public function checkOut(Request $request): JsonResponse
+    public function checkOut(Request $request, AttendancePolicy $policy): JsonResponse
     {
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -66,9 +88,17 @@ class AttendanceController extends Controller
         ]);
         $attendance = Attendance::where('user_id', $request->user()->id)->whereDate('attendance_date', today())->firstOrFail();
         abort_if($attendance->checked_out_at, 422, 'Already checked out.');
-        $attendance->update(['checked_out_at' => now(), 'check_out_latitude' => $validated['latitude'], 'check_out_longitude' => $validated['longitude']]);
+        $checkedOutAt = now();
+        $attendance->update([
+            'checked_out_at' => $checkedOutAt,
+            'check_out_latitude' => $validated['latitude'],
+            'check_out_longitude' => $validated['longitude'],
+            'day_status' => $policy->checkoutDayStatus($attendance, $checkedOutAt),
+        ]);
+        $attendance = $attendance->fresh();
+        $attendance->setAttribute('display_status', $policy->displayStatus($attendance));
 
-        return response()->json(['message' => 'Checkout recorded.', 'attendance' => $attendance->fresh()]);
+        return response()->json(['message' => 'Checkout recorded.', 'attendance' => $attendance]);
     }
 
     private function distanceInMeters(float $lat1, float $lon1, float $lat2, float $lon2): float

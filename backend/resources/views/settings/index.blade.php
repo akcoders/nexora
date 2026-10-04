@@ -1,8 +1,52 @@
 <x-app-layout>
-    <x-slot name="title">Settings</x-slot><x-slot name="pageTitle">System settings</x-slot><x-slot name="breadcrumb">Administration / Settings</x-slot>
-    <form method="POST" action="{{ route('settings.update') }}">@csrf @method('PUT')
-        <div class="row g-4"><div class="col-xl-8"><section class="nx-card p-4 mb-4"><div class="d-flex align-items-center gap-3 mb-4"><span class="nx-metric-icon"><i data-lucide="building-2"></i></span><div><h2 class="h6 fw-bold mb-1">Company profile</h2><div class="small text-secondary">General identity displayed across Nexora.</div></div></div><div class="row g-3"><div class="col-12"><label class="form-label">Company name *</label><input class="form-control" name="company_name" value="{{ $settings['company_name'] ?? 'Nexora HVAC Services' }}" required></div><div class="col-md-6"><label class="form-label">Company email</label><input type="email" class="form-control" name="company_email" value="{{ $settings['company_email'] ?? '' }}"></div><div class="col-md-6"><label class="form-label">Company phone</label><input class="form-control" name="company_phone" value="{{ $settings['company_phone'] ?? '' }}"></div></div></section>
-        <section class="nx-card p-4"><div class="d-flex align-items-center gap-3 mb-4"><span class="nx-metric-icon"><i data-lucide="sliders-horizontal"></i></span><div><h2 class="h6 fw-bold mb-1">Operations</h2><div class="small text-secondary">Attendance and workflow business rules.</div></div></div><div class="row g-3"><div class="col-md-6"><label class="form-label">Default geofence radius (meters)</label><input type="number" class="form-control" name="default_geofence_radius" value="{{ $settings['default_geofence_radius'] ?? 200 }}" min="25" required></div><div class="col-md-6"><label class="form-label">Auto checkout time</label><input type="time" class="form-control" name="auto_checkout_time" value="{{ $settings['auto_checkout_time'] ?? '23:59' }}" required></div><div class="col-12"><label class="form-check form-switch"><input type="checkbox" class="form-check-input" name="require_attendance_for_tasks" value="1" @checked(($settings['require_attendance_for_tasks'] ?? '1') === '1')><span class="form-check-label fw-semibold">Require attendance before technician task actions</span></label></div></div></section></div>
-        <div class="col-xl-4"><aside class="nx-card p-4 nx-summary"><h3 class="h6 fw-bold mb-3">Environment</h3><div class="small border-bottom py-2 d-flex justify-content-between"><span class="text-secondary">Application</span><strong>{{ app()->environment() }}</strong></div><div class="small border-bottom py-2 d-flex justify-content-between"><span class="text-secondary">Laravel</span><strong>{{ app()->version() }}</strong></div><div class="small border-bottom py-2"><span class="text-secondary d-block">Production API</span><strong class="text-break">https://nexora.webignitors.in/api/v1/</strong></div><div class="alert alert-primary border-0 small mt-4">Changes are saved immediately for web and mobile operations.</div><button class="btn btn-primary w-100">Save settings</button></aside></div></div>
+    <x-slot name="title">Settings</x-slot>
+    <x-slot name="pageTitle">System settings</x-slot>
+    <x-slot name="breadcrumb">Administration / Settings</x-slot>
+
+    <form method="POST" action="{{ route('settings.update') }}">
+        @csrf
+        @method('PUT')
+        <div class="row g-4">
+            <div class="col-xl-8">
+                <section class="nx-card p-4 mb-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <span class="nx-metric-icon"><i data-lucide="building-2"></i></span>
+                        <div><h2 class="h6 fw-bold mb-1">Company profile</h2><div class="small text-secondary">General identity displayed across Nexora.</div></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12"><label class="form-label">Company name *</label><input class="form-control" name="company_name" value="{{ old('company_name', $settings['company_name'] ?? 'Nexora HVAC Services') }}" required></div>
+                        <div class="col-md-6"><label class="form-label">Company email</label><input type="email" class="form-control" name="company_email" value="{{ old('company_email', $settings['company_email'] ?? '') }}"></div>
+                        <div class="col-md-6"><label class="form-label">Company phone</label><input class="form-control" name="company_phone" value="{{ old('company_phone', $settings['company_phone'] ?? '') }}"></div>
+                    </div>
+                </section>
+
+                <section class="nx-card p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                        <span class="nx-metric-icon"><i data-lucide="calendar-clock"></i></span>
+                        <div><h2 class="h6 fw-bold mb-1">Attendance rules</h2><div class="small text-secondary">Control full-day, half-day and checkout classification.</div></div>
+                    </div>
+                    <div class="alert alert-light border small mb-4">Check-in after start time + grace is a half day. Checkout before end time − grace is also a half day.</div>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Full-day check-in time</label><input type="time" class="form-control" name="attendance_check_in_time" value="{{ old('attendance_check_in_time', $settings['attendance_check_in_time'] ?? '09:00') }}" required></div>
+                        <div class="col-md-6"><label class="form-label">Check-in grace (minutes)</label><input type="number" class="form-control" name="attendance_check_in_grace_minutes" value="{{ old('attendance_check_in_grace_minutes', $settings['attendance_check_in_grace_minutes'] ?? 15) }}" min="0" max="180" required></div>
+                        <div class="col-md-6"><label class="form-label">Full-day checkout time</label><input type="time" class="form-control" name="attendance_checkout_time" value="{{ old('attendance_checkout_time', $settings['attendance_checkout_time'] ?? '18:00') }}" required></div>
+                        <div class="col-md-6"><label class="form-label">Checkout grace (minutes)</label><input type="number" class="form-control" name="attendance_checkout_grace_minutes" value="{{ old('attendance_checkout_grace_minutes', $settings['attendance_checkout_grace_minutes'] ?? 15) }}" min="0" max="180" required></div>
+                        <div class="col-md-6"><label class="form-label">Auto checkout time</label><input type="time" class="form-control" name="auto_checkout_time" value="{{ old('auto_checkout_time', $settings['auto_checkout_time'] ?? '23:59') }}" required></div>
+                        <div class="col-md-6"><label class="form-label">Default geofence radius (meters)</label><input type="number" class="form-control" name="default_geofence_radius" value="{{ old('default_geofence_radius', $settings['default_geofence_radius'] ?? 200) }}" min="25" max="5000" required></div>
+                        <div class="col-12"><label class="form-check form-switch"><input type="checkbox" class="form-check-input" name="require_attendance_for_tasks" value="1" @checked(old('require_attendance_for_tasks', $settings['require_attendance_for_tasks'] ?? '1') == '1')><span class="form-check-label fw-semibold">Require attendance before technician task actions</span></label></div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-xl-4">
+                <aside class="nx-card p-4 nx-summary">
+                    <h3 class="h6 fw-bold mb-3">Environment</h3>
+                    <div class="small border-bottom py-2 d-flex justify-content-between"><span class="text-secondary">Application</span><strong>{{ app()->environment() }}</strong></div>
+                    <div class="small border-bottom py-2 d-flex justify-content-between"><span class="text-secondary">Timezone</span><strong>{{ config('app.timezone') }}</strong></div>
+                    <div class="small border-bottom py-2"><span class="text-secondary d-block">Production API</span><strong class="text-break">https://nexora.webignitors.in/api/v1/</strong></div>
+                    <button class="btn btn-primary w-100 mt-4">Save settings</button>
+                </aside>
+            </div>
+        </div>
     </form>
 </x-app-layout>

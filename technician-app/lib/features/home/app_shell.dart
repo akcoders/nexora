@@ -16,21 +16,31 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int index = 0;
-  final pages = const [
-    HomeScreen(),
-    TasksScreen(),
-    AttendanceScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
-  ];
+  int homeRefresh = 0;
+
+  void navigate(int value) {
+    setState(() {
+      if (value == 0 && index != 0) homeRefresh++;
+      index = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: index, children: pages),
+      body: IndexedStack(
+        index: index,
+        children: [
+          HomeScreen(onNavigate: navigate, refreshKey: homeRefresh),
+          const TasksScreen(),
+          const AttendanceScreen(),
+          const NotificationsScreen(),
+          const ProfileScreen(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
+        onDestinationSelected: navigate,
         destinations: const [
           NavigationDestination(
             icon: Icon(LucideIcons.home),

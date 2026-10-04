@@ -19,6 +19,7 @@ class TaskController extends Controller
         $tasks = Task::with(['customer', 'assignee', 'creator'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
+            ->when($request->filled('type'), fn ($query) => $query->where('task_type', $request->string('type')))
             ->when($request->filled('search'), fn ($query) => $query->where(fn ($query) => $query
                 ->where('title', 'like', '%'.$request->string('search').'%')
                 ->orWhere('task_no', 'like', '%'.$request->string('search').'%')))
@@ -39,6 +40,7 @@ class TaskController extends Controller
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
+            'task_type' => ['required', Rule::in(['job', 'workflow'])],
             'description' => ['nullable', 'string', 'max:5000'],
             'customer_id' => ['nullable', 'exists:customers,id'],
             'category' => ['nullable', 'string', 'max:100'],

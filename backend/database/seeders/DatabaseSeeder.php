@@ -89,6 +89,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $task = Task::firstOrCreate(['task_no' => 'TSK000001'], [
+            'task_type' => 'job',
             'title' => 'Quarterly HVAC preventive maintenance',
             'description' => 'Complete the standard preventive-maintenance checklist and upload readings.',
             'customer_id' => $customer->id,
@@ -124,6 +125,10 @@ class DatabaseSeeder extends Seeder
         collect([
             'company_name' => 'Nexora HVAC Services',
             'default_geofence_radius' => '200',
+            'attendance_check_in_time' => '09:00',
+            'attendance_check_in_grace_minutes' => '15',
+            'attendance_checkout_time' => '18:00',
+            'attendance_checkout_grace_minutes' => '15',
             'auto_checkout_time' => '23:59',
             'require_attendance_for_tasks' => '1',
         ])->each(fn ($value, $key) => Setting::firstOrCreate(['key' => $key], ['value' => $value, 'group' => str_starts_with($key, 'company_') ? 'company' : 'operations']));

@@ -13,6 +13,7 @@ import '../../core/theme/app_theme.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
+
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
@@ -20,6 +21,9 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   Map<String, dynamic>? today;
   List<dynamic> premises = [];
+  Map<String, String> attendanceByDate = {};
+  Map<String, dynamic> rules = {};
+  DateTime visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
   bool loading = true;
 
   @override
@@ -29,16 +33,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> load() async {
+    if (mounted) setState(() => loading = true);
     try {
       final api = context.read<ApiClient>().dio;
       final responses = await Future.wait([
         api.get('attendance/today'),
         api.get('premises'),
+        api.get(
+          'attendance',
+          queryParameters: {
+            'month': DateFormat('yyyy-MM').format(visibleMonth),
+          },
+        ),
       ]);
       today = responses[0].data['attendance'];
       premises = List<dynamic>.from(responses[1].data['data'] ?? []);
-    } catch (_) {}
+      rules = Map<String, dynamic>.from(
+        responses[2].data['rules'] ?? responses[0].data['rules'] ?? {},
+      );
+      attendanceByDate = {
+        for (final item in List<dynamic>.from(responses[2].data['data'] ?? []))
+          item['attendance_date'].toString().substring(0, 10):
+              item['display_status']?.toString() ?? 'present',
+      };
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to refresh attendance.')),
+        );
+      }
+    }
     if (mounted) setState(() => loading = false);
+  }
+
+  Future<void> changeMonth(int delta) async {
+    visibleMonth = DateTime(visibleMonth.year, visibleMonth.month + delta);
+    await load();
   }
 
   Future<Position> locate() async {
@@ -60,11 +90,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> checkIn() async {
     if (premises.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No premises is assigned to your account.'),
-        ),
-      );
+      _message('No premises is assigned to your account.');
       return;
     }
     final remark = TextEditingController();
@@ -74,53 +100,56 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Attendance check-in'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 150,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(16),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 150,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: photo == null
+                      ? const Icon(
+                          LucideIcons.camera,
+                          size: 44,
+                          color: AppColors.primary,
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.file(
+                            File(photo!.path),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                 ),
-                child: photo == null
-                    ? const Icon(
-                        LucideIcons.camera,
-                        size: 44,
-                        color: AppColors.primary,
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.file(File(photo!.path), fit: BoxFit.cover),
-                      ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final picked = await ImagePicker().pickImage(
-                    source: ImageSource.camera,
-                    preferredCameraDevice: CameraDevice.front,
-                    imageQuality: 78,
-                  );
-                  if (picked != null) {
-                    setDialogState(() => photo = picked);
-                  }
-                },
-                icon: const Icon(LucideIcons.camera),
-                label: Text(
-                  photo == null ? 'Take live selfie' : 'Retake selfie',
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await ImagePicker().pickImage(
+                      source: ImageSource.camera,
+                      preferredCameraDevice: CameraDevice.front,
+                      imageQuality: 78,
+                    );
+                    if (picked != null) setDialogState(() => photo = picked);
+                  },
+                  icon: const Icon(LucideIcons.camera),
+                  label: Text(
+                    photo == null ? 'Take live selfie' : 'Retake selfie',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: remark,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Remark (required if outside)',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: remark,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Remark (required if outside)',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -128,19 +157,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Continue'),
+              onPressed: photo == null
+                  ? null
+                  : () => Navigator.pop(context, true),
+              child: const Text('Check in'),
             ),
           ],
         ),
       ),
     );
     if (proceed != true || photo == null || !mounted) return;
-    final api = context.read<ApiClient>();
+
+    final api = context.read<ApiClient>().dio;
     _busy('Getting precise location…');
     try {
       final position = await locate();
-      await api.dio.post(
+      await api.post(
         'attendance/check-in',
         data: FormData.fromMap({
           'premises_id': premises.first['id'],
@@ -156,59 +188,75 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       await load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Check-in recorded successfully.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      _message('Check-in recorded successfully.', success: true);
     } on DioException catch (error) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.response?.data?['message']?.toString() ??
-                  'Check-in failed.',
-            ),
-          ),
-        );
-      }
+      if (mounted) Navigator.pop(context);
+      _message(
+        error.response?.data?['message']?.toString() ?? 'Check-in failed.',
+      );
     } catch (error) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
+      if (mounted) Navigator.pop(context);
+      _message(error.toString());
     }
   }
 
   Future<void> checkOut() async {
-    final api = context.read<ApiClient>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(LucideIcons.logOut, color: AppColors.danger),
+        title: const Text('Confirm checkout'),
+        content: const Text(
+          'Your current location and checkout time will be recorded. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Check out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final api = context.read<ApiClient>().dio;
     _busy('Recording checkout…');
     try {
       final position = await locate();
-      await api.dio.post(
+      await api.post(
         'attendance/check-out',
         data: {'latitude': position.latitude, 'longitude': position.longitude},
       );
       if (!mounted) return;
       Navigator.pop(context);
       await load();
+      _message('Checkout recorded successfully.', success: true);
+    } on DioException catch (error) {
+      if (mounted) Navigator.pop(context);
+      _message(
+        error.response?.data?['message']?.toString() ?? 'Checkout failed.',
+      );
     } catch (error) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
+      if (mounted) Navigator.pop(context);
+      _message(error.toString());
     }
   }
 
-  void _busy(String message) => showDialog(
+  void _message(String message, {bool success = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? AppColors.success : null,
+      ),
+    );
+  }
+
+  void _busy(String message) => showDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (_) => AlertDialog(
@@ -225,42 +273,48 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     final checkedOut = today?['checked_out_at'] != null;
+    final checkedIn = today != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
-      body: loading
+      appBar: AppBar(
+        title: const Text('Attendance'),
+        actions: [
+          IconButton(onPressed: load, icon: const Icon(LucideIcons.refreshCw)),
+        ],
+      ),
+      body: loading && attendanceByDate.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(18),
-              children: [
-                Card(
-                  child: Padding(
+          : RefreshIndicator(
+              onRefresh: load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(18),
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    decoration: BoxDecoration(
+                      color: checkedIn ? const Color(0xFFEAF8EF) : Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: checkedIn
+                            ? const Color(0xFFBBF7D0)
+                            : const Color(0xFFE8EEF6),
+                      ),
+                    ),
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        Container(
-                          width: 62,
-                          height: 62,
-                          decoration: BoxDecoration(
-                            color:
-                                (today == null
-                                        ? AppColors.warning
-                                        : AppColors.success)
-                                    .withValues(alpha: .12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            today == null
-                                ? LucideIcons.clock3
-                                : LucideIcons.checkCircle2,
-                            color: today == null
-                                ? AppColors.warning
-                                : AppColors.success,
-                            size: 30,
-                          ),
+                        Icon(
+                          checkedIn
+                              ? LucideIcons.checkCircle2
+                              : LucideIcons.clock3,
+                          color: checkedIn
+                              ? AppColors.success
+                              : AppColors.warning,
+                          size: 42,
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
                         Text(
-                          today == null
+                          !checkedIn
                               ? 'Not checked in'
                               : checkedOut
                               ? 'Shift completed'
@@ -277,24 +331,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           ).format(DateTime.now()),
                           style: const TextStyle(color: AppColors.muted),
                         ),
-                        if (today != null) ...[
-                          const Divider(height: 34),
+                        if (checkedIn) ...[
+                          const Divider(height: 32),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _Time(
                                 label: 'Check in',
-                                keyName: 'checked_in_at',
+                                value: today?['checked_in_at'],
                               ),
                               _Time(
                                 label: 'Check out',
-                                keyName: 'checked_out_at',
+                                value: today?['checked_out_at'],
                               ),
-                            ].map((widget) => widget.withData(today!)).toList(),
+                            ],
                           ),
                         ],
-                        const SizedBox(height: 22),
-                        if (today == null)
+                        const SizedBox(height: 20),
+                        if (!checkedIn)
                           FilledButton.icon(
                             onPressed: checkIn,
                             icon: const Icon(LucideIcons.camera),
@@ -309,53 +363,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Attendance rules',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 14),
-                        const _Rule(
-                          icon: LucideIcons.camera,
-                          text: 'A live selfie is required at check-in.',
-                        ),
-                        const _Rule(
-                          icon: LucideIcons.mapPin,
-                          text: 'Precise GPS verifies the assigned premises.',
-                        ),
-                        const _Rule(
-                          icon: LucideIcons.clock3,
-                          text:
-                              'Outside check-ins require a remark and review.',
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 20),
+                  _AttendanceCalendar(
+                    month: visibleMonth,
+                    attendanceByDate: attendanceByDate,
+                    rules: rules,
+                    onPrevious: () => changeMonth(-1),
+                    onNext: () => changeMonth(1),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
 }
 
 class _Time extends StatelessWidget {
-  const _Time({required this.label, required this.keyName, this.data});
+  const _Time({required this.label, required this.value});
+
   final String label;
-  final String keyName;
-  final Map<String, dynamic>? data;
-  _Time withData(Map<String, dynamic> value) =>
-      _Time(label: label, keyName: keyName, data: value);
+  final dynamic value;
+
   @override
   Widget build(BuildContext context) {
-    final raw = data?[keyName]?.toString();
-    final date = raw == null ? null : DateTime.tryParse(raw);
+    final date = DateTime.tryParse(value?.toString() ?? '');
     return Column(
       children: [
         Text(
@@ -371,24 +402,185 @@ class _Time extends StatelessWidget {
   }
 }
 
-class _Rule extends StatelessWidget {
-  const _Rule({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.primary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: AppColors.muted, fontSize: 13),
-          ),
-        ),
-      ],
+class _AttendanceCalendar extends StatelessWidget {
+  const _AttendanceCalendar({
+    required this.month,
+    required this.attendanceByDate,
+    required this.rules,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final DateTime month;
+  final Map<String, String> attendanceByDate;
+  final Map<String, dynamic> rules;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  static const statuses = <String, ({Color color, Color soft, String label})>{
+    'present': (
+      color: AppColors.success,
+      soft: Color(0xFFDCFCE7),
+      label: 'Present',
     ),
-  );
+    'half_day': (
+      color: AppColors.warning,
+      soft: Color(0xFFFEF3C7),
+      label: 'Half day',
+    ),
+    'absent': (
+      color: AppColors.danger,
+      soft: Color(0xFFFEE2E2),
+      label: 'Absent',
+    ),
+    'pending_review': (
+      color: Color(0xFF7C3AED),
+      soft: Color(0xFFEDE9FE),
+      label: 'Pending review',
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final first = DateTime(month.year, month.month);
+    final days = DateUtils.getDaysInMonth(month.year, month.month);
+    final leading = first.weekday - 1;
+    final cells = ((leading + days + 6) ~/ 7) * 7;
+    final currentMonth = DateTime(DateTime.now().year, DateTime.now().month);
+    final canNext = month.isBefore(currentMonth);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Attendance calendar',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onPrevious,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text(
+                  DateFormat('MMM yyyy').format(month),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: canNext ? onNext : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+                  .map(
+                    (day) => Expanded(
+                      child: Center(
+                        child: Text(
+                          day,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 8),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+              ),
+              itemCount: cells,
+              itemBuilder: (context, index) {
+                final day = index - leading + 1;
+                if (day < 1 || day > days) return const SizedBox.shrink();
+                final date = DateTime(month.year, month.month, day);
+                final key = DateFormat('yyyy-MM-dd').format(date);
+                final isFuture = DateUtils.dateOnly(
+                  date,
+                ).isAfter(DateUtils.dateOnly(DateTime.now()));
+                final status = isFuture
+                    ? null
+                    : attendanceByDate[key] ?? 'absent';
+                final palette = status == null ? null : statuses[status];
+                final isToday = DateUtils.isSameDay(date, DateTime.now());
+                return Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: palette?.soft ?? const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: isToday
+                        ? Border.all(color: AppColors.primary, width: 1.5)
+                        : null,
+                  ),
+                  child: Text(
+                    '$day',
+                    style: TextStyle(
+                      color: palette?.color ?? AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: statuses.values
+                  .map(
+                    (item) => Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: item.color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          item.label,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
+            if (rules.isNotEmpty) ...[
+              const Divider(height: 28),
+              Text(
+                'Full day: check in by ${rules['check_in_time']} + ${rules['check_in_grace_minutes']} min grace, check out at ${rules['checkout_time']} (early grace ${rules['checkout_grace_minutes']} min).',
+                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

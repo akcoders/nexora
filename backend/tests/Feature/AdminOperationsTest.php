@@ -52,6 +52,7 @@ class AdminOperationsTest extends TestCase
 
         $this->actingAs($admin)->post(route('tasks.store'), [
             'title' => 'Inspect VRV installation',
+            'task_type' => 'job',
             'priority' => 'high',
             'assigned_to' => $technician->id,
             'category' => 'Inspection',
@@ -61,6 +62,10 @@ class AdminOperationsTest extends TestCase
         $this->actingAs($admin)->put(route('settings.update'), [
             'company_name' => 'Nexora HVAC Services',
             'default_geofence_radius' => 300,
+            'attendance_check_in_time' => '09:00',
+            'attendance_check_in_grace_minutes' => 15,
+            'attendance_checkout_time' => '18:00',
+            'attendance_checkout_grace_minutes' => 15,
             'auto_checkout_time' => '23:59',
             'require_attendance_for_tasks' => 1,
         ])->assertRedirect();
