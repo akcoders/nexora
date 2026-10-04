@@ -1,0 +1,16 @@
+/.idea
+/.vscode
+/.DS_Store
+/backend/.env
+/backend/vendor
+/backend/node_modules
+/backend/public/build
+/backend/storage/*.key
+/technician-app/.dart_tool
+/technician-app/.flutter-plugins*
+/technician-app/build
+/technician-app/android/.gradle
+/technician-app/android/key.properties
+/git.md
+*.jks
+*.keystore
