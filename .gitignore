@@ -4,7 +4,6 @@
 /backend/.env
 /backend/vendor
 /backend/node_modules
-/backend/public/build
 /backend/storage/*.key
 /technician-app/.dart_tool
 /technician-app/.flutter-plugins*
