@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreCustomerEquipmentRequest;
+use App\Http\Requests\StoreCustomerFloorPlanRequest;
 use App\Models\ActivityLog;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
+use App\Models\Product;
+use App\Models\ServiceMasterOption;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -35,6 +39,68 @@ class CustomerController extends Controller
             'groups' => CustomerGroup::where('status', 'active')->orderBy('name')->get(),
             'users' => User::where('status', 'active')->orderBy('name')->get(),
         ]);
+    }
+
+    public function show(Customer $customer): View
+    {
+        $customer->load([
+            'group',
+            'contacts.branch',
+            'branches.contacts',
+            'creditTerms',
+            'documents',
+            'floorPlans' => fn ($query) => $query->with(['branch', 'equipments.branch'])->latest(),
+            'equipments' => fn ($query) => $query->with(['branch', 'product', 'floorPlan'])->latest(),
+            'serviceJobs' => fn ($query) => $query->with(['technician', 'serviceType', 'equipment'])->latest()->limit(10),
+        ]);
+
+        return view('customers.show', [
+            'customer' => $customer,
+            'products' => Product::where('active', true)->orderBy('name')->get(),
+            'equipmentTypes' => ServiceMasterOption::where('type', 'equipment_type')->where('active', true)->orderBy('sort_order')->get(),
+        ]);
+    }
+
+    public function storeFloorPlan(StoreCustomerFloorPlanRequest $request, Customer $customer): RedirectResponse
+    {
+        $data = $request->validated();
+        unset($data['image']);
+
+        $floorPlan = $customer->floorPlans()->create(array_merge($data, [
+            'image_path' => $request->file('image')->store("customers/{$customer->id}/floor-plans", 'public'),
+            'created_by' => $request->user()->id,
+        ]));
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'event' => 'customer.floor_plan_added',
+            'subject_type' => Customer::class,
+            'subject_id' => $customer->id,
+            'properties' => ['floor_plan_id' => $floorPlan->id, 'name' => $floorPlan->name],
+            'ip_address' => $request->ip(),
+        ]);
+
+        return redirect()->route('customers.show', $customer)->with('success', 'Floor plan uploaded successfully.');
+    }
+
+    public function storeEquipment(StoreCustomerEquipmentRequest $request, Customer $customer): RedirectResponse
+    {
+        $equipment = $customer->equipments()->create($request->validated());
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'event' => 'customer.equipment_added',
+            'subject_type' => Customer::class,
+            'subject_id' => $customer->id,
+            'properties' => [
+                'equipment_id' => $equipment->id,
+                'equipment_type' => $equipment->equipment_type,
+                'serial_no' => $equipment->serial_no,
+            ],
+            'ip_address' => $request->ip(),
+        ]);
+
+        return redirect()->route('customers.show', $customer)->with('success', 'AC unit added successfully.');
     }
 
     public function store(Request $request): RedirectResponse

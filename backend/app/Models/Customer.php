@@ -56,6 +56,11 @@ class Customer extends Model
         return $this->hasMany(CustomerEquipment::class);
     }
 
+    public function floorPlans(): HasMany
+    {
+        return $this->hasMany(CustomerFloorPlan::class);
+    }
+
     public function serviceJobs(): HasMany
     {
         return $this->hasMany(ServiceJob::class);

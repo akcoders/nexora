@@ -20,8 +20,14 @@ class _TasksScreenState extends State<TasksScreen>
   late final TabController tabs = TabController(length: 3, vsync: this);
   int reload = 0;
 
-  Future<List<dynamic>> load({required String status, String? type}) async {
-    final query = <String, dynamic>{'status': status};
+  Future<List<dynamic>> load({
+    String? status,
+    String? scope,
+    String? type,
+  }) async {
+    final query = <String, dynamic>{};
+    if (status != null) query['status'] = status;
+    if (scope != null) query['scope'] = scope;
     if (type != null) query['type'] = type;
     final response = await context.read<ApiClient>().dio.get(
       'tasks',
@@ -53,9 +59,15 @@ class _TasksScreenState extends State<TasksScreen>
           controller: tabs,
           isScrollable: true,
           tabs: const [
-            Tab(text: 'Jobs'),
-            Tab(text: 'Workflow'),
-            Tab(text: 'Closed'),
+            Tab(
+              icon: Icon(LucideIcons.briefcaseBusiness, size: 17),
+              text: 'Jobs',
+            ),
+            Tab(icon: Icon(LucideIcons.gitBranch, size: 17), text: 'Workflow'),
+            Tab(
+              icon: Icon(LucideIcons.circleCheckBig, size: 17),
+              text: 'Closed',
+            ),
           ],
           labelColor: AppColors.primary,
           indicatorColor: AppColors.primary,
@@ -66,17 +78,23 @@ class _TasksScreenState extends State<TasksScreen>
         children: [
           _TaskList(
             key: ValueKey('jobs$reload'),
-            future: load(status: 'pending', type: 'job'),
+            future: load(scope: 'open', type: 'job'),
+            title: 'Active jobs',
+            subtitle: 'Jobs stay here until they are closed',
             onRefresh: refresh,
           ),
           _TaskList(
             key: ValueKey('workflow$reload'),
-            future: load(status: 'pending', type: 'workflow'),
+            future: load(scope: 'open', type: 'workflow'),
+            title: 'My workflow',
+            subtitle: 'All active hand-offs, not only pending tasks',
             onRefresh: refresh,
           ),
           _TaskList(
             key: ValueKey('closed$reload'),
             future: load(status: 'closed'),
+            title: 'Completed work',
+            subtitle: 'Your closed jobs and workflows',
             onRefresh: refresh,
           ),
         ],
@@ -86,9 +104,17 @@ class _TasksScreenState extends State<TasksScreen>
 }
 
 class _TaskList extends StatelessWidget {
-  const _TaskList({super.key, required this.future, required this.onRefresh});
+  const _TaskList({
+    super.key,
+    required this.future,
+    required this.title,
+    required this.subtitle,
+    required this.onRefresh,
+  });
 
   final Future<List<dynamic>> future;
+  final String title;
+  final String subtitle;
   final VoidCallback onRefresh;
 
   @override
@@ -121,15 +147,102 @@ class _TaskList extends StatelessWidget {
           child: ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(18),
-            itemCount: tasks.length,
+            itemCount: tasks.length + 1,
             separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) => _TaskCard(
-              task: Map<String, dynamic>.from(tasks[index]),
-              onUpdated: onRefresh,
-            ),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _QueueHeader(
+                  tasks: tasks,
+                  title: title,
+                  subtitle: subtitle,
+                );
+              }
+              return _TaskCard(
+                task: Map<String, dynamic>.from(tasks[index - 1]),
+                onUpdated: onRefresh,
+              );
+            },
           ),
         );
       },
+    );
+  }
+}
+
+class _QueueHeader extends StatelessWidget {
+  const _QueueHeader({
+    required this.tasks,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final List<dynamic> tasks;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = tasks.where((item) {
+      final priority = item['priority']?.toString();
+      return priority == 'high' || priority == 'very_high';
+    }).length;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF172554), Color(0xFF1E40AF), Color(0xFF0284C7)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: .2),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${tasks.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                urgent == 0 ? 'tasks' : '$urgent priority',
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -152,7 +265,10 @@ class _TaskCard extends StatelessWidget {
     final typeColor = taskType == 'workflow'
         ? AppColors.primary
         : AppColors.success;
+    final isClosed = task['status']?.toString() == 'closed';
+    final actionsCount = (task['actions_count'] as num?)?.toInt() ?? 0;
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () => showModalBottomSheet<void>(
@@ -175,16 +291,29 @@ class _TaskCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _Pill(
-                    text: taskType == 'workflow' ? 'WORKFLOW' : 'JOB',
-                    color: typeColor,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 7,
+                      runSpacing: 6,
+                      children: [
+                        _Pill(
+                          text: taskType == 'workflow' ? 'WORKFLOW' : 'JOB',
+                          color: typeColor,
+                        ),
+                        _Pill(
+                          text: priority.replaceAll('_', ' ').toUpperCase(),
+                          color: priorityColor,
+                        ),
+                        _Pill(
+                          text: isClosed ? 'CLOSED' : 'ACTIVE',
+                          color: isClosed
+                              ? AppColors.success
+                              : AppColors.warning,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 7),
-                  _Pill(
-                    text: priority.replaceAll('_', ' ').toUpperCase(),
-                    color: priorityColor,
-                  ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Text(
                     task['task_no']?.toString() ?? '',
                     style: const TextStyle(
@@ -207,6 +336,39 @@ class _TaskCard extends StatelessWidget {
                 task['customer']?['name']?.toString() ?? 'Internal workflow',
                 style: const TextStyle(color: AppColors.muted, fontSize: 13),
               ),
+              if (task['latest_action'] != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.activity,
+                        size: 15,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          task['latest_action']?['remark']?.toString() ??
+                              'Workflow updated',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const Divider(height: 28),
               Row(
                 children: [
@@ -225,9 +387,9 @@ class _TaskCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const Text(
-                    'Open',
-                    style: TextStyle(
+                  Text(
+                    '$actionsCount updates',
+                    style: const TextStyle(
                       color: AppColors.primary,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -313,6 +475,33 @@ class _TaskDetailsState extends State<_TaskDetails> {
       return;
     }
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(
+          action == 'close' ? LucideIcons.circleCheckBig : LucideIcons.forward,
+          color: action == 'close' ? AppColors.success : AppColors.primary,
+        ),
+        title: Text(action == 'close' ? 'Close this task?' : 'Assign next?'),
+        content: Text(
+          action == 'close'
+              ? 'This task will move out of your active workflow.'
+              : 'This task will stay in Workflow and move to the selected assignee.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(action == 'close' ? 'Close task' : 'Assign'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() {
       submitting = true;
       error = null;
@@ -355,7 +544,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
 
     final currentUserId = context.read<AuthController>().user?['id'];
     final canAct =
-        task?['status'] == 'pending' && task?['assigned_to'] == currentUserId;
+        task?['status'] != 'closed' && task?['assigned_to'] == currentUserId;
     final actions = List<dynamic>.from(task?['actions'] ?? []);
     final type = task?['task_type']?.toString() ?? 'job';
 
@@ -393,6 +582,11 @@ class _TaskDetailsState extends State<_TaskDetails> {
         Text(
           task?['description']?.toString() ?? 'No description provided.',
           style: const TextStyle(color: AppColors.muted, height: 1.5),
+        ),
+        const SizedBox(height: 18),
+        _WorkflowProgress(
+          closed: task?['status'] == 'closed',
+          actions: actions.length,
         ),
         const SizedBox(height: 18),
         Card(
@@ -498,7 +692,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
                   ),
             label: Text(submitting ? 'Saving…' : 'Submit action'),
           ),
-        ] else if (task?['status'] == 'pending') ...[
+        ] else if (task?['status'] != 'closed') ...[
           const SizedBox(height: 18),
           const Card(
             child: Padding(
@@ -563,6 +757,91 @@ class _ActionTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WorkflowProgress extends StatelessWidget {
+  const _WorkflowProgress({required this.closed, required this.actions});
+
+  final bool closed;
+  final int actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      (label: 'Created', icon: LucideIcons.plus, done: true),
+      (label: 'Assigned', icon: LucideIcons.userCheck, done: true),
+      (
+        label: closed ? 'Processed' : 'In workflow',
+        icon: LucideIcons.activity,
+        done: closed || actions > 1,
+      ),
+      (label: 'Closed', icon: LucideIcons.circleCheckBig, done: closed),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: List.generate(steps.length, (index) {
+          final step = steps[index];
+          final active = !closed && index == 2;
+          final color = step.done
+              ? AppColors.success
+              : active
+              ? AppColors.primary
+              : const Color(0xFFCBD5E1);
+          return Expanded(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    if (index > 0)
+                      Expanded(child: Divider(color: color, thickness: 2)),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: step.done || active ? color : Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: color, width: 2),
+                      ),
+                      child: Icon(
+                        step.icon,
+                        size: 14,
+                        color: step.done || active ? Colors.white : color,
+                      ),
+                    ),
+                    if (index < steps.length - 1)
+                      Expanded(
+                        child: Divider(
+                          color: step.done
+                              ? AppColors.success
+                              : const Color(0xFFCBD5E1),
+                          thickness: 2,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  step.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: active ? AppColors.primary : AppColors.muted,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }

@@ -17,13 +17,16 @@ class TaskController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $tasks = Task::with(['customer', 'assignee'])
+        $tasks = Task::with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee'])
+            ->withCount('actions')
             ->where(function ($query) use ($request) {
                 $query->where('assigned_to', $request->user()->id)
                     ->orWhereHas('members', fn ($query) => $query->where('user_id', $request->user()->id));
             })
+            ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('type'), fn ($query) => $query->where('task_type', $request->string('type')))
+            ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
             ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
             ->orderBy('due_at')
             ->paginate(20);

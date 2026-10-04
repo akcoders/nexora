@@ -28,7 +28,9 @@ Route::post('/service-feedback/{token}', [ServiceFeedbackController::class, 'sto
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
-    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store']);
+    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show']);
+    Route::post('/customers/{customer}/floor-plans', [CustomerController::class, 'storeFloorPlan'])->name('customers.floor-plans.store');
+    Route::post('/customers/{customer}/equipment', [CustomerController::class, 'storeEquipment'])->name('customers.equipment.store');
     Route::post('/customers/draft', [CustomerDraftController::class, 'store'])->name('customers.draft.store');
     Route::put('/customers/draft/{uuid}', [CustomerDraftController::class, 'update'])->name('customers.draft.update');
     Route::get('/customers/draft/{uuid}', [CustomerDraftController::class, 'show'])->name('customers.draft.show');

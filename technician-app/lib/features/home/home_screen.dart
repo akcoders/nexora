@@ -27,7 +27,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? today;
-  List<dynamic> pendingTasks = [];
+  List<dynamic> activeTasks = [];
   List<dynamic> todayServiceJobs = [];
   int closedCount = 0;
   bool loading = true;
@@ -51,12 +51,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final api = context.read<ApiClient>().dio;
       final responses = await Future.wait([
         api.get('attendance/today'),
-        api.get('tasks', queryParameters: {'status': 'pending'}),
+        api.get('tasks', queryParameters: {'scope': 'open'}),
         api.get('tasks', queryParameters: {'status': 'closed'}),
         api.get('service-jobs', queryParameters: {'scope': 'today'}),
       ]);
       today = responses[0].data['attendance'];
-      pendingTasks = List<dynamic>.from(responses[1].data['data'] ?? []);
+      activeTasks = List<dynamic>.from(responses[1].data['data'] ?? []);
       closedCount =
           (responses[2].data['total'] as num?)?.toInt() ??
           List<dynamic>.from(responses[2].data['data'] ?? []).length;
@@ -154,9 +154,9 @@ class _HomeScreenState extends State<HomeScreen> {
         .first;
     final hasCheckedIn = today != null;
     final hasCheckedOut = today?['checked_out_at'] != null;
-    final priorityTask = pendingTasks.isEmpty
+    final priorityTask = activeTasks.isEmpty
         ? null
-        : Map<String, dynamic>.from(pendingTasks.first);
+        : Map<String, dynamic>.from(activeTasks.first);
     final cardColors = hasCheckedIn
         ? const [Color(0xFF166534), Color(0xFF16A34A), Color(0xFF22C55E)]
         : const [Color(0xFF1E3A8A), AppColors.primary, AppColors.secondary];
@@ -282,8 +282,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: _MetricCard(
-                    label: 'Pending',
-                    value: pendingTasks.length.toString(),
+                    label: 'Active',
+                    value: activeTasks.length.toString(),
                     icon: LucideIcons.clock3,
                     color: AppColors.warning,
                     soft: const Color(0xFFFFF7E6),
@@ -400,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Padding(
                   padding: EdgeInsets.all(22),
                   child: Text(
-                    'No pending tasks. You are all caught up.',
+                    'No active tasks. You are all caught up.',
                     style: TextStyle(color: AppColors.muted),
                   ),
                 ),

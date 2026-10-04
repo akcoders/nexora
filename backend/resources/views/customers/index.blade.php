@@ -22,13 +22,13 @@
                 <tbody>
                 @forelse($customers as $customer)
                     <tr>
-                        <td class="ps-4"><div class="d-flex align-items-center gap-3"><span class="nx-avatar">{{ strtoupper(substr($customer->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $customer->name }}</div><div class="small text-secondary">{{ $customer->code }}</div></div></div></td>
+                        <td class="ps-4"><a href="{{ route('customers.show', $customer) }}" class="d-flex align-items-center gap-3 text-dark"><span class="nx-avatar">{{ strtoupper(substr($customer->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $customer->name }}</div><div class="small text-secondary">{{ $customer->code }}</div></div></a></td>
                         <td><span class="small">{{ collect($customer->types)->map(fn($type) => str($type)->headline())->join(', ') }}</span></td>
                         <td><div>{{ $customer->city ?: '—' }}</div><div class="small text-secondary">{{ $customer->state }}</div></td>
                         <td>{{ $customer->contacts_count }}</td><td>{{ $customer->branches_count }}</td>
                         <td><span class="badge rounded-pill {{ $customer->priority === 'very_high' ? 'badge-soft-danger' : ($customer->priority === 'high' ? 'badge-soft-warning' : 'badge-soft-primary') }}">{{ str($customer->priority)->headline() }}</span></td>
                         <td><span class="badge rounded-pill {{ $customer->status === 'active' ? 'badge-soft-success' : ($customer->status === 'blacklisted' ? 'badge-soft-danger' : 'bg-light text-secondary') }}">{{ ucfirst($customer->status) }}</span></td>
-                        <td class="text-end pe-4"><button class="nx-icon-btn ms-auto"><i data-lucide="more-horizontal" style="width:18px"></i></button></td>
+                        <td class="text-end pe-4"><a class="nx-icon-btn ms-auto" href="{{ route('customers.show', $customer) }}" aria-label="Open {{ $customer->name }}"><i data-lucide="arrow-right" style="width:18px"></i></a></td>
                     </tr>
                 @empty
                     <tr><td colspan="8" class="text-center py-5"><div class="mx-auto mb-3 nx-metric-icon"><i data-lucide="building-2"></i></div><div class="fw-semibold">No customers found</div><div class="small text-secondary mb-3">Create your first customer to get started.</div><a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">New customer</a></td></tr>

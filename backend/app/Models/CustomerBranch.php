@@ -19,4 +19,14 @@ class CustomerBranch extends Model
     {
         return $this->hasMany(CustomerContact::class);
     }
+
+    public function equipments(): HasMany
+    {
+        return $this->hasMany(CustomerEquipment::class);
+    }
+
+    public function floorPlans(): HasMany
+    {
+        return $this->hasMany(CustomerFloorPlan::class);
+    }
 }

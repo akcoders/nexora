@@ -16,23 +16,29 @@ class TaskController extends Controller
 {
     public function index(Request $request): View
     {
-        $tasks = Task::with(['customer', 'assignee', 'creator'])
+        $tasks = Task::with(['customer', 'assignee', 'creator', 'latestAction.user', 'latestAction.assignee'])
+            ->withCount('actions')
+            ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
             ->when($request->filled('type'), fn ($query) => $query->where('task_type', $request->string('type')))
+            ->when($request->filled('assignee'), fn ($query) => $query->where('assigned_to', $request->integer('assignee')))
             ->when($request->filled('search'), fn ($query) => $query->where(fn ($query) => $query
                 ->where('title', 'like', '%'.$request->string('search').'%')
-                ->orWhere('task_no', 'like', '%'.$request->string('search').'%')))
-            ->orderByRaw("CASE WHEN status = 'pending' THEN 1 ELSE 2 END")
+                ->orWhere('task_no', 'like', '%'.$request->string('search').'%')
+                ->orWhereHas('customer', fn ($query) => $query->where('name', 'like', '%'.$request->string('search').'%'))))
+            ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
+            ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
             ->orderBy('due_at')->paginate(20)->withQueryString();
 
         return view('tasks.index', [
             'tasks' => $tasks,
             'users' => User::where('status', 'active')->orderBy('name')->get(),
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
-            'pendingCount' => Task::where('status', 'pending')->count(),
+            'openCount' => Task::where('status', '!=', 'closed')->count(),
+            'workflowOpenCount' => Task::where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
             'closedCount' => Task::where('status', 'closed')->count(),
-            'overdueCount' => Task::where('status', 'pending')->where('due_at', '<', now())->count(),
+            'overdueCount' => Task::where('status', '!=', 'closed')->where('due_at', '<', now())->count(),
         ]);
     }
 

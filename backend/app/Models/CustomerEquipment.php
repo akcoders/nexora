@@ -17,7 +17,14 @@ class CustomerEquipment extends Model
 
     protected function casts(): array
     {
-        return ['installed_at' => 'date', 'warranty_ends_at' => 'date', 'metadata' => 'array', 'active' => 'boolean'];
+        return [
+            'installed_at' => 'date',
+            'warranty_ends_at' => 'date',
+            'plan_x' => 'decimal:2',
+            'plan_y' => 'decimal:2',
+            'metadata' => 'array',
+            'active' => 'boolean',
+        ];
     }
 
     public function customer(): BelongsTo
@@ -33,6 +40,11 @@ class CustomerEquipment extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function floorPlan(): BelongsTo
+    {
+        return $this->belongsTo(CustomerFloorPlan::class, 'customer_floor_plan_id');
     }
 
     public function serviceJobs(): HasMany
