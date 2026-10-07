@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/attendance', [AdminAttendanceController::class, 'index'])->name('attendance.index');
     Route::post('/attendance/{attendance}/review', [AdminAttendanceController::class, 'review'])->name('attendance.review');
     Route::post('/premises', [PremisesController::class, 'store'])->name('premises.store');
+    Route::put('/premises/{premises}', [PremisesController::class, 'update'])->name('premises.update');
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');

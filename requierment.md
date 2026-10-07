@@ -600,7 +600,7 @@ User/Employee, Role & Permission, Department, Designation, Location/Premises, Ta
 ## 6.2 Attendance Management
 
 ### 6.2.1 Admin Side (Web)
-- Premises setup: Name, Lat/Long, Radius, Assigned Technicians, Shift
+- Premises setup: Create and edit premises from their cards, including Name, Address, Lat/Long, Radius, Assigned Technicians, Shift, and active status
 - Dashboard: Today's list, Selfie preview, Map view, Inside/Outside, Pending reviews
 - Approve/Reject with remark
 - Daily/Monthly reports, Export Excel/PDF
@@ -898,4 +898,4 @@ Phase 1 me ERP ka strong base banega:
 - ✅ **Internal task workflow** with monitoring & timeline
 - 📊 **Dashboard & charts**
 
-Architecture aisa hoga ki future me Sales, Accounts, Projects, Services aur Administration modules easily plug ho sakein.
+Architecture aisa hoga ki future me Sales, Accounts, Projects, Services aur Administration modules easily plug ho sakei
