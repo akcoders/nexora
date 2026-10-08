@@ -37,6 +37,7 @@ class AdminAttendanceController extends Controller
             'start' => $start,
             'pendingCount' => Attendance::where('status', 'pending')->count(),
             'premises' => Premises::with(['users:id,name'])->withCount('users')->orderBy('name')->get(),
+            'activePremisesCount' => Premises::where('active', true)->count(),
             'technicians' => User::whereHas('roles', fn ($query) => $query->where('name', 'Technician'))->orderBy('name')->get(),
             'employees' => User::query()->where('status', 'active')->orderBy('name')->get(['id', 'name', 'employee_code']),
         ]);

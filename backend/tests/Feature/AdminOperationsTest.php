@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Premises;
 use App\Models\ProductCategory;
 use App\Models\ServiceChecklist;
 use App\Models\User;
@@ -72,5 +73,59 @@ class AdminOperationsTest extends TestCase
             'require_attendance_for_tasks' => 1,
         ])->assertRedirect();
         $this->assertDatabaseHas('settings', ['key' => 'default_geofence_radius', 'value' => '300']);
+    }
+
+    public function test_admin_can_edit_all_premises_settings_and_technician_assignments(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@nexora.test')->firstOrFail();
+        $technician = User::where('email', 'technician@nexora.test')->firstOrFail();
+        $replacementTechnician = User::factory()->create();
+        $replacementTechnician->assignRole('Technician');
+
+        $this->actingAs($admin)->post(route('premises.store'), [
+            'name' => 'Old Office',
+            'address' => 'Old address',
+            'latitude' => 19.12,
+            'longitude' => 72.91,
+            'radius_meters' => 250,
+            'shift_start' => '09:00',
+            'shift_end' => '18:00',
+            'technicians' => [$technician->id],
+        ])->assertRedirect();
+
+        $premises = Premises::where('name', 'Old Office')->firstOrFail();
+
+        $this->actingAs($admin)->put(route('premises.update', $premises), [
+            '_premises_id' => $premises->id,
+            'name' => 'Updated Office',
+            'address' => 'New address',
+            'latitude' => 20.1234567,
+            'longitude' => 73.1234567,
+            'radius_meters' => 500,
+            'shift_start' => '10:30',
+            'shift_end' => '19:30',
+            'active' => 0,
+            'technicians' => [$replacementTechnician->id],
+        ])->assertRedirect()->assertSessionHas('success', 'Premises updated.');
+
+        $this->assertDatabaseHas('premises', [
+            'id' => $premises->id,
+            'name' => 'Updated Office',
+            'address' => 'New address',
+            'latitude' => '20.1234567',
+            'longitude' => '73.1234567',
+            'radius_meters' => 500,
+            'shift_start' => '10:30',
+            'shift_end' => '19:30',
+            'active' => 0,
+        ]);
+        $this->assertDatabaseHas('premises_user', ['premises_id' => $premises->id, 'user_id' => $replacementTechnician->id]);
+        $this->assertDatabaseMissing('premises_user', ['premises_id' => $premises->id, 'user_id' => $technician->id]);
+
+        $this->actingAs($admin)->get(route('attendance.index'))
+            ->assertOk()
+            ->assertSee('Edit premises')
+            ->assertSee('Updated Office');
     }
 }
