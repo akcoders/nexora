@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
+import '../hr/hr_self_service_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -72,9 +73,15 @@ class ProfileScreen extends StatelessWidget {
           Card(
             child: Column(
               children: [
-                const _ProfileTile(
-                  icon: Icons.lock_outline,
-                  title: 'Change password',
+                _ProfileTile(
+                  icon: LucideIcons.briefcaseBusiness,
+                  title: 'My HR, leave & payroll',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HrSelfServiceScreen(),
+                    ),
+                  ),
                 ),
                 const Divider(height: 1, indent: 62),
                 const _ProfileTile(
@@ -120,12 +127,19 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({required this.icon, required this.title, this.trailing});
+  const _ProfileTile({
+    required this.icon,
+    required this.title,
+    this.trailing,
+    this.onTap,
+  });
   final IconData icon;
   final String title;
   final String? trailing;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => ListTile(
+    onTap: onTap,
     leading: Icon(icon, color: AppColors.primary),
     title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
     trailing: trailing == null

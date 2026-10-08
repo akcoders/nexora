@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -22,10 +21,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _start() async {
     final auth = context.read<AuthController>();
-    await Future.wait([
-      auth.restore(),
-      Future<void>.delayed(const Duration(milliseconds: 1800)),
-    ]);
+    await auth.restore();
     if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
@@ -79,10 +75,11 @@ class _SplashScreenState extends State<SplashScreen> {
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          LucideIcons.snowflake,
-                          color: AppColors.primary,
-                          size: 46,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Image.asset(
+                            'assets/images/classic-app-icon.png',
+                          ),
                         ),
                       )
                       .animate()
@@ -93,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                   const SizedBox(height: 28),
                   Text(
-                    'NEXORA',
+                    'CLASSIC',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
@@ -102,7 +99,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ).animate().fadeIn(delay: 250.ms).slideY(begin: .35),
                   const SizedBox(height: 8),
                   Text(
-                    'HVAC FIELD OPERATIONS',
+                    'THE ART OF COOLING',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: Colors.white70,
                       letterSpacing: 1.8,

@@ -58,6 +58,7 @@ class CustomerController extends Controller
             'customer' => $customer,
             'products' => Product::where('active', true)->orderBy('name')->get(),
             'equipmentTypes' => ServiceMasterOption::where('type', 'equipment_type')->where('active', true)->orderBy('sort_order')->get(),
+            'equipmentCapacities' => ServiceMasterOption::where('type', 'ac_capacity')->where('active', true)->orderBy('sort_order')->get(),
         ]);
     }
 

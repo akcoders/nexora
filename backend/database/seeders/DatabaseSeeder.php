@@ -2,10 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Models\Company;
 use App\Models\Customer;
 use App\Models\CustomerEquipment;
 use App\Models\CustomerGroup;
+use App\Models\EmployeeProfile;
+use App\Models\Holiday;
 use App\Models\InspectionCondition;
+use App\Models\LeaveBalance;
+use App\Models\LeaveType;
 use App\Models\Premises;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -20,6 +25,7 @@ use App\Notifications\TaskAssignedNotification;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -29,7 +35,7 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        $permissions = collect(['customers', 'products', 'checklists', 'users', 'attendance', 'tasks', 'reports', 'settings'])
+        $permissions = collect(['customers', 'products', 'checklists', 'users', 'attendance', 'tasks', 'reports', 'settings', 'employees', 'companies', 'roles', 'hr', 'leaves', 'vouchers', 'payroll'])
             ->flatMap(fn (string $module) => collect(['create', 'read', 'update', 'delete', 'approve', 'assign', 'export'])
                 ->map(fn (string $action) => "$module.$action"));
 
@@ -47,7 +53,7 @@ class DatabaseSeeder extends Seeder
         Role::firstOrCreate(['name' => 'Viewer', 'guard_name' => 'web']);
         $superAdmin->syncPermissions(Permission::all());
         $adminRole->syncPermissions(Permission::where('name', 'not like', 'settings.%')->get());
-        $managerRole->syncPermissions(Permission::whereIn('name', ['attendance.read', 'attendance.approve', 'attendance.export', 'tasks.read', 'tasks.assign', 'reports.read', 'reports.export', 'service_jobs.read', 'service_jobs.assign', 'service_jobs.approve', 'service_jobs.view_financials'])->get());
+        $managerRole->syncPermissions(Permission::whereIn('name', ['attendance.read', 'attendance.approve', 'attendance.export', 'tasks.read', 'tasks.assign', 'reports.read', 'reports.export', 'service_jobs.read', 'service_jobs.assign', 'service_jobs.approve', 'service_jobs.view_financials', 'employees.read', 'hr.read', 'leaves.read', 'leaves.approve', 'vouchers.read', 'vouchers.approve'])->get());
         $technicianRole->syncPermissions(Permission::whereIn('name', ['service_jobs.read', 'service_jobs.inspect', 'service_jobs.create_estimate', 'service_jobs.perform', 'service_jobs.payment', 'service_jobs.complete'])->get());
 
         $admin = User::updateOrCreate(['email' => 'admin@nexora.test'], [
@@ -75,7 +81,7 @@ class DatabaseSeeder extends Seeder
             'address' => 'Mumbai, Maharashtra',
             'latitude' => 19.0760,
             'longitude' => 72.8777,
-            'radius_meters' => 200,
+            'radius_meters' => 5,
             'shift_start' => '09:00',
             'shift_end' => '18:00',
         ]);
@@ -183,10 +189,11 @@ class DatabaseSeeder extends Seeder
 
         collect([
             'payment_method' => ['cash' => 'Cash', 'upi' => 'UPI', 'card' => 'Card', 'online' => 'Online', 'credit' => 'Credit / Pay Later'],
-            'equipment_type' => ['split_ac' => 'Split AC', 'window_ac' => 'Window AC', 'cassette_ac' => 'Cassette AC', 'ductable_ac' => 'Ductable AC', 'vrv_vrf' => 'VRV / VRF', 'chiller' => 'Chiller'],
+            'equipment_type' => collect(['Air Cooled Chiller', 'Water Cooled Chiller', 'Screw Chiller', 'Centrifuge Chiller', 'Recip Chiller', 'Ammonia Chiller', 'Modular Chiller', 'VRF', 'VRV', 'ODU', 'IDU', 'Indoor Unit', 'Outdoor Unit', 'Condenser Unit', 'Window AC', 'High Wall Split AC', '4 Way Cassette AC', '1 Way Cassette AC', 'Ductable AC', 'Concealed AC', 'Tower AC', 'VRF 1 Way Cassette IDU', 'VRF 4 Way Cassette IDU', 'VRF Compact Cassette IDU', 'VRF Highwall Split IDU', 'VRF LS/MS/HS Ductable IDU', 'VRF Tower AC IDU', 'IDU/ODU Refnet', 'Single/Double Skin AHU DX/CHW'])->mapWithKeys(fn (string $label) => [Str::slug($label, '_') => $label])->all(),
+            'ac_capacity' => collect(['0.6', '0.8', '1', '1.3', '1.5', '1.6', '1.8', '2', '2.1', '2.2', '2.3', '2.5', '2.6', '2.9', '3', '3.3', '3.5', '3.8', '4', '4.2', '4.5', '4.8', '5', '5.5'])->mapWithKeys(fn (string $capacity) => [str_replace('.', '_', $capacity).'_tr' => $capacity.' TR'])->all(),
             'reschedule_reason' => ['customer_request' => 'Customer Request', 'technician_unavailable' => 'Technician Unavailable', 'parts_unavailable' => 'Parts Unavailable', 'site_closed' => 'Site Closed'],
             'cancellation_reason' => ['customer_cancelled' => 'Customer Cancelled', 'duplicate_job' => 'Duplicate Job', 'out_of_scope' => 'Out of Scope', 'other' => 'Other'],
-            'unit' => ['piece' => 'Piece', 'meter' => 'Meter', 'kilogram' => 'Kilogram', 'liter' => 'Liter', 'service' => 'Service'],
+            'unit' => ['tr' => 'TR', 'hp' => 'HP', 'kw' => 'kW', 'kg' => 'kg', 'sq_ft' => 'sq.ft', 'sq_mt' => 'sq.mt', 'rmt' => 'rmt', 'nos' => 'nos', 'lump_sum' => 'lump sum', 'roll' => 'roll', 'feet' => 'feet', 'metre' => 'metre'],
         ])->each(function (array $options, string $type): void {
             collect($options)->each(fn (string $label, string $code) => ServiceMasterOption::updateOrCreate(
                 ['type' => $type, 'code' => $code],
@@ -230,8 +237,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         collect([
-            'company_name' => 'Nexora HVAC Services',
-            'default_geofence_radius' => '200',
+            'company_name' => 'Classic Cooling Systems Pvt. Ltd.',
+            'company_short_name' => 'Classic Field Service',
+            'default_geofence_radius' => '5',
             'attendance_check_in_time' => '09:00',
             'attendance_check_in_grace_minutes' => '15',
             'attendance_checkout_time' => '18:00',
@@ -239,6 +247,69 @@ class DatabaseSeeder extends Seeder
             'auto_checkout_time' => '23:59',
             'require_attendance_for_tasks' => '1',
         ])->each(fn ($value, $key) => Setting::firstOrCreate(['key' => $key], ['value' => $value, 'group' => str_starts_with($key, 'company_') ? 'company' : 'operations']));
+
+        $company = Company::updateOrCreate(['organization_id' => 'CCSPL - HO -001'], [
+            'code' => 'CCSPL-MUM',
+            'short_name' => 'CLASSIC',
+            'legal_name' => 'Classic Cooling Systems Pvt. Ltd.',
+            'logo_path' => 'images/brand/classic-logo.jpeg',
+            'company_type' => 'head_office',
+            'organization_type' => 'private_limited',
+            'industry' => 'HVAC',
+            'business_models' => ['sales', 'service', 'amc', 'projects'],
+            'status' => 'active',
+            'address' => ['country' => 'India', 'state' => 'Maharashtra', 'city' => 'Mumbai'],
+            'localization' => ['timezone' => 'Asia/Kolkata', 'currency' => 'INR', 'financial_year_start' => 'April'],
+            'invoice_settings' => ['prefix' => 'CCSPL', 'e_invoice' => true, 'e_way_bill' => true],
+            'created_by' => $admin->id,
+        ]);
+        $company->sites()->updateOrCreate(['site_id' => 'CCSPL-SITE-001'], [
+            'code' => 'MUM-HO',
+            'name' => 'Mumbai Head Office',
+            'type' => 'office',
+            'address' => ['country' => 'India', 'state' => 'Maharashtra', 'city' => 'Mumbai'],
+            'active' => true,
+        ]);
+
+        EmployeeProfile::firstOrCreate(['user_id' => $admin->id], [
+            'first_name' => 'Nexora',
+            'last_name' => 'Admin',
+            'date_of_joining' => now()->subYears(3)->toDateString(),
+            'employment_type' => 'permanent',
+            'salary_currency' => 'INR',
+            'pay_frequency' => 'monthly',
+            'created_by' => $admin->id,
+        ]);
+        EmployeeProfile::firstOrCreate(['user_id' => $technician->id], [
+            'first_name' => 'Aarav',
+            'last_name' => 'Sharma',
+            'date_of_joining' => now()->subYear()->toDateString(),
+            'employment_type' => 'permanent',
+            'basic_salary' => 22000,
+            'hra' => 8000,
+            'transport_allowance' => 2000,
+            'gross_monthly_salary' => 32000,
+            'salary_currency' => 'INR',
+            'pay_frequency' => 'monthly',
+            'created_by' => $admin->id,
+        ]);
+
+        collect([
+            ['CL', 'Casual Leave', 12, 'primary', true, false],
+            ['SL', 'Sick Leave', 12, 'danger', true, true],
+            ['EL', 'Earned Leave', 18, 'success', true, false],
+            ['LWP', 'Leave Without Pay', 365, 'secondary', false, false],
+        ])->each(fn (array $leave) => LeaveType::updateOrCreate(['code' => $leave[0]], [
+            'name' => $leave[1], 'annual_quota' => $leave[2], 'color' => $leave[3], 'paid' => $leave[4], 'requires_document' => $leave[5], 'active' => true,
+        ]));
+        User::query()->each(function (User $user): void {
+            LeaveType::where('active', true)->each(fn (LeaveType $type) => LeaveBalance::firstOrCreate(
+                ['user_id' => $user->id, 'leave_type_id' => $type->id, 'year' => now()->year],
+                ['allocated' => $type->annual_quota],
+            ));
+        });
+        Holiday::firstOrCreate(['holiday_date' => now()->startOfYear()->addMonths(7)->day(15)->toDateString()], ['name' => 'Independence Day', 'type' => 'national']);
+        Holiday::firstOrCreate(['holiday_date' => now()->startOfYear()->addMonths(9)->day(2)->toDateString()], ['name' => 'Gandhi Jayanti', 'type' => 'national']);
 
         if ($technician->notifications()->doesntExist()) {
             $technician->notify(new TaskAssignedNotification($task));

@@ -62,6 +62,7 @@ class AdminOperationsTest extends TestCase
 
         $this->actingAs($admin)->put(route('settings.update'), [
             'company_name' => 'Nexora HVAC Services',
+            'company_short_name' => 'Nexora Field Service',
             'default_geofence_radius' => 300,
             'attendance_check_in_time' => '09:00',
             'attendance_check_in_grace_minutes' => 15,

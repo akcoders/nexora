@@ -11,7 +11,7 @@
     <body>
         <div class="nx-shell">
             <aside class="nx-sidebar" id="nxSidebar">
-                <a class="nx-brand" href="{{ route('dashboard') }}"><span class="nx-brand-mark"><i data-lucide="snowflake"></i></span><span>NEXORA</span></a>
+                <a class="nx-brand" href="{{ route('dashboard') }}"><span class="nx-brand-mark p-0 overflow-hidden bg-white"><img src="{{ asset('images/brand/classic-app-icon.png') }}" alt="Classic" class="w-100 h-100 object-fit-cover"></span><span>CLASSIC</span></a>
                 <nav class="nx-nav">
                     <div class="nx-nav-label">Workspace</div>
                     <a class="nx-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
@@ -25,8 +25,14 @@
                     <a class="nx-nav-link {{ request()->routeIs('attendance.*') || request()->routeIs('premises.*') ? 'active' : '' }}" href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance <span class="badge bg-warning text-dark ms-auto">{{ \App\Models\Attendance::where('status', 'pending')->count() }}</span></a>
                     <a class="nx-nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}"><i data-lucide="list-checks"></i>Tasks & Workflow</a>
                     <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>
+                    <div class="nx-nav-label">HR & People</div>
+                    @can('employees.read')<a class="nx-nav-link {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i data-lucide="contact-round"></i>Employees</a>@endcan
+                    @can('hr.read')<a class="nx-nav-link {{ request()->routeIs('hr.*') ? 'active' : '' }}" href="{{ route('hr.index') }}"><i data-lucide="calendar-heart"></i>Leave & Expenses</a>@endcan
+                    @can('payroll.read')<a class="nx-nav-link {{ request()->routeIs('payroll.*') ? 'active' : '' }}" href="{{ route('payroll.index') }}"><i data-lucide="wallet-cards"></i>Payroll</a>@endcan
                     <div class="nx-nav-label">Administration</div>
-                    <a class="nx-nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i data-lucide="users-round"></i>Users & Roles</a>
+                    @can('companies.read')<a class="nx-nav-link {{ request()->routeIs('companies.*') ? 'active' : '' }}" href="{{ route('companies.index') }}"><i data-lucide="landmark"></i>Company Master</a>@endcan
+                    <a class="nx-nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i data-lucide="users-round"></i>User Accounts</a>
+                    @can('roles.read')<a class="nx-nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}" href="{{ route('roles.index') }}"><i data-lucide="shield-check"></i>Roles & Permissions</a>@endcan
                     <a class="nx-nav-link {{ request()->routeIs('notifications.*') ? 'active' : '' }}" href="{{ route('notifications.index') }}"><i data-lucide="bell"></i>Notifications @if(auth()->user()->unreadNotifications()->count())<span class="badge bg-danger ms-auto">{{ auth()->user()->unreadNotifications()->count() }}</span>@endif</a>
                     <a class="nx-nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}"><i data-lucide="settings"></i>Settings</a>
                 </nav>
@@ -40,7 +46,7 @@
                 <header class="nx-topbar">
                     <div class="d-flex align-items-center gap-3">
                         <button class="nx-icon-btn d-lg-none" type="button" onclick="document.getElementById('nxSidebar').classList.toggle('open')"><i data-lucide="menu"></i></button>
-                        <div><div class="nx-eyebrow">Nexora / {{ $breadcrumb ?? 'Workspace' }}</div><h1 class="nx-page-title">{{ $pageTitle ?? 'Dashboard' }}</h1></div>
+                        <div><div class="nx-eyebrow">Classic / {{ $breadcrumb ?? 'Workspace' }}</div><h1 class="nx-page-title">{{ $pageTitle ?? 'Dashboard' }}</h1></div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button class="nx-icon-btn d-none d-sm-grid" title="Search"><i data-lucide="search" style="width:18px"></i></button>

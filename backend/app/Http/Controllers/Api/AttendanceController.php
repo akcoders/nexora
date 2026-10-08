@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Attendance;
+use App\Models\Premises;
 use App\Services\AttendancePolicy;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -43,7 +44,7 @@ class AttendanceController extends Controller
     public function checkIn(Request $request, AttendancePolicy $policy): JsonResponse
     {
         $validated = $request->validate([
-            'premises_id' => ['required', 'exists:premises,id'],
+            'premises_id' => ['nullable', 'exists:premises,id'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'selfie' => ['required', 'image', 'max:5120'],
@@ -52,8 +53,7 @@ class AttendanceController extends Controller
 
         abort_if(Attendance::where('user_id', $request->user()->id)->whereDate('attendance_date', today())->exists(), 422, 'Attendance is already marked today.');
 
-        $premises = $request->user()->premises()->whereKey($validated['premises_id'])->firstOrFail();
-        $distance = $this->distanceInMeters((float) $validated['latitude'], (float) $validated['longitude'], (float) $premises->latitude, (float) $premises->longitude);
+        [$premises, $distance] = $this->nearestPremises($request, (float) $validated['latitude'], (float) $validated['longitude']);
         $inside = $distance <= $premises->radius_meters;
         abort_if(! $inside && blank($validated['remark'] ?? null), 422, 'A remark is required outside the premises.');
 
@@ -85,20 +85,44 @@ class AttendanceController extends Controller
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'selfie' => ['required', 'image', 'max:5120'],
+            'remark' => ['nullable', 'string', 'max:1000'],
         ]);
         $attendance = Attendance::where('user_id', $request->user()->id)->whereDate('attendance_date', today())->firstOrFail();
         abort_if($attendance->checked_out_at, 422, 'Already checked out.');
+        [$premises, $distance] = $this->nearestPremises($request, (float) $validated['latitude'], (float) $validated['longitude']);
+        $inside = $distance <= $premises->radius_meters;
+        abort_if(! $inside && blank($validated['remark'] ?? null), 422, 'A remark is required outside the premises.');
         $checkedOutAt = now();
         $attendance->update([
             'checked_out_at' => $checkedOutAt,
             'check_out_latitude' => $validated['latitude'],
             'check_out_longitude' => $validated['longitude'],
+            'checkout_premises_id' => $premises->id,
+            'checkout_distance_meters' => round($distance),
+            'checkout_inside_premises' => $inside,
+            'checkout_selfie_path' => $request->file('selfie')->store('attendance/'.today()->format('Y/m'), 'public'),
+            'remark' => filled($validated['remark'] ?? null) ? trim(($attendance->remark ? $attendance->remark."\n" : '').'Checkout: '.$validated['remark']) : $attendance->remark,
+            'status' => $inside ? $attendance->status : 'pending',
             'day_status' => $policy->checkoutDayStatus($attendance, $checkedOutAt),
         ]);
         $attendance = $attendance->fresh();
         $attendance->setAttribute('display_status', $policy->displayStatus($attendance));
 
-        return response()->json(['message' => 'Checkout recorded.', 'attendance' => $attendance]);
+        ActivityLog::create(['user_id' => $request->user()->id, 'event' => 'attendance.checked_out', 'subject_type' => Attendance::class, 'subject_id' => $attendance->id, 'properties' => ['inside' => $inside, 'distance' => round($distance)], 'ip_address' => $request->ip()]);
+
+        return response()->json(['message' => 'Checkout recorded.', 'attendance' => $attendance->load(['premises', 'checkoutPremises'])]);
+    }
+
+    /** @return array{0: Premises, 1: float} */
+    private function nearestPremises(Request $request, float $latitude, float $longitude): array
+    {
+        $nearest = $request->user()->premises()->where('active', true)->get()->map(function (Premises $premises) use ($latitude, $longitude): array {
+            return ['premises' => $premises, 'distance' => $this->distanceInMeters($latitude, $longitude, (float) $premises->latitude, (float) $premises->longitude)];
+        })->sortBy('distance')->first();
+        abort_if($nearest === null, 422, 'No active premises is assigned to your account.');
+
+        return [$nearest['premises'], $nearest['distance']];
     }
 
     private function distanceInMeters(float $lat1, float $lon1, float $lat2, float $lon2): float

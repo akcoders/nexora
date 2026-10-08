@@ -16,6 +16,7 @@ class Attendance extends Model
             'checked_in_at' => 'datetime',
             'checked_out_at' => 'datetime',
             'inside_premises' => 'boolean',
+            'checkout_inside_premises' => 'boolean',
             'auto_checked_out' => 'boolean',
         ];
     }
@@ -28,5 +29,10 @@ class Attendance extends Model
     public function premises(): BelongsTo
     {
         return $this->belongsTo(Premises::class);
+    }
+
+    public function checkoutPremises(): BelongsTo
+    {
+        return $this->belongsTo(Premises::class, 'checkout_premises_id');
     }
 }

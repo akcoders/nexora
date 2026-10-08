@@ -23,6 +23,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   List<dynamic> premises = [];
   Map<String, String> attendanceByDate = {};
   Map<String, dynamic> rules = {};
+  Position? currentPosition;
   DateTime visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
   bool loading = true;
 
@@ -56,6 +57,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           item['attendance_date'].toString().substring(0, 10):
               item['display_status']?.toString() ?? 'present',
       };
+      await _refreshPosition(silent: true);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -83,9 +85,43 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         permission == LocationPermission.deniedForever) {
       throw Exception('Location permission is required.');
     }
-    return Geolocator.getCurrentPosition(
+    final position = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
+    currentPosition = position;
+    if (mounted) setState(() {});
+    return position;
+  }
+
+  Future<void> _refreshPosition({bool silent = false}) async {
+    try {
+      await locate();
+    } catch (error) {
+      if (!silent) _message(error.toString());
+    }
+  }
+
+  double? _distance(dynamic premise) {
+    final position = currentPosition;
+    if (position == null) return null;
+    return Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      double.parse(premise['latitude'].toString()),
+      double.parse(premise['longitude'].toString()),
+    );
+  }
+
+  List<dynamic> get sortedPremises {
+    final values = [...premises];
+    if (currentPosition != null) {
+      values.sort(
+        (a, b) => (_distance(a) ?? double.infinity).compareTo(
+          _distance(b) ?? double.infinity,
+        ),
+      );
+    }
+    return values;
   }
 
   Future<void> checkIn() async {
@@ -175,7 +211,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       await api.post(
         'attendance/check-in',
         data: FormData.fromMap({
-          'premises_id': premises.first['id'],
+          'premises_id': sortedPremises.first['id'],
           'latitude': position.latitude,
           'longitude': position.longitude,
           'remark': remark.text,
@@ -201,27 +237,81 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> checkOut() async {
+    final remark = TextEditingController();
+    XFile? photo;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(LucideIcons.logOut, color: AppColors.danger),
-        title: const Text('Confirm checkout'),
-        content: const Text(
-          'Your current location and checkout time will be recorded. Continue?',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(LucideIcons.logOut, color: AppColors.danger),
+          title: const Text('Confirm checkout'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 140,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: photo == null
+                      ? const Icon(
+                          LucideIcons.camera,
+                          size: 42,
+                          color: AppColors.primary,
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.file(
+                            File(photo!.path),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await ImagePicker().pickImage(
+                      source: ImageSource.camera,
+                      preferredCameraDevice: CameraDevice.front,
+                      imageQuality: 78,
+                    );
+                    if (picked != null) setDialogState(() => photo = picked);
+                  },
+                  icon: const Icon(LucideIcons.camera),
+                  label: Text(
+                    photo == null ? 'Take checkout selfie' : 'Retake selfie',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: remark,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Remark (required if outside)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: photo == null
+                  ? null
+                  : () => Navigator.pop(context, true),
+              child: const Text('Check out'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Check out'),
-          ),
-        ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || photo == null || !mounted) return;
 
     final api = context.read<ApiClient>().dio;
     _busy('Recording checkout…');
@@ -229,7 +319,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       final position = await locate();
       await api.post(
         'attendance/check-out',
-        data: {'latitude': position.latitude, 'longitude': position.longitude},
+        data: FormData.fromMap({
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'remark': remark.text,
+          'selfie': await MultipartFile.fromFile(
+            photo!.path,
+            filename: photo!.name,
+          ),
+        }),
       );
       if (!mounted) return;
       Navigator.pop(context);
@@ -361,6 +459,59 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             label: const Text('Check out'),
                           ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Assigned premises',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _refreshPosition(),
+                                icon: const Icon(LucideIcons.locateFixed),
+                              ),
+                            ],
+                          ),
+                          ...sortedPremises.asMap().entries.map((entry) {
+                            final distance = _distance(entry.value);
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                entry.key == 0
+                                    ? LucideIcons.mapPinCheck
+                                    : LucideIcons.mapPin,
+                                color: entry.key == 0
+                                    ? AppColors.success
+                                    : AppColors.primary,
+                              ),
+                              title: Text(
+                                entry.value['name']?.toString() ?? 'Premises',
+                              ),
+                              subtitle: Text(
+                                entry.value['address']?.toString() ?? '',
+                              ),
+                              trailing: Text(
+                                distance == null
+                                    ? 'Locate'
+                                    : '${(distance / 1000).toStringAsFixed(2)} km',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),

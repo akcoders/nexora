@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -60,11 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(
-                    LucideIcons.snowflake,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset('assets/images/classic-app-icon.png'),
                 ),
                 const SizedBox(height: 44),
                 Text(
@@ -142,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 26),
                 const Center(
                   child: Text(
-                    'Secure access for Nexora field teams',
+                    'Secure access for Classic Cooling field teams',
                     style: TextStyle(color: AppColors.muted, fontSize: 12),
                   ),
                 ),

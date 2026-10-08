@@ -28,6 +28,12 @@ class AdminPagesTest extends TestCase
             route('tasks.show', $task),
             route('reports.index'),
             route('users.index'),
+            route('employees.index'),
+            route('employees.show', $admin),
+            route('companies.index'),
+            route('roles.index'),
+            route('hr.index'),
+            route('payroll.index'),
             route('notifications.index'),
             route('settings.index'),
         ];

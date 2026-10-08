@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
+import '../service_jobs/service_job_detail_screen.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -34,6 +35,34 @@ class _TasksScreenState extends State<TasksScreen>
       queryParameters: query,
     );
     return List<dynamic>.from(response.data['data'] ?? []);
+  }
+
+  Future<List<dynamic>> loadServiceJobs({bool completed = false}) async {
+    final response = await context.read<ApiClient>().dio.get('service-jobs');
+    final jobs = List<dynamic>.from(response.data['data'] ?? []);
+    const closed = {'completed', 'cancelled', 'customer_declined'};
+    return jobs
+        .where(
+          (job) => completed
+              ? closed.contains(job['status'])
+              : !closed.contains(job['status']),
+        )
+        .toList();
+  }
+
+  Future<List<dynamic>> loadClosedWork() async {
+    final results = await Future.wait([
+      load(status: 'closed', type: 'workflow'),
+      loadServiceJobs(completed: true),
+    ]);
+    return [
+      ...results[0].map(
+        (item) => {...Map<String, dynamic>.from(item), '_kind': 'workflow'},
+      ),
+      ...results[1].map(
+        (item) => {...Map<String, dynamic>.from(item), '_kind': 'service_job'},
+      ),
+    ];
   }
 
   void refresh() => setState(() => reload++);
@@ -76,11 +105,9 @@ class _TasksScreenState extends State<TasksScreen>
       body: TabBarView(
         controller: tabs,
         children: [
-          _TaskList(
+          _ServiceJobList(
             key: ValueKey('jobs$reload'),
-            future: load(scope: 'open', type: 'job'),
-            title: 'Active jobs',
-            subtitle: 'Jobs stay here until they are closed',
+            future: loadServiceJobs(),
             onRefresh: refresh,
           ),
           _TaskList(
@@ -90,11 +117,9 @@ class _TasksScreenState extends State<TasksScreen>
             subtitle: 'All active hand-offs, not only pending tasks',
             onRefresh: refresh,
           ),
-          _TaskList(
+          _ClosedWorkList(
             key: ValueKey('closed$reload'),
-            future: load(status: 'closed'),
-            title: 'Completed work',
-            subtitle: 'Your closed jobs and workflows',
+            future: loadClosedWork(),
             onRefresh: refresh,
           ),
         ],
@@ -167,6 +192,194 @@ class _TaskList extends StatelessWidget {
       },
     );
   }
+}
+
+class _ServiceJobList extends StatelessWidget {
+  const _ServiceJobList({
+    super.key,
+    required this.future,
+    required this.onRefresh,
+  });
+
+  final Future<List<dynamic>> future;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<dynamic>>(
+    future: future,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final jobs = snapshot.data ?? [];
+      if (snapshot.hasError || jobs.isEmpty) {
+        return _Empty(
+          icon: snapshot.hasError
+              ? LucideIcons.cloudOff
+              : LucideIcons.briefcaseBusiness,
+          title: snapshot.hasError
+              ? 'Unable to load service jobs'
+              : 'No active service jobs',
+          subtitle: 'Assigned service visits appear here until completed.',
+          onRefresh: onRefresh,
+        );
+      }
+      return RefreshIndicator(
+        onRefresh: () async => onRefresh(),
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+          itemCount: jobs.length + 1,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return _QueueHeader(
+                tasks: jobs,
+                title: 'Service jobs',
+                subtitle: 'Only assigned HVAC service jobs',
+              );
+            }
+            return _ServiceJobCard(
+              job: Map<String, dynamic>.from(jobs[index - 1]),
+              onRefresh: onRefresh,
+            );
+          },
+        ),
+      );
+    },
+  );
+}
+
+class _ClosedWorkList extends StatelessWidget {
+  const _ClosedWorkList({
+    super.key,
+    required this.future,
+    required this.onRefresh,
+  });
+
+  final Future<List<dynamic>> future;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<dynamic>>(
+    future: future,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final items = snapshot.data ?? [];
+      if (snapshot.hasError || items.isEmpty) {
+        return _Empty(
+          icon: LucideIcons.circleCheckBig,
+          title: 'No closed work',
+          subtitle: 'Completed jobs and workflows appear here.',
+          onRefresh: onRefresh,
+        );
+      }
+      return RefreshIndicator(
+        onRefresh: () async => onRefresh(),
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final item = Map<String, dynamic>.from(items[index]);
+            if (item['_kind'] == 'service_job') {
+              return _ServiceJobCard(job: item, onRefresh: onRefresh);
+            }
+            return _TaskCard(task: item, onUpdated: onRefresh);
+          },
+        ),
+      );
+    },
+  );
+}
+
+class _ServiceJobCard extends StatelessWidget {
+  const _ServiceJobCard({required this.job, required this.onRefresh});
+
+  final Map<String, dynamic> job;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () async {
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ServiceJobDetailScreen(serviceJobId: job['id'] as int),
+          ),
+        );
+        onRefresh();
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(17),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const _Pill(text: 'SERVICE JOB', color: AppColors.success),
+                const SizedBox(width: 7),
+                _Pill(
+                  text: (job['status_label'] ?? job['status'] ?? '')
+                      .toString()
+                      .toUpperCase(),
+                  color: job['status'] == 'completed'
+                      ? AppColors.success
+                      : AppColors.primary,
+                ),
+                const Spacer(),
+                Text(
+                  job['job_no']?.toString() ?? '',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 13),
+            Text(
+              job['customer']?['name']?.toString() ?? 'Customer',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              job['complaint']?.toString() ??
+                  job['service_type']?['name']?.toString() ??
+                  'Service visit',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.muted),
+            ),
+            const Divider(height: 26),
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.calendarClock,
+                  size: 16,
+                  color: AppColors.muted,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _TaskCard._date(job['scheduled_at']),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppColors.primary),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _QueueHeader extends StatelessWidget {
@@ -548,8 +761,10 @@ class _TaskDetailsState extends State<_TaskDetails> {
     final actions = List<dynamic>.from(task?['actions'] ?? []);
     final type = task?['task_type']?.toString() ?? 'job';
 
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 32),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.fromLTRB(22, 0, 22, 32 + keyboardInset),
       children: [
         Row(
           children: [
@@ -653,6 +868,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
           TextField(
             controller: remark,
             maxLines: 3,
+            scrollPadding: EdgeInsets.only(bottom: keyboardInset + 120),
             decoration: const InputDecoration(
               labelText: 'Remark *',
               hintText: 'Describe work completed or next steps',

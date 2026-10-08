@@ -7,7 +7,12 @@ use App\Models\Customer;
 use App\Models\CustomerEquipment;
 use App\Models\CustomerGroup;
 use App\Models\DemoDataRecord;
+use App\Models\EmployeeProfile;
+use App\Models\ExpenseVoucher;
 use App\Models\InspectionCondition;
+use App\Models\LeaveBalance;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\Premises;
 use App\Models\Product;
 use App\Models\ServiceCatalogItem;
@@ -37,6 +42,7 @@ class DemoDataSeeder extends Seeder
         $catalogItem = ServiceCatalogItem::where('code', 'SVC-GENERAL')->firstOrFail();
         $checklist = ServiceChecklist::where('phase', 'pre')->with('items')->firstOrFail();
         $condition = InspectionCondition::where('code', 'OK')->firstOrFail();
+        $leaveType = LeaveType::where('code', 'CL')->firstOrFail();
 
         if (is_file(public_path('images/ac-unit-card.png'))) {
             Storage::disk('public')->put('demo/ac-unit-card.png', file_get_contents(public_path('images/ac-unit-card.png')));
@@ -72,6 +78,42 @@ class DemoDataSeeder extends Seeder
             $technician->syncRoles(['Technician']);
             $technician->premises()->syncWithoutDetaching([$premises->id]);
             $this->register($technician, $scenarioKey);
+
+            EmployeeProfile::updateOrCreate(['user_id' => $technician->id], [
+                'first_name' => 'Demo',
+                'last_name' => 'Technician '.str_pad((string) $case, 2, '0', STR_PAD_LEFT),
+                'date_of_joining' => now()->subMonths(6 + $case)->toDateString(),
+                'employment_type' => $case % 3 === 0 ? 'probation' : 'permanent',
+                'salary_currency' => 'INR',
+                'pay_frequency' => 'monthly',
+                'basic_salary' => 20000 + ($case * 1000),
+                'hra' => 8000,
+                'transport_allowance' => 2000,
+                'gross_monthly_salary' => 30000 + ($case * 1000),
+                'bank_details' => ['bank_name' => 'Demo Bank', 'account_number' => 'DEMO'.str_pad((string) $case, 8, '0', STR_PAD_LEFT), 'ifsc' => 'DEMO0000001'],
+                'created_by' => $admin->id,
+            ]);
+            LeaveBalance::updateOrCreate(
+                ['user_id' => $technician->id, 'leave_type_id' => $leaveType->id, 'year' => now()->year],
+                ['allocated' => 12, 'used' => $case % 4, 'pending' => 1],
+            );
+            LeaveType::query()->where('id', '!=', $leaveType->id)->where('active', true)->each(fn (LeaveType $type) => LeaveBalance::updateOrCreate(
+                ['user_id' => $technician->id, 'leave_type_id' => $type->id, 'year' => now()->year],
+                ['allocated' => $type->annual_quota, 'used' => 0, 'pending' => 0],
+            ));
+            LeaveRequest::updateOrCreate(
+                ['user_id' => $technician->id, 'leave_type_id' => $leaveType->id, 'from_date' => today()->addDays(20 + $case)->toDateString()],
+                ['to_date' => today()->addDays(20 + $case)->toDateString(), 'total_days' => 1, 'reason' => 'Demo leave request '.$case, 'status' => 'pending'],
+            );
+            ExpenseVoucher::updateOrCreate(['voucher_no' => 'DEMO-EXP-'.str_pad((string) $case, 3, '0', STR_PAD_LEFT)], [
+                'user_id' => $technician->id,
+                'expense_date' => today()->subDays($case)->toDateString(),
+                'category' => $case % 2 === 0 ? 'Travel' : 'Material',
+                'amount' => 250 + ($case * 100),
+                'description' => 'Demo field expense voucher '.$case,
+                'receipt_path' => 'demo/ac-unit-card.png',
+                'status' => $case % 3 === 0 ? 'approved' : 'pending',
+            ]);
 
             $customerCode = $case === 1 ? 'CUST00001' : 'CUST'.str_pad((string) $case, 5, '0', STR_PAD_LEFT);
             $customer = Customer::withTrashed()->updateOrCreate(['code' => $customerCode], [

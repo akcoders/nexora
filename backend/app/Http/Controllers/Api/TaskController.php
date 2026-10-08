@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\OneSignalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function action(Request $request, Task $task): JsonResponse
+    public function action(Request $request, Task $task, OneSignalService $oneSignal): JsonResponse
     {
         abort_unless($task->assigned_to === $request->user()->id, 403, 'Only the current assignee can act on this task.');
         abort_if($task->status === 'closed', 422, 'This task is already closed.');
@@ -60,6 +61,10 @@ class TaskController extends Controller
 
         DB::transaction(function () use ($request, $task, $validated) {
             $task->actions()->create(['user_id' => $request->user()->id, 'action' => $validated['action'], 'remark' => $validated['remark'], 'assigned_to' => $validated['assigned_to'] ?? null]);
+            if ($validated['action'] === 'assign') {
+                $task->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'previous_assignee']);
+                $task->members()->firstOrCreate(['user_id' => $validated['assigned_to'], 'role' => 'assignee']);
+            }
             $task->update($validated['action'] === 'close'
                 ? ['status' => 'closed', 'closed_at' => now()]
                 : ['status' => 'pending', 'assigned_to' => $validated['assigned_to'], 'closed_at' => null]);
@@ -67,6 +72,7 @@ class TaskController extends Controller
 
         if ($validated['action'] === 'assign') {
             $task->fresh()->assignee->notify(new TaskAssignedNotification($task->fresh()));
+            $oneSignal->sendToUser($task->fresh()->assignee, 'Workflow assigned to you', $task->title, ['type' => 'workflow_task', 'task_id' => $task->id]);
         }
 
         return response()->json(['message' => 'Task updated.', 'task' => $task->fresh()->load(['assignee', 'actions.user', 'actions.assignee'])]);

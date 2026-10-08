@@ -1,16 +1,21 @@
 <?php
 
 use App\Http\Controllers\AdminAttendanceController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDraftController;
 use App\Http\Controllers\CustomerGroupController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoDataController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\HrController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PremisesController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\ServiceChecklistController;
 use App\Http\Controllers\ServiceDocumentController;
 use App\Http\Controllers\ServiceFeedbackController;
@@ -56,6 +61,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/attendance', [AdminAttendanceController::class, 'index'])->name('attendance.index');
     Route::post('/attendance/{attendance}/review', [AdminAttendanceController::class, 'review'])->name('attendance.review');
     Route::post('/premises', [PremisesController::class, 'store'])->name('premises.store');
+    Route::put('/premises/{premises}', [PremisesController::class, 'update'])->name('premises.update');
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
@@ -64,6 +70,20 @@ Route::middleware('auth')->group(function () {
     Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
     Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
+    Route::resource('employees', EmployeeController::class)->except(['destroy']);
+    Route::resource('companies', CompanyController::class)->except(['show', 'destroy']);
+    Route::get('/roles-permissions', [RolePermissionController::class, 'index'])->name('roles.index');
+    Route::post('/roles-permissions', [RolePermissionController::class, 'store'])->name('roles.store');
+    Route::put('/roles-permissions/{role}', [RolePermissionController::class, 'update'])->name('roles.update');
+    Route::get('/hr', [HrController::class, 'index'])->name('hr.index');
+    Route::post('/hr/holidays', [HrController::class, 'storeHoliday'])->name('hr.holidays.store');
+    Route::post('/hr/leave-types', [HrController::class, 'storeLeaveType'])->name('hr.leave-types.store');
+    Route::post('/hr/leaves/{leaveRequest}/review', [HrController::class, 'reviewLeave'])->name('hr.leaves.review');
+    Route::post('/hr/vouchers/{expenseVoucher}/review', [HrController::class, 'reviewVoucher'])->name('hr.vouchers.review');
+    Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll.index');
+    Route::post('/payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
+    Route::post('/payroll/{payrollRun}/approve', [PayrollController::class, 'approve'])->name('payroll.approve');
+    Route::patch('/payroll/entries/{payrollEntry}', [PayrollController::class, 'markPaid'])->name('payroll.entries.update');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/read', [NotificationController::class, 'markAllRead'])->name('notifications.read');
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');

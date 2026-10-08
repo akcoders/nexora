@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\HrSelfServiceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PremisesController;
 use App\Http\Controllers\Api\ServiceJobController;
@@ -9,6 +11,7 @@ use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('/app-config', AppConfigController::class);
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -22,6 +25,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/attendance/today', [AttendanceController::class, 'today']);
         Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
         Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
+        Route::get('/hr-self-service', [HrSelfServiceController::class, 'index']);
+        Route::post('/leave-requests', [HrSelfServiceController::class, 'storeLeave']);
+        Route::post('/expense-vouchers', [HrSelfServiceController::class, 'storeVoucher']);
         Route::get('/tasks', [TaskController::class, 'index']);
         Route::get('/tasks/{task}', [TaskController::class, 'show']);
         Route::post('/tasks/{task}/action', [TaskController::class, 'action']);

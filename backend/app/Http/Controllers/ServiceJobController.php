@@ -9,6 +9,7 @@ use App\Models\ServiceJob;
 use App\Models\ServiceType;
 use App\Models\User;
 use App\Notifications\ServiceJobAssignedNotification;
+use App\Services\OneSignalService;
 use App\Services\ServiceJobWorkflow;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -72,7 +73,7 @@ class ServiceJobController extends Controller
         ]);
     }
 
-    public function store(StoreServiceJobRequest $request, ServiceJobWorkflow $workflow): RedirectResponse
+    public function store(StoreServiceJobRequest $request, ServiceJobWorkflow $workflow, OneSignalService $oneSignal): RedirectResponse
     {
         $serviceJob = DB::transaction(function () use ($request, $workflow): ServiceJob {
             $serviceJob = ServiceJob::create(array_merge($request->validated(), [
@@ -94,6 +95,7 @@ class ServiceJobController extends Controller
         });
 
         $serviceJob->technician->notify(new ServiceJobAssignedNotification($serviceJob->load('customer')));
+        $oneSignal->sendToUser($serviceJob->technician, 'New service job assigned', $serviceJob->job_no.' · '.$serviceJob->customer->name, ['type' => 'service_job', 'service_job_id' => $serviceJob->id]);
 
         return redirect()->route('service-jobs.show', $serviceJob)->with('success', 'Service job created and assigned.');
     }
@@ -113,7 +115,7 @@ class ServiceJobController extends Controller
         return view('service-jobs.show', compact('serviceJob', 'workflow', 'technicians'));
     }
 
-    public function update(Request $request, ServiceJob $serviceJob, ServiceJobWorkflow $workflow): RedirectResponse
+    public function update(Request $request, ServiceJob $serviceJob, ServiceJobWorkflow $workflow, OneSignalService $oneSignal): RedirectResponse
     {
         abort_unless($request->user()->can('service_jobs.assign') || $request->user()->can('service_jobs.update'), 403);
         $validated = $request->validate([
@@ -156,6 +158,7 @@ class ServiceJobController extends Controller
 
         if ($wasReassigned) {
             $serviceJob->fresh()->technician->notify(new ServiceJobAssignedNotification($serviceJob->fresh()->load('customer')));
+            $oneSignal->sendToUser($serviceJob->fresh()->technician, 'Service job reassigned', $serviceJob->job_no.' · '.$serviceJob->customer->name, ['type' => 'service_job', 'service_job_id' => $serviceJob->id]);
         }
 
         return back()->with('success', 'Service job assignment and schedule updated.');

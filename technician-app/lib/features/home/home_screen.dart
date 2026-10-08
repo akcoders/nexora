@@ -257,15 +257,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   else if (!hasCheckedOut)
                     FilledButton.icon(
-                      onPressed: checkingOut ? null : checkOut,
+                      onPressed: () => widget.onNavigate(2),
                       style: _whiteButton(const Color(0xFF15803D)),
-                      icon: checkingOut
-                          ? const SizedBox.square(
-                              dimension: 17,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(LucideIcons.logOut, size: 18),
-                      label: Text(checkingOut ? 'Checking out…' : 'Check out'),
+                      icon: const Icon(LucideIcons.camera, size: 18),
+                      label: const Text('Selfie & check out'),
                     ),
                 ],
               ),

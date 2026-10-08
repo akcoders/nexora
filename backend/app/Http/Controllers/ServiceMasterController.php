@@ -85,7 +85,7 @@ class ServiceMasterController extends Controller
         $this->authorizeChange($request);
         $request->merge(['code' => Str::lower(Str::slug((string) $request->input('code'), '_'))]);
         $validated = $request->validate([
-            'type' => ['required', Rule::in(['equipment_type', 'reschedule_reason', 'cancellation_reason', 'payment_method', 'unit'])],
+            'type' => ['required', Rule::in(['equipment_type', 'ac_capacity', 'reschedule_reason', 'cancellation_reason', 'payment_method', 'unit'])],
             'code' => ['required', 'string', 'max:50'],
             'label' => ['required', 'string', 'max:255'],
         ]);

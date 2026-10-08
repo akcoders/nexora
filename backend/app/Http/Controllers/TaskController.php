@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use App\Services\OneSignalService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, OneSignalService $oneSignal): RedirectResponse
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -70,6 +71,7 @@ class TaskController extends Controller
             return $task;
         });
         $task->assignee->notify(new TaskAssignedNotification($task));
+        $oneSignal->sendToUser($task->assignee, 'New workflow assigned', $task->title, ['type' => 'workflow_task', 'task_id' => $task->id]);
 
         return redirect()->route('tasks.show', $task)->with('success', 'Task created successfully.');
     }
@@ -82,7 +84,7 @@ class TaskController extends Controller
         ]);
     }
 
-    public function action(Request $request, Task $task): RedirectResponse
+    public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse
     {
         $data = $request->validate([
             'action' => ['required', Rule::in(['close', 'assign'])],
@@ -92,12 +94,17 @@ class TaskController extends Controller
 
         DB::transaction(function () use ($request, $task, $data) {
             $task->actions()->create(['user_id' => $request->user()->id, 'assigned_to' => $data['assigned_to'] ?? null, 'action' => $data['action'], 'remark' => $data['remark']]);
+            if ($data['action'] === 'assign') {
+                $task->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'previous_assignee']);
+                $task->members()->firstOrCreate(['user_id' => $data['assigned_to'], 'role' => 'assignee']);
+            }
             $task->update($data['action'] === 'close'
                 ? ['status' => 'closed', 'closed_at' => now()]
                 : ['status' => 'pending', 'assigned_to' => $data['assigned_to'], 'closed_at' => null]);
         });
         if ($data['action'] === 'assign') {
             $task->fresh()->assignee->notify(new TaskAssignedNotification($task->fresh()));
+            $oneSignal->sendToUser($task->fresh()->assignee, 'Workflow assigned to you', $task->title, ['type' => 'workflow_task', 'task_id' => $task->id]);
         }
 
         return back()->with('success', 'Task action recorded.');
