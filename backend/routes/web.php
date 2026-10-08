@@ -16,6 +16,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\SalarySlipController;
 use App\Http\Controllers\ServiceChecklistController;
 use App\Http\Controllers\ServiceDocumentController;
 use App\Http\Controllers\ServiceFeedbackController;
@@ -32,6 +33,7 @@ Route::get('/', function () {
 
 Route::get('/service-feedback/{token}', [ServiceFeedbackController::class, 'show'])->name('service-feedback.show');
 Route::post('/service-feedback/{token}', [ServiceFeedbackController::class, 'store'])->middleware('throttle:10,1')->name('service-feedback.store');
+Route::get('/salary-slips/{payrollEntry}', SalarySlipController::class)->middleware('signed')->name('salary-slips.download');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

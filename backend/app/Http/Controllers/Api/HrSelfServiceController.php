@@ -13,6 +13,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 
 class HrSelfServiceController extends Controller
@@ -35,6 +36,16 @@ class HrSelfServiceController extends Controller
             ];
         });
 
+        $payslips = $user->payrollEntries()
+            ->with('payrollRun:id,payroll_month,status')
+            ->whereIn('status', ['approved', 'paid', 'on_hold'])
+            ->latest()
+            ->limit(12)
+            ->get()
+            ->map(fn ($entry): array => array_merge($entry->toArray(), [
+                'download_url' => URL::temporarySignedRoute('salary-slips.download', now()->addHour(), ['payrollEntry' => $entry]),
+            ]));
+
         return response()->json([
             'user' => $user,
             'leave_balances' => $balances,
@@ -42,7 +53,7 @@ class HrSelfServiceController extends Controller
             'leave_requests' => $user->leaveRequests()->with('leaveType')->latest()->limit(30)->get(),
             'holidays' => Holiday::query()->where('holiday_date', '>=', today())->orderBy('holiday_date')->limit(30)->get(),
             'vouchers' => $user->expenseVouchers()->latest()->limit(30)->get(),
-            'payslips' => $user->payrollEntries()->with('payrollRun:id,payroll_month,status')->whereIn('status', ['approved', 'paid', 'on_hold'])->latest()->limit(12)->get(),
+            'payslips' => $payslips,
         ]);
     }
 

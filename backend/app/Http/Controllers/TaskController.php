@@ -19,6 +19,7 @@ class TaskController extends Controller
     {
         $tasks = Task::with(['customer', 'assignee', 'creator', 'latestAction.user', 'latestAction.assignee'])
             ->withCount('actions')
+            ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
@@ -38,6 +39,7 @@ class TaskController extends Controller
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
             'openCount' => Task::where('status', '!=', 'closed')->count(),
             'workflowOpenCount' => Task::where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
+            'ticketOpenCount' => Task::where('task_type', Task::TYPE_TICKET)->where('status', '!=', 'closed')->count(),
             'closedCount' => Task::where('status', 'closed')->count(),
             'overdueCount' => Task::where('status', '!=', 'closed')->where('due_at', '<', now())->count(),
         ]);
@@ -47,9 +49,14 @@ class TaskController extends Controller
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'task_type' => ['required', Rule::in(['job', 'workflow'])],
+            'task_type' => ['required', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
             'description' => ['nullable', 'string', 'max:5000'],
-            'customer_id' => ['nullable', 'exists:customers,id'],
+            'customer_id' => [
+                Rule::requiredIf(fn (): bool => $request->string('task_type')->toString() === Task::TYPE_TICKET),
+                Rule::prohibitedIf(fn (): bool => $request->string('task_type')->toString() === Task::TYPE_WORKFLOW),
+                'nullable',
+                'exists:customers,id',
+            ],
             'category' => ['nullable', 'string', 'max:100'],
             'priority' => ['required', Rule::in(['normal', 'high', 'very_high'])],
             'due_at' => ['nullable', 'date'],
@@ -62,7 +69,9 @@ class TaskController extends Controller
             $observers = $data['observers'] ?? [];
             unset($data['observers']);
             $nextId = (Task::withTrashed()->max('id') ?? 0) + 1;
-            $task = Task::create(array_merge($data, ['task_no' => 'TSK'.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT), 'created_by' => $request->user()->id, 'status' => 'pending']));
+            $prefix = $data['task_type'] === Task::TYPE_TICKET ? 'TKT' : 'WFL';
+            $data['customer_id'] = $data['task_type'] === Task::TYPE_TICKET ? $data['customer_id'] : null;
+            $task = Task::create(array_merge($data, ['task_no' => $prefix.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT), 'created_by' => $request->user()->id, 'status' => 'pending']));
             foreach ($observers as $observer) {
                 $task->members()->create(['user_id' => $observer, 'role' => 'observer']);
             }
@@ -71,7 +80,8 @@ class TaskController extends Controller
             return $task;
         });
         $task->assignee->notify(new TaskAssignedNotification($task));
-        $oneSignal->sendToUser($task->assignee, 'New workflow assigned', $task->title, ['type' => 'workflow_task', 'task_id' => $task->id]);
+        $label = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
+        $oneSignal->sendToUser($task->assignee, 'New '.ucfirst($label).' assigned', $task->title, ['type' => $label.'_task', 'task_id' => $task->id]);
 
         return redirect()->route('tasks.show', $task)->with('success', 'Task created successfully.');
     }
@@ -104,7 +114,8 @@ class TaskController extends Controller
         });
         if ($data['action'] === 'assign') {
             $task->fresh()->assignee->notify(new TaskAssignedNotification($task->fresh()));
-            $oneSignal->sendToUser($task->fresh()->assignee, 'Workflow assigned to you', $task->title, ['type' => 'workflow_task', 'task_id' => $task->id]);
+            $type = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
+            $oneSignal->sendToUser($task->fresh()->assignee, ucfirst($type).' assigned to you', $task->title, ['type' => $type.'_task', 'task_id' => $task->id]);
         }
 
         return back()->with('success', 'Task action recorded.');

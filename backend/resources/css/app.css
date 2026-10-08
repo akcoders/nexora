@@ -176,6 +176,8 @@ a { text-decoration: none; }
 .nx-task-type-icon svg { width: 18px; }
 .nx-task-type-icon.workflow { color: #6d28d9; background: #ede9fe; }
 .nx-task-type-icon.job { color: #15803d; background: #dcfce7; }
+.nx-task-type-icon.ticket { color: #0369a1; background: #e0f2fe; }
+.badge-soft-info { color: #075985; background: #e0f2fe; }
 .nx-flow-track { display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; }
 .nx-flow-track span { width: 10px; height: 10px; position: relative; display: block; background: #cbd5e1; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px #cbd5e1; }
 .nx-flow-track span:not(:last-child)::after { content: ''; width: calc(100% + 28px); height: 2px; position: absolute; left: 9px; top: 2px; background: #cbd5e1; }

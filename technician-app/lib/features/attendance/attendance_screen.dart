@@ -12,7 +12,9 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
+  const AttendanceScreen({super.key, required this.onOpenMenu});
+
+  final VoidCallback onOpenMenu;
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -374,6 +376,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final checkedIn = today != null;
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: widget.onOpenMenu,
+          icon: const Icon(LucideIcons.menu),
+        ),
         title: const Text('Attendance'),
         actions: [
           IconButton(onPressed: load, icon: const Icon(LucideIcons.refreshCw)),

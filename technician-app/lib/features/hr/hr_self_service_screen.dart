@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
@@ -547,10 +548,23 @@ class _Payslips extends StatelessWidget {
     padding: const EdgeInsets.all(18),
     itemCount: items.length,
     separatorBuilder: (_, _) => const SizedBox(height: 10),
-    itemBuilder: (_, i) {
+    itemBuilder: (context, i) {
       final item = items[i];
       return Card(
         child: ListTile(
+          onTap: () async {
+            final rawUrl = item['download_url']?.toString();
+            if (rawUrl == null || rawUrl.isEmpty) return;
+            final opened = await launchUrl(
+              Uri.parse(rawUrl),
+              mode: LaunchMode.externalApplication,
+            );
+            if (!opened && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Unable to open salary slip.')),
+              );
+            }
+          },
           leading: const CircleAvatar(
             backgroundColor: Color(0xFFDCFCE7),
             child: Icon(LucideIcons.walletCards, color: AppColors.success),
@@ -561,12 +575,37 @@ class _Payslips extends StatelessWidget {
           subtitle: Text(
             'Gross ₹${item['gross_amount']} · Deductions ₹${item['deduction_amount']}',
           ),
-          trailing: Text(
-            '₹${item['net_amount']}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: AppColors.success,
-            ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₹${item['net_amount']}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.success,
+                ),
+              ),
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    LucideIcons.fileDown,
+                    size: 13,
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: 3),
+                  Text(
+                    'PDF',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       );

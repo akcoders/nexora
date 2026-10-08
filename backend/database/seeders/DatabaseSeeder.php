@@ -106,7 +106,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $task = Task::firstOrCreate(['task_no' => 'TSK000001'], [
-            'task_type' => 'job',
+            'task_type' => 'ticket',
             'title' => 'Quarterly HVAC preventive maintenance',
             'description' => 'Complete the standard preventive-maintenance checklist and upload readings.',
             'customer_id' => $customer->id,

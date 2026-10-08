@@ -205,27 +205,31 @@ class DemoDataSeeder extends Seeder
                 'active' => true,
             ]);
 
-            $taskNo = $case === 1 ? 'TSK000001' : 'TSKDEMO'.str_pad((string) $case, 4, '0', STR_PAD_LEFT);
             $taskAssignee = $case === 1 ? $primaryTechnician : $technician;
-            $task = Task::withTrashed()->updateOrCreate(['task_no' => $taskNo], [
-                'task_type' => $case % 2 === 0 ? 'workflow' : 'job',
-                'title' => 'Demo workflow case '.$case.' · '.$complaints[$case - 1],
-                'description' => 'Complete linked demo workflow with ownership, due date and activity history.',
-                'customer_id' => $customer->id,
-                'category' => $case % 2 === 0 ? 'Approval' : 'Preventive Maintenance',
-                'priority' => $case % 3 === 0 ? 'very_high' : 'high',
-                'due_at' => now()->addDays($case - 4),
-                'created_by' => $admin->id,
-                'assigned_to' => $taskAssignee->id,
-                'status' => in_array($case, [4, 8], true) ? 'closed' : 'pending',
-                'closed_at' => in_array($case, [4, 8], true) ? now()->subHours($case) : null,
-                'deleted_at' => null,
-            ]);
-            $task->actions()->firstOrCreate(['action' => 'created'], ['user_id' => $admin->id, 'assigned_to' => $taskAssignee->id, 'remark' => 'Demo task created and assigned.']);
-            if ($task->status === 'closed') {
-                $task->actions()->firstOrCreate(['action' => 'close'], ['user_id' => $technician->id, 'remark' => 'Demo workflow completed successfully.']);
+            foreach (['workflow', 'ticket'] as $taskType) {
+                $taskNo = $taskType === 'workflow'
+                    ? 'WFLDEMO'.str_pad((string) $case, 4, '0', STR_PAD_LEFT)
+                    : ($case === 1 ? 'TSK000001' : 'TKTDEMO'.str_pad((string) $case, 4, '0', STR_PAD_LEFT));
+                $task = Task::withTrashed()->updateOrCreate(['task_no' => $taskNo], [
+                    'task_type' => $taskType,
+                    'title' => ($taskType === 'workflow' ? 'Internal workflow' : 'Customer ticket').' case '.$case.' · '.$complaints[$case - 1],
+                    'description' => 'Complete linked demo work with ownership, due date and activity history.',
+                    'customer_id' => $taskType === 'ticket' ? $customer->id : null,
+                    'category' => $taskType === 'workflow' ? 'Approval' : 'Customer Support',
+                    'priority' => $case % 3 === 0 ? 'very_high' : 'high',
+                    'due_at' => now()->addDays($case - 4),
+                    'created_by' => $admin->id,
+                    'assigned_to' => $taskAssignee->id,
+                    'status' => in_array($case, [4, 8], true) ? 'closed' : 'pending',
+                    'closed_at' => in_array($case, [4, 8], true) ? now()->subHours($case) : null,
+                    'deleted_at' => null,
+                ]);
+                $task->actions()->firstOrCreate(['action' => 'created'], ['user_id' => $admin->id, 'assigned_to' => $taskAssignee->id, 'remark' => 'Demo '.$taskType.' created and assigned.']);
+                if ($task->status === 'closed') {
+                    $task->actions()->firstOrCreate(['action' => 'close'], ['user_id' => $taskAssignee->id, 'remark' => 'Demo '.$taskType.' completed successfully.']);
+                }
+                $this->register($task, $scenarioKey);
             }
-            $this->register($task, $scenarioKey);
 
             $attendance = Attendance::updateOrCreate([
                 'user_id' => $technician->id,

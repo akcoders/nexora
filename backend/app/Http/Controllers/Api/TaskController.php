@@ -18,15 +18,22 @@ class TaskController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'scope' => ['nullable', Rule::in(['open'])],
+            'status' => ['nullable', Rule::in(['pending', 'in_progress', 'closed'])],
+            'type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
+        ]);
+
         $tasks = Task::with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee'])
             ->withCount('actions')
+            ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->where(function ($query) use ($request) {
                 $query->where('assigned_to', $request->user()->id)
                     ->orWhereHas('members', fn ($query) => $query->where('user_id', $request->user()->id));
             })
-            ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->when($request->filled('type'), fn ($query) => $query->where('task_type', $request->string('type')))
+            ->when(($filters['scope'] ?? null) === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
+            ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['type']), fn ($query) => $query->where('task_type', $filters['type']))
             ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
             ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
             ->orderBy('due_at')
@@ -72,7 +79,8 @@ class TaskController extends Controller
 
         if ($validated['action'] === 'assign') {
             $task->fresh()->assignee->notify(new TaskAssignedNotification($task->fresh()));
-            $oneSignal->sendToUser($task->fresh()->assignee, 'Workflow assigned to you', $task->title, ['type' => 'workflow_task', 'task_id' => $task->id]);
+            $type = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
+            $oneSignal->sendToUser($task->fresh()->assignee, ucfirst($type).' assigned to you', $task->title, ['type' => $type.'_task', 'task_id' => $task->id]);
         }
 
         return response()->json(['message' => 'Task updated.', 'task' => $task->fresh()->load(['assignee', 'actions.user', 'actions.assignee'])]);

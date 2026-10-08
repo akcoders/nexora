@@ -15,10 +15,12 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.onNavigate,
+    required this.onOpenMenu,
     required this.refreshKey,
   });
 
   final ValueChanged<int> onNavigate;
+  final VoidCallback onOpenMenu;
   final int refreshKey;
 
   @override
@@ -163,6 +165,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: widget.onOpenMenu,
+          icon: const Icon(LucideIcons.menu),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -530,11 +536,11 @@ class _PriorityTask extends StatelessWidget {
                 const SizedBox(width: 8),
                 Badge(
                   label: Text(
-                    task['task_type'] == 'workflow' ? 'WORKFLOW' : 'JOB',
+                    task['task_type'] == 'ticket' ? 'TICKET' : 'WORKFLOW',
                   ),
-                  backgroundColor: task['task_type'] == 'workflow'
-                      ? AppColors.primary
-                      : AppColors.success,
+                  backgroundColor: task['task_type'] == 'ticket'
+                      ? AppColors.secondary
+                      : AppColors.primary,
                   textColor: Colors.white,
                 ),
               ],

@@ -24,6 +24,7 @@ class TaskAssignedNotification extends Notification
             'message' => $this->task->title,
             'task_id' => $this->task->id,
             'task_no' => $this->task->task_no,
+            'type' => $this->task->task_type.'_task',
             'icon' => 'clipboard-list',
         ];
     }

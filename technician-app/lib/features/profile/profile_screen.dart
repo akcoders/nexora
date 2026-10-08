@@ -7,13 +7,21 @@ import '../auth/auth_controller.dart';
 import '../hr/hr_self_service_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, required this.onOpenMenu});
+
+  final VoidCallback onOpenMenu;
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
     final user = auth.user ?? {};
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: onOpenMenu,
+          icon: const Icon(LucideIcons.menu),
+        ),
+        title: const Text('Profile'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
@@ -92,7 +100,7 @@ class ProfileScreen extends StatelessWidget {
                 const _ProfileTile(
                   icon: Icons.info_outline,
                   title: 'App version',
-                  trailing: '1.0.0',
+                  trailing: '1.3.0',
                 ),
               ],
             ),

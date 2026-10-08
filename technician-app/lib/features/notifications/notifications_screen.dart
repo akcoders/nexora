@@ -9,7 +9,9 @@ import '../../core/theme/app_theme.dart';
 import '../service_jobs/service_job_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, required this.onOpenMenu});
+
+  final VoidCallback onOpenMenu;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -97,6 +99,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
+      leading: IconButton(
+        onPressed: widget.onOpenMenu,
+        icon: const Icon(LucideIcons.menu),
+      ),
       title: const Text('Notifications'),
       actions: [
         TextButton(

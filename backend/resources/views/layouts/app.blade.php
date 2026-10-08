@@ -23,7 +23,9 @@
                     @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan
                     <a class="nx-nav-link {{ request()->routeIs('service-jobs.*') ? 'active' : '' }}" href="{{ route('service-jobs.index') }}"><i data-lucide="wrench"></i>Service Jobs</a>
                     <a class="nx-nav-link {{ request()->routeIs('attendance.*') || request()->routeIs('premises.*') ? 'active' : '' }}" href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance <span class="badge bg-warning text-dark ms-auto">{{ \App\Models\Attendance::where('status', 'pending')->count() }}</span></a>
-                    <a class="nx-nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}"><i data-lucide="list-checks"></i>Tasks & Workflow</a>
+                    @php $workType = request('type') ?: request()->route('task')?->task_type; @endphp
+                    <a class="nx-nav-link {{ request()->routeIs('tasks.*') && $workType !== 'ticket' ? 'active' : '' }}" href="{{ route('tasks.index', ['scope' => 'open', 'type' => 'workflow']) }}"><i data-lucide="git-branch"></i>Internal Workflow</a>
+                    <a class="nx-nav-link {{ request()->routeIs('tasks.*') && $workType === 'ticket' ? 'active' : '' }}" href="{{ route('tasks.index', ['scope' => 'open', 'type' => 'ticket']) }}"><i data-lucide="ticket-check"></i>Customer Tickets</a>
                     <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>
                     <div class="nx-nav-label">HR & People</div>
                     @can('employees.read')<a class="nx-nav-link {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i data-lucide="contact-round"></i>Employees</a>@endcan

@@ -9,6 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 
 class PayrollController extends Controller
@@ -19,6 +20,10 @@ class PayrollController extends Controller
         $selectedRun = $request->filled('run')
             ? PayrollRun::query()->with(['entries.user.employeeProfile', 'generator', 'approver'])->findOrFail($request->integer('run'))
             : PayrollRun::query()->with(['entries.user.employeeProfile', 'generator', 'approver'])->latest('payroll_month')->first();
+        $selectedRun?->entries->each(fn (PayrollEntry $entry) => $entry->setAttribute(
+            'salary_slip_url',
+            URL::temporarySignedRoute('salary-slips.download', now()->addHour(), ['payrollEntry' => $entry]),
+        ));
 
         return view('payroll.index', [
             'runs' => PayrollRun::query()->withCount('entries')->withSum('entries', 'net_amount')->latest('payroll_month')->get(),

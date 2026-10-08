@@ -12,6 +12,10 @@ class Task extends Model
 {
     use SoftDeletes;
 
+    public const TYPE_TICKET = 'ticket';
+
+    public const TYPE_WORKFLOW = 'workflow';
+
     protected $guarded = [];
 
     protected function casts(): array

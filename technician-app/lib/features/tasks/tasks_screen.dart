@@ -10,7 +10,14 @@ import '../auth/auth_controller.dart';
 import '../service_jobs/service_job_detail_screen.dart';
 
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
+  const TasksScreen({
+    super.key,
+    required this.initialTab,
+    required this.onOpenMenu,
+  });
+
+  final int initialTab;
+  final VoidCallback onOpenMenu;
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -18,8 +25,27 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController tabs = TabController(length: 3, vsync: this);
+  late final TabController tabs;
   int reload = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    tabs = TabController(
+      length: 4,
+      initialIndex: widget.initialTab,
+      vsync: this,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant TasksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab &&
+        tabs.index != widget.initialTab) {
+      tabs.animateTo(widget.initialTab);
+    }
+  }
 
   Future<List<dynamic>> load({
     String? status,
@@ -53,6 +79,7 @@ class _TasksScreenState extends State<TasksScreen>
   Future<List<dynamic>> loadClosedWork() async {
     final results = await Future.wait([
       load(status: 'closed', type: 'workflow'),
+      load(status: 'closed', type: 'ticket'),
       loadServiceJobs(completed: true),
     ]);
     return [
@@ -60,6 +87,9 @@ class _TasksScreenState extends State<TasksScreen>
         (item) => {...Map<String, dynamic>.from(item), '_kind': 'workflow'},
       ),
       ...results[1].map(
+        (item) => {...Map<String, dynamic>.from(item), '_kind': 'ticket'},
+      ),
+      ...results[2].map(
         (item) => {...Map<String, dynamic>.from(item), '_kind': 'service_job'},
       ),
     ];
@@ -77,6 +107,10 @@ class _TasksScreenState extends State<TasksScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: widget.onOpenMenu,
+          icon: const Icon(LucideIcons.menu),
+        ),
         title: const Text('My tasks'),
         actions: [
           IconButton(
@@ -93,6 +127,7 @@ class _TasksScreenState extends State<TasksScreen>
               text: 'Jobs',
             ),
             Tab(icon: Icon(LucideIcons.gitBranch, size: 17), text: 'Workflow'),
+            Tab(icon: Icon(LucideIcons.ticketCheck, size: 17), text: 'Tickets'),
             Tab(
               icon: Icon(LucideIcons.circleCheckBig, size: 17),
               text: 'Closed',
@@ -115,6 +150,13 @@ class _TasksScreenState extends State<TasksScreen>
             future: load(scope: 'open', type: 'workflow'),
             title: 'My workflow',
             subtitle: 'All active hand-offs, not only pending tasks',
+            onRefresh: refresh,
+          ),
+          _TaskList(
+            key: ValueKey('tickets$reload'),
+            future: load(scope: 'open', type: 'ticket'),
+            title: 'Customer tickets',
+            subtitle: 'Customer-linked tickets assigned to you',
             onRefresh: refresh,
           ),
           _ClosedWorkList(
@@ -272,7 +314,7 @@ class _ClosedWorkList extends StatelessWidget {
         return _Empty(
           icon: LucideIcons.circleCheckBig,
           title: 'No closed work',
-          subtitle: 'Completed jobs and workflows appear here.',
+          subtitle: 'Completed jobs, workflows and tickets appear here.',
           onRefresh: onRefresh,
         );
       }
@@ -469,15 +511,15 @@ class _TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final priority = task['priority']?.toString() ?? 'normal';
-    final taskType = task['task_type']?.toString() ?? 'job';
+    final taskType = task['task_type']?.toString() ?? 'workflow';
     final priorityColor = priority == 'very_high'
         ? AppColors.danger
         : priority == 'high'
         ? AppColors.warning
         : AppColors.secondary;
-    final typeColor = taskType == 'workflow'
-        ? AppColors.primary
-        : AppColors.success;
+    final typeColor = taskType == 'ticket'
+        ? AppColors.secondary
+        : AppColors.primary;
     final isClosed = task['status']?.toString() == 'closed';
     final actionsCount = (task['actions_count'] as num?)?.toInt() ?? 0;
     return Card(
@@ -510,7 +552,7 @@ class _TaskCard extends StatelessWidget {
                       runSpacing: 6,
                       children: [
                         _Pill(
-                          text: taskType == 'workflow' ? 'WORKFLOW' : 'JOB',
+                          text: taskType == 'ticket' ? 'TICKET' : 'WORKFLOW',
                           color: typeColor,
                         ),
                         _Pill(
@@ -688,6 +730,8 @@ class _TaskDetailsState extends State<_TaskDetails> {
       return;
     }
 
+    final isTicket = task?['task_type'] == 'ticket';
+    final workLabel = isTicket ? 'ticket' : 'workflow';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -695,11 +739,13 @@ class _TaskDetailsState extends State<_TaskDetails> {
           action == 'close' ? LucideIcons.circleCheckBig : LucideIcons.forward,
           color: action == 'close' ? AppColors.success : AppColors.primary,
         ),
-        title: Text(action == 'close' ? 'Close this task?' : 'Assign next?'),
+        title: Text(
+          action == 'close' ? 'Close this $workLabel?' : 'Assign next?',
+        ),
         content: Text(
           action == 'close'
-              ? 'This task will move out of your active workflow.'
-              : 'This task will stay in Workflow and move to the selected assignee.',
+              ? 'This $workLabel will move out of your active queue.'
+              : 'This $workLabel will stay active and move to the selected assignee.',
         ),
         actions: [
           TextButton(
@@ -708,7 +754,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(action == 'close' ? 'Close task' : 'Assign'),
+            child: Text(action == 'close' ? 'Close $workLabel' : 'Assign'),
           ),
         ],
       ),
@@ -759,7 +805,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
     final canAct =
         task?['status'] != 'closed' && task?['assigned_to'] == currentUserId;
     final actions = List<dynamic>.from(task?['actions'] ?? []);
-    final type = task?['task_type']?.toString() ?? 'job';
+    final type = task?['task_type']?.toString() ?? 'workflow';
 
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return ListView(
@@ -769,8 +815,8 @@ class _TaskDetailsState extends State<_TaskDetails> {
         Row(
           children: [
             _Pill(
-              text: type == 'workflow' ? 'WORKFLOW' : 'JOB',
-              color: type == 'workflow' ? AppColors.primary : AppColors.success,
+              text: type == 'ticket' ? 'TICKET' : 'WORKFLOW',
+              color: type == 'ticket' ? AppColors.secondary : AppColors.primary,
             ),
             const SizedBox(width: 8),
             _Pill(

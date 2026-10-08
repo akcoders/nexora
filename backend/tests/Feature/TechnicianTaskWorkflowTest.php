@@ -21,9 +21,9 @@ class TechnicianTaskWorkflowTest extends TestCase
         Setting::updateOrCreate(['key' => 'require_attendance_for_tasks'], ['value' => '0']);
         Sanctum::actingAs($technician);
 
-        $this->getJson('/api/v1/tasks?status=pending&type=job')
+        $this->getJson('/api/v1/tasks?status=pending&type=ticket')
             ->assertOk()
-            ->assertJsonPath('data.0.task_type', 'job');
+            ->assertJsonPath('data.0.task_type', 'ticket');
 
         $this->getJson('/api/v1/tasks/'.$task->id)
             ->assertOk()

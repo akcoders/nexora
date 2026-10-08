@@ -25,7 +25,9 @@ class DemoDataManagementTest extends TestCase
         $this->assertSame(10, DemoDataRecord::where('model_type', Customer::class)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', CustomerGroup::class)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', ServiceJob::class)->count());
-        $this->assertSame(10, DemoDataRecord::where('model_type', Task::class)->count());
+        $this->assertSame(20, DemoDataRecord::where('model_type', Task::class)->count());
+        $this->assertSame(10, Task::where('task_type', Task::TYPE_WORKFLOW)->count());
+        $this->assertSame(10, Task::where('task_type', Task::TYPE_TICKET)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', Attendance::class)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', User::class)->count());
 
