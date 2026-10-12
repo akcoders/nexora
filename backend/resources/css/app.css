@@ -80,7 +80,7 @@ a { text-decoration: none; }
 .nx-step.error { color: #b91c1c; }
 .nx-step.error .nx-step-number { color: #b91c1c; border-color: #ef4444; background: #fff1f2; box-shadow: 0 0 0 4px #fee2e2; }
 .nx-step.error.active .nx-step-number { color: #fff; background: #dc2626; }
-.nx-step-pane { display: none; animation: nxFade .28s ease both; }
+.nx-step-pane { display: none; animation: nxFade .28s ease backwards; }
 .nx-step-pane.active { display: block; }
 .nx-section-title { font-size: 17px; font-weight: 700; }
 .nx-choice input { position: absolute; opacity: 0; }

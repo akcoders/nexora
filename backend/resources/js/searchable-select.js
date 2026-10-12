@@ -162,11 +162,28 @@ function build(select) {
         const rect = toggle.getBoundingClientRect();
         const below = window.innerHeight - rect.bottom;
         const up = below < 280 && rect.top > below;
-        panel.style.left = `${rect.left}px`;
+        let left = rect.left;
+        let top = rect.bottom + 4;
+        let bottom = window.innerHeight - rect.top + 4;
+        const place = () => {
+            panel.style.left = `${left}px`;
+            panel.style.top = up ? '' : `${top}px`;
+            panel.style.bottom = up ? `${bottom}px` : '';
+        };
         panel.style.width = `${rect.width}px`;
-        panel.style.top = up ? '' : `${rect.bottom + 4}px`;
-        panel.style.bottom = up ? `${window.innerHeight - rect.top + 4}px` : '';
         panel.classList.toggle('nx-combo-up', up);
+        place();
+
+        // An ancestor with a transform/filter (e.g. an animated step pane) becomes the
+        // containing block for position:fixed, so correct by the offset actually measured.
+        const actual = panel.getBoundingClientRect();
+        const dx = actual.left - rect.left;
+        const dy = up ? actual.bottom - (rect.top - 4) : actual.top - (rect.bottom + 4);
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+            left -= dx;
+            if (up) bottom += dy; else top -= dy;
+            place();
+        }
     }
 
     function onOutside(e) {
@@ -179,12 +196,13 @@ function build(select) {
         wrap.classList.add('open');
         toggle.setAttribute('aria-expanded', 'true');
         search.value = seed;
-        position();
         render();
+        position();
         search.focus({ preventScroll: true });
         document.addEventListener('pointerdown', onOutside, true);
         window.addEventListener('scroll', position, true);
         window.addEventListener('resize', position);
+        document.addEventListener('animationend', position, true);
     }
 
     function close(refocus = true) {
@@ -195,6 +213,7 @@ function build(select) {
         document.removeEventListener('pointerdown', onOutside, true);
         window.removeEventListener('scroll', position, true);
         window.removeEventListener('resize', position);
+        document.removeEventListener('animationend', position, true);
         if (refocus) toggle.focus({ preventScroll: true });
     }
 
