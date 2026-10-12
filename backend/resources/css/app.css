@@ -232,3 +232,25 @@ a { text-decoration: none; }
     .nx-unit-specs { grid-template-columns: 1fr; }
     .nx-floor-plan { min-height: 220px; }
 }
+
+/* Client-side validation (resources/js/validation.js) */
+.nx-error { margin-top: 5px; color: #dc2626; font-size: 12.5px; line-height: 1.4; font-weight: 500; }
+.nx-error::before { content: '\26A0\FE0E'; margin-right: 5px; }
+.nx-error-summary { border: 0; border-left: 4px solid #dc2626; border-radius: 12px; background: #fef2f2; color: #7f1d1d; }
+.nx-error-summary a { color: #b91c1c; text-decoration: underline; }
+.form-control.is-invalid, .form-select.is-invalid, textarea.is-invalid { background-image: none; padding-right: .75rem; }
+.form-control.is-valid, .form-select.is-valid { border-color: #86efac; background-image: none; padding-right: .75rem; box-shadow: none; }
+.form-check-input.is-invalid { border-color: #dc2626; }
+.form-check-input.is-invalid ~ .form-check-label, .form-check-input.is-invalid + span { color: #b91c1c; }
+input.is-invalid:not(.form-control):not(.form-check-input):not([type=checkbox]):not([type=radio]), select.is-invalid:not(.form-select), textarea.is-invalid:not(.form-control) { border-color: #dc2626; box-shadow: 0 0 0 .16rem rgba(220,38,38,.08); }
+.nx-choice input.is-invalid + span { border-color: #f87171; background: #fff7f7; }
+.nx-counter { margin-top: 4px; text-align: right; color: var(--nx-muted); font-size: 11.5px; }
+.nx-counter-full { color: #dc2626; font-weight: 600; }
+.nx-strength { display: flex; align-items: center; gap: 10px; margin-top: 7px; font-size: 12px; color: var(--nx-muted); }
+.nx-strength-bar { display: flex; gap: 4px; flex: 1 1 auto; max-width: 180px; }
+.nx-strength-bar i { height: 4px; flex: 1; border-radius: 4px; background: #e2e8f0; transition: background-color .2s ease; }
+.nx-strength[data-score="0"] .nx-strength-bar i:nth-child(-n+1), .nx-strength[data-score="1"] .nx-strength-bar i:nth-child(-n+1) { background: #ef4444; }
+.nx-strength[data-score="2"] .nx-strength-bar i:nth-child(-n+2) { background: #f59e0b; }
+.nx-strength[data-score="3"] .nx-strength-bar i:nth-child(-n+3) { background: #84cc16; }
+.nx-strength[data-score="4"] .nx-strength-bar i { background: #16a34a; }
+.nx-spinner { margin-right: .35rem; }

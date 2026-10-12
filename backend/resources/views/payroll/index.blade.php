@@ -11,7 +11,7 @@
                         @csrf
                         <label class="form-label fw-semibold">Generate monthly payroll</label>
                         <input type="month" class="form-control mb-2" name="month" value="{{ now()->subMonth()->format('Y-m') }}" required>
-                        <textarea class="form-control mb-2" name="notes" placeholder="Run notes"></textarea>
+                        <textarea class="form-control mb-2" name="notes" placeholder="Run notes" maxlength="2000"></textarea>
                         <button class="btn btn-primary w-100">Calculate payroll</button>
                     </form>
                 @endcan

@@ -6,6 +6,7 @@ import $ from 'jquery';
 import Swal from 'sweetalert2';
 import { createIcons, icons } from 'lucide';
 import ApexCharts from 'apexcharts';
+import './validation.js';
 
 window.Alpine = Alpine;
 window.bootstrap = bootstrap;
