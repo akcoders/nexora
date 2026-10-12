@@ -7,6 +7,7 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveType;
 use App\Models\Premises;
 use App\Models\User;
+use App\Services\IndiaLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -201,6 +202,9 @@ class EmployeeController extends Controller
             'remarks' => ['nullable', 'string', 'max:5000'],
             'documents' => ['nullable', 'array', 'max:20'],
             'documents.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:8192'],
+            ...IndiaLocations::optionalAddressRules('current_address.'),
+            ...IndiaLocations::optionalAddressRules('permanent_address.'),
+            ...IndiaLocations::optionalAddressRules('company_accommodation_address.'),
         ]);
     }
 
@@ -234,9 +238,9 @@ class EmployeeController extends Controller
             'languages' => $validated['languages'] ?? [],
             'identity_documents' => $validated['identity_documents'] ?? [],
             'personal_email' => $validated['personal_email'] ?? null,
-            'current_address' => $validated['current_address'] ?? [],
-            'permanent_address' => $validated['permanent_address'] ?? [],
-            'company_accommodation_address' => $validated['company_accommodation_address'] ?? [],
+            'current_address' => IndiaLocations::withCountry($validated['current_address'] ?? null),
+            'permanent_address' => IndiaLocations::withCountry($validated['permanent_address'] ?? null),
+            'company_accommodation_address' => IndiaLocations::withCountry($validated['company_accommodation_address'] ?? null),
             'emergency_family' => $validated['emergency_family'] ?? [],
             'date_of_joining' => $validated['date_of_joining'] ?? null,
             'employment_type' => $validated['employment_type'] ?? null,

@@ -6,7 +6,7 @@
     @php
         $openJobs = $customer->serviceJobs->whereNotIn('status', ['completed', 'cancelled'])->count();
         $unmappedEquipment = $customer->equipments->whereNull('customer_floor_plan_id');
-        $address = collect([$customer->address_line_1, $customer->address_line_2, $customer->area, $customer->city, $customer->state, $customer->pin_code])->filter()->join(', ');
+        $address = collect([$customer->address_line_1, $customer->address_line_2, $customer->area, $customer->city, $customer->district, $customer->state, $customer->pin_code])->filter()->join(', ');
     @endphp
 
     <a href="{{ route('customers.index') }}" class="small d-inline-flex align-items-center gap-1 mb-3"><i data-lucide="arrow-left" style="width:15px"></i>All customers</a>

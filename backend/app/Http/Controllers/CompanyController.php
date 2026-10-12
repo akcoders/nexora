@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Services\IndiaLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,6 +93,8 @@ class CompanyController extends Controller
             'sites.*.type' => ['nullable', Rule::in(['additional_place', 'warehouse', 'workshop', 'counter', 'office'])],
             'sites.*.address' => ['nullable', 'array'],
             'sites.*.contacts' => ['nullable', 'array'],
+            ...IndiaLocations::optionalAddressRules('address.'),
+            ...IndiaLocations::optionalAddressRules('sites.*.address.'),
         ]);
     }
 
@@ -111,7 +114,7 @@ class CompanyController extends Controller
             'status' => $validated['status'],
             'incorporation_date' => $validated['incorporation_date'] ?? null,
             'logo_path' => $request->file('logo')?->store('company/logo', 'public') ?? $company?->logo_path ?? 'images/brand/classic-logo.jpeg',
-            'address' => $validated['address'] ?? [],
+            'address' => IndiaLocations::withCountry($validated['address'] ?? null),
             'contacts' => $validated['contacts'] ?? [],
             'localization' => $validated['localization'] ?? [],
             'invoice_settings' => $validated['invoice_settings'] ?? [],
@@ -135,7 +138,7 @@ class CompanyController extends Controller
                 'code' => $site['code'],
                 'name' => $site['name'],
                 'type' => $site['type'] ?? 'additional_place',
-                'address' => $site['address'] ?? [],
+                'address' => IndiaLocations::withCountry($site['address'] ?? null),
                 'contacts' => $site['contacts'] ?? [],
                 'active' => true,
             ]);

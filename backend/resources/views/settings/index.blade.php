@@ -61,5 +61,17 @@
                 <div class="d-flex flex-wrap align-items-start gap-2 flex-shrink-0"><form method="POST" action="{{ route('settings.demo-data.store') }}" onsubmit="return confirm('Existing generated demo scenarios will be reset. Continue?')">@csrf<button class="btn btn-outline-primary"><i data-lucide="refresh-cw" style="width:17px"></i>Create / reset 10 demos</button></form><form method="POST" action="{{ route('settings.demo-data.destroy') }}" onsubmit="return confirm('Clear all generated demo records? Real records will not be touched.')">@csrf @method('DELETE')<button class="btn btn-outline-danger" @disabled($demoStats['scenarios'] === 0)><i data-lucide="trash-2" style="width:17px"></i>Clear demo data</button></form></div>
             </div>
         </section>
+        <section class="nx-card p-4 mt-4" id="system-maintenance">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                <div class="d-flex gap-3"><span class="nx-metric-icon" style="--metric:#0f766e;--metric-soft:#ccfbf1"><i data-lucide="server-cog"></i></span><div><h2 class="h6 fw-bold mb-1">System maintenance</h2><div class="small text-secondary">Run pending database migrations, seed master data (states, districts, roles, settings) and clear + rebuild the config, route, view and PHP caches. Use after every deployment.</div></div></div>
+                <div class="d-flex flex-wrap align-items-start gap-2 flex-shrink-0">
+                    @foreach(['migrate' => ['database', 'Run migrations', 'Run all pending database migrations now?'], 'seed' => ['sprout', 'Seed data', 'Run the database seeders now? Existing records are kept.'], 'optimize' => ['zap', 'Clear & rebuild cache', 'Clear and rebuild the application caches now?'], 'all' => ['rocket', 'Run all', 'Run migrations, seed data and rebuild caches now?']] as $task => [$icon, $label, $question])
+                        <form method="POST" action="{{ route('settings.maintenance', $task) }}" onsubmit="return confirm(@js($question))">@csrf<button class="btn {{ $task === 'all' ? 'btn-primary' : 'btn-outline-secondary' }}"><i data-lucide="{{ $icon }}" style="width:17px"></i>{{ $label }}</button></form>
+                    @endforeach
+                </div>
+            </div>
+            @if(session('maintenance_error'))<div class="alert alert-danger border-0 mt-3 mb-0">{{ session('maintenance_error') }}</div>@endif
+            @if(session('maintenance_output'))<pre class="small bg-light border rounded-3 p-3 mt-3 mb-0" style="max-height:320px;white-space:pre-wrap">{{ session('maintenance_output') }}</pre>@endif
+        </section>
     @endcan
 </x-app-layout>

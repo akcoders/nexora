@@ -10,6 +10,9 @@ use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ServiceMasterOption;
 use App\Models\User;
+use App\Rules\IndianDistrict;
+use App\Rules\IndianState;
+use App\Services\IndiaLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -106,6 +109,7 @@ class CustomerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->forceIndianCountry($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'customer_group_id' => ['required', Rule::exists('customer_groups', 'id')->where('status', 'active')],
@@ -122,10 +126,10 @@ class CustomerController extends Controller
             'landmark' => ['nullable', 'string', 'max:255'],
             'area' => ['nullable', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:120'],
-            'district' => ['nullable', 'string', 'max:120'],
-            'state' => ['required', 'string', 'max:120'],
+            'state' => ['required', 'string', 'max:120', new IndianState],
+            'district' => ['required', 'string', 'max:120', new IndianDistrict],
             'pin_code' => ['required', 'regex:/^[0-9]{6}$/'],
-            'country' => ['required', 'string', 'max:120'],
+            'country' => ['required', Rule::in([IndiaLocations::COUNTRY])],
             'email_1' => ['required_without:email_2', 'nullable', 'email'],
             'email_2' => ['nullable', 'email'],
             'gstin' => ['nullable', 'regex:/^[0-9A-Za-z]{15}$/'],
@@ -153,10 +157,10 @@ class CustomerController extends Controller
             'branches.*.landmark' => ['nullable', 'string', 'max:255'],
             'branches.*.area' => ['nullable', 'string', 'max:255'],
             'branches.*.city' => ['required_with:branches', 'string', 'max:120'],
-            'branches.*.district' => ['nullable', 'string', 'max:120'],
-            'branches.*.state' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.state' => ['required_with:branches', 'string', 'max:120', new IndianState],
+            'branches.*.district' => ['required_with:branches', 'string', 'max:120', new IndianDistrict],
             'branches.*.pin_code' => ['required_with:branches', 'regex:/^[0-9]{6}$/'],
-            'branches.*.country' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.country' => ['required_with:branches', Rule::in([IndiaLocations::COUNTRY])],
             'branches.*.contact_no_1' => ['nullable', 'string', 'max:20'],
             'branches.*.contact_no_2' => ['nullable', 'string', 'max:20'],
             'branches.*.email_1' => ['nullable', 'email'],
@@ -268,5 +272,17 @@ class CustomerController extends Controller
         });
 
         return redirect()->route('customers.index')->with('success', "{$customer->name} created successfully.");
+    }
+
+    /** Addresses are India-only, so the country is always stored as India whatever was posted. */
+    private function forceIndianCountry(Request $request): void
+    {
+        $request->merge(['country' => IndiaLocations::COUNTRY]);
+        if (is_array($branches = $request->input('branches'))) {
+            $request->merge(['branches' => array_map(
+                fn (mixed $branch): mixed => is_array($branch) ? ['country' => IndiaLocations::COUNTRY] + $branch : $branch,
+                $branches,
+            )]);
+        }
     }
 }

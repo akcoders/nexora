@@ -7,6 +7,8 @@ import Swal from 'sweetalert2';
 import { createIcons, icons } from 'lucide';
 import ApexCharts from 'apexcharts';
 import './validation.js';
+import './searchable-select.js';
+import './india-address.js';
 
 window.Alpine = Alpine;
 window.bootstrap = bootstrap;
