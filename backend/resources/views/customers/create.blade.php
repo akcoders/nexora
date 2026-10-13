@@ -12,7 +12,7 @@
         $motherTongues = ['Hindi','English','Marathi','Gujarati','Punjabi','Bengali','Tamil','Telugu','Kannada','Malayalam','Odia','Urdu','Other'];
     @endphp
 
-    <form id="customerWizard" action="{{ route('customers.store') }}" method="POST" enctype="multipart/form-data" novalidate>
+    <form id="customerWizard" class="nx-customer-form" action="{{ route('customers.store') }}" method="POST" enctype="multipart/form-data" novalidate>
         @csrf
         <input type="hidden" id="draftUuid" value="">
 
@@ -23,6 +23,12 @@
             </div>
             <button type="button" class="btn btn-light border" id="saveDraft"><i data-lucide="save" style="width:17px"></i>Save draft</button>
         </div>
+
+        <section class="nx-form-hero nx-customer-hero-form mb-4">
+            <div class="nx-form-hero-icon"><i data-lucide="building-2"></i></div>
+            <div class="min-w-0"><span class="nx-form-hero-kicker">CUSTOMER RELATIONSHIPS</span><h2>Let's make a great first impression</h2><p>A little detail goes a long way. Add your customer information step by step.</p></div>
+            <span class="nx-form-hero-badge"><i data-lucide="sparkles"></i> Easy setup</span>
+        </section>
 
         @if($errors->any())
             <div class="alert alert-danger nx-validation-summary" role="alert">

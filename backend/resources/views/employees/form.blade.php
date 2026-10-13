@@ -9,7 +9,12 @@
         $langs = old('languages', $profile?->languages ?? []);
     @endphp
     @if($errors->any())<div class="alert alert-danger"><strong>Please fix the highlighted fields.</strong><div class="small">The first step with an error opens automatically.</div></div>@endif
-    <form id="employeeWizard" method="POST" enctype="multipart/form-data" action="{{ $employee ? route('employees.update',$employee) : route('employees.store') }}" novalidate>@csrf @if($employee)@method('PUT')@endif
+    <form id="employeeWizard" class="nx-employee-form" method="POST" enctype="multipart/form-data" action="{{ $employee ? route('employees.update',$employee) : route('employees.store') }}" novalidate>@csrf @if($employee)@method('PUT')@endif
+        <section class="nx-form-hero nx-employee-hero mb-4">
+            <div class="nx-form-hero-icon"><i data-lucide="users-round"></i></div>
+            <div class="min-w-0"><span class="nx-form-hero-kicker">PEOPLE & CULTURE</span><h2>{{ $employee ? 'Every detail helps us support your team' : 'Let\'s welcome someone wonderful to the team' }}</h2><p>Take it one step at a time. Your progress is organized into simple sections.</p></div>
+            <span class="nx-form-hero-badge"><i data-lucide="heart-handshake"></i> People first</span>
+        </section>
         <section class="nx-card p-3 p-lg-4 mb-4"><div class="nx-stepper">@foreach($sections as $i=>$label)<button class="nx-step {{ $i===0?'active':'' }}" type="button" data-step="{{ $i+1 }}"><span class="nx-step-number">{{ $i+1 }}</span><span>{{ $label }}</span></button>@endforeach</div></section>
         <section class="nx-card p-3 p-lg-4">
             <div class="nx-step-pane active" data-pane="1"><h2 class="nx-section-title">Core identity</h2><p class="small text-secondary">Personal identity and language details from Employee Master.</p><div class="row g-3">
