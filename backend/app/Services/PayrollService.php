@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\EmployeeProfile;
+use App\Models\DemoDataRecord;
 use App\Models\Holiday;
 use App\Models\PayrollRun;
 use App\Models\User;
@@ -35,6 +36,9 @@ class PayrollService
 
             EmployeeProfile::query()
                 ->whereHas('user', fn ($query) => $query->where('status', 'active'))
+                ->whereNotIn('user_id', DemoDataRecord::query()
+                    ->where('model_type', User::class)
+                    ->select('model_id'))
                 ->with([
                     'user.attendances' => fn ($query) => $query->whereBetween('attendance_date', [$start, $end]),
                     'user.leaveRequests' => fn ($query) => $query->where('status', 'approved')->where('from_date', '<=', $end)->where('to_date', '>=', $start)->with('leaveType'),

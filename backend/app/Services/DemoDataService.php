@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\DemoDataRecord;
+use App\Models\PayrollEntry;
 use App\Models\ServiceJob;
 use App\Models\Task;
 use App\Models\User;
@@ -35,6 +36,10 @@ class DemoDataService
                 $ids = DemoDataRecord::where('model_type', $modelClass)->pluck('model_id');
                 if ($ids->isEmpty()) {
                     continue;
+                }
+
+                if ($modelClass === User::class) {
+                    PayrollEntry::query()->whereIn('user_id', $ids)->delete();
                 }
 
                 $query = in_array(SoftDeletes::class, class_uses_recursive($modelClass), true)

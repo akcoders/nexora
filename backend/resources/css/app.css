@@ -200,6 +200,79 @@ a { text-decoration: none; }
 .nx-group-badge-sm { min-height: 22px; padding: 3px 7px; border-radius: 7px; font-size: 9px; }
 .nx-group-badge-sm svg { width: 11px; height: 11px; }
 .nx-demo-data-card { background: radial-gradient(circle at 92% 15%, rgba(124,58,237,.1), transparent 27%), #fff; border-color: #ddd6fe; }
+.nx-role-page { max-width: 1800px; margin-inline: auto; }
+.nx-role-intro { padding: 22px 24px; background: radial-gradient(circle at 96% 0%, rgba(59,130,246,.09), transparent 25%), #fff; }
+.nx-role-intro-icon { width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center; color: #1d4ed8; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 15px; }
+.nx-role-intro-icon svg { width: 22px; height: 22px; }
+.nx-role-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.nx-role-summary > div { min-width: 155px; padding: 10px 14px; display: grid; gap: 2px; background: rgba(248,250,252,.9); border: 1px solid #edf2f7; border-radius: 12px; }
+.nx-role-summary strong { color: #0f172a; font-size: 17px; line-height: 1.2; }
+.nx-role-summary span { color: #64748b; font-size: 11px; font-weight: 600; }
+.nx-role-matrix-card { overflow: hidden; }
+.nx-role-matrix-heading { padding: 20px 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e8edf4; }
+.nx-role-edit-hint { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 11px; font-weight: 600; }
+.nx-role-edit-hint svg { width: 15px; height: 15px; color: #2563eb; }
+.nx-permission-scroll { max-height: min(72vh, 820px); min-height: 360px; overflow: auto; overscroll-behavior: contain; scrollbar-color: #cbd5e1 #f8fafc; scrollbar-width: thin; }
+.nx-permission-table { width: 100%; min-width: 700px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.nx-permission-table th, .nx-permission-table td { border-bottom: 1px solid #edf1f6; }
+.nx-permission-table thead th { position: sticky; top: 0; z-index: 4; padding: 12px; background: #fff; vertical-align: top; }
+.nx-permission-table thead .nx-permission-label-column { position: sticky; left: 0; z-index: 6; width: 260px; min-width: 260px; padding: 19px 22px; text-align: left; vertical-align: bottom; background: #f8fafc; border-right: 1px solid #e8edf4; }
+.nx-table-eyebrow { display: block; color: #94a3b8; font-size: 9px; font-weight: 800; line-height: 1.4; letter-spacing: .09em; text-transform: uppercase; }
+.nx-table-title { display: block; margin-top: 4px; color: #334155; font-size: 13px; font-weight: 700; }
+.nx-role-column { min-width: 200px; }
+.nx-role-column-card { min-height: 116px; padding: 13px; display: flex; flex-direction: column; gap: 13px; background: #fff; border: 1px solid #e6ebf2; border-radius: 13px; box-shadow: 0 4px 12px rgba(15,23,42,.035); }
+.nx-role-column-icon { width: 31px; height: 31px; flex: 0 0 auto; display: grid; place-items: center; color: #1d4ed8; background: #eff6ff; border-radius: 9px; }
+.nx-role-column-icon svg { width: 16px; height: 16px; }
+.nx-role-name { display: block; overflow: hidden; color: #172554; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.nx-role-name-input { width: 100%; min-width: 0; padding: 2px 5px; color: #172554; background: #fff; border: 1px solid transparent; border-radius: 6px; font-size: 14px; font-weight: 700; }
+.nx-role-name-input:hover, .nx-role-name-input:focus { border-color: #bfdbfe; outline: 0; }
+.nx-role-column-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #64748b; font-size: 10px; white-space: nowrap; }
+.nx-role-column-footer strong { color: #1e293b; font-size: 12px; }
+.nx-role-column-footer .btn { min-height: 30px; padding: 4px 8px; border-radius: 8px; font-size: 10px; }
+.nx-role-locked { display: inline-flex; align-items: center; gap: 4px; color: #15803d; font-size: 9px; font-weight: 700; }
+.nx-role-locked svg { width: 13px; height: 13px; }
+.nx-permission-table tbody th { position: sticky; left: 0; z-index: 1; width: 260px; min-width: 260px; padding: 10px 22px; background: #fff; border-right: 1px solid #edf1f6; text-align: left; }
+.nx-permission-table tbody td { width: 200px; min-width: 200px; padding: 7px 12px; background: #fff; text-align: center; }
+.nx-permission-group-row th, .nx-permission-group-row td { background: #f1f6ff !important; }
+.nx-permission-group-row th { color: #1e3a8a; font-size: 11px; font-weight: 800; letter-spacing: .025em; }
+.nx-permission-group-icon { width: 21px; height: 21px; margin-right: 7px; display: inline-grid; place-items: center; vertical-align: middle; color: #2563eb; background: #dbeafe; border-radius: 6px; }
+.nx-permission-group-icon svg { width: 13px; height: 13px; }
+.nx-module-count { min-width: 20px; margin-left: 6px; padding: 2px 6px; display: inline-block; color: #475569; background: #fff; border: 1px solid #dbeafe; border-radius: 999px; font-size: 9px; text-align: center; }
+.nx-permission-row:hover th, .nx-permission-row:hover td { background: #f8fbff; }
+.nx-permission-name, .nx-permission-key { display: block; }
+.nx-permission-name { color: #334155; font-size: 11px; font-weight: 600; }
+.nx-permission-key { margin-top: 2px; color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; }
+.nx-permission-check-cell { min-width: 34px; min-height: 32px; display: inline-grid; place-items: center; cursor: pointer; }
+.nx-permission-checkbox { width: 17px; height: 17px; margin: 0 !important; float: none !important; cursor: pointer; }
+.nx-permission-checkbox:checked { background-color: #16a34a; border-color: #16a34a; }
+.nx-permission-checkbox:focus { box-shadow: 0 0 0 .2rem rgba(22,163,74,.15); }
+.nx-permission-checkbox:disabled { opacity: .72; cursor: not-allowed; }
+.nx-role-matrix-footer { min-height: 48px; padding: 10px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; color: #64748b; background: #fbfcfe; font-size: 10px; }
+.nx-role-matrix-footer > span { display: inline-flex; align-items: center; gap: 6px; }
+.nx-access-indicator { width: 8px; height: 8px; border-radius: 50%; }
+.nx-access-indicator.granted { background: #16a34a; }
+.nx-access-indicator.not-granted { background: #cbd5e1; }
+.nx-role-create-modal { border: 0; border-radius: 18px; box-shadow: 0 24px 70px rgba(15,23,42,.22); }
+.nx-role-create-modal .modal-header, .nx-role-create-modal .modal-footer { padding: 18px 22px; border-color: #edf1f6; }
+.nx-role-create-modal .modal-body { padding: 22px; }
+.nx-role-create-name { max-width: 560px; }
+.nx-role-create-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 12px; }
+.nx-role-create-group { min-width: 0; margin: 0; padding: 14px; border: 1px solid #e8edf4; border-radius: 12px; }
+.nx-role-create-group legend { width: auto; float: none; margin: 0 0 10px; padding: 0; color: #1e3a8a; font-size: 12px; font-weight: 700; }
+.nx-role-create-permissions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 10px; }
+.nx-role-create-permission { min-width: 0; margin: 0; display: flex; align-items: flex-start; gap: 6px; }
+.nx-role-create-permission .form-check-input { float: none; flex: 0 0 auto; margin: 2px 0 0; }
+.nx-role-create-permission .form-check-label { color: #475569; font-size: 10px; }
+@media (max-width: 767.98px) {
+    .nx-role-intro { padding: 18px; }
+    .nx-role-summary > div { min-width: 125px; flex: 1; }
+    .nx-permission-scroll { max-height: 72vh; }
+    .nx-permission-table thead .nx-permission-label-column, .nx-permission-table tbody th { width: 210px; min-width: 210px; padding-inline: 14px; }
+    .nx-role-column { min-width: 175px; }
+    .nx-permission-table tbody td { min-width: 175px; }
+    .nx-role-column-card { min-height: 108px; padding: 10px; }
+    .nx-role-matrix-footer { padding-inline: 14px; gap: 10px; }
+}
 @media (max-width: 991.98px) {
     .nx-sidebar { transform: translateX(-100%); }
     .nx-sidebar.open { transform: none; }

@@ -39,6 +39,9 @@ class HrManagementTest extends TestCase
         $this->actingAs($admin)->post(route('payroll.generate'), ['month' => $month])->assertRedirect();
 
         $this->assertDatabaseHas('payroll_runs', ['payroll_month' => $month, 'status' => 'draft']);
-        $this->assertDatabaseCount('payroll_entries', 12);
+        $this->assertDatabaseCount('payroll_entries', 2);
+        $this->assertDatabaseMissing('payroll_entries', [
+            'user_id' => User::where('email', 'demo.tech01@nexora.test')->value('id'),
+        ]);
     }
 }
