@@ -3,7 +3,7 @@
     <x-slot name="pageTitle">System settings</x-slot>
     <x-slot name="breadcrumb">Administration / Settings</x-slot>
 
-    <form method="POST" action="{{ route('settings.update') }}">
+    <form method="POST" action="{{ route('settings.update') }}" class="nx-form-theme-sky">
         @csrf
         @method('PUT')
         <div class="row g-4">

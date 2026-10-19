@@ -79,14 +79,18 @@ class HrSelfServiceController extends Controller
         if ($overlaps) {
             throw ValidationException::withMessages(['from_date' => 'These dates overlap an existing leave request.']);
         }
-        $holidayDates = Holiday::query()->whereBetween('holiday_date', [$from, $to])->pluck('holiday_date')->map->format('Y-m-d')->all();
+        $holidayDates = Holiday::query()->whereBetween('holiday_date', [$from, $to])->where('optional', false)->pluck('holiday_date')->map->format('Y-m-d')->all();
         $totalDays = collect(CarbonPeriod::create($from, $to))->filter(fn ($date): bool => ! $date->isSunday() && ! in_array($date->format('Y-m-d'), $holidayDates, true))->count();
         if ($totalDays === 0) {
             throw ValidationException::withMessages(['from_date' => 'Selected period has no working days.']);
         }
 
         $leaveRequest = DB::transaction(function () use ($request, $validated, $from, $leaveType, $totalDays): LeaveRequest {
-            $balance = LeaveBalance::query()->where('user_id', $request->user()->id)->where('leave_type_id', $leaveType->id)->where('year', $from->year)->lockForUpdate()->firstOrFail();
+            $balance = LeaveBalance::query()->firstOrCreate(
+                ['user_id' => $request->user()->id, 'leave_type_id' => $leaveType->id, 'year' => $from->year],
+                ['allocated' => $leaveType->annual_quota],
+            );
+            $balance = LeaveBalance::query()->whereKey($balance->id)->lockForUpdate()->firstOrFail();
             $available = (float) $balance->allocated - (float) $balance->used - (float) $balance->pending;
             if ($available < $totalDays) {
                 throw ValidationException::withMessages(['to_date' => 'Insufficient leave balance.']);

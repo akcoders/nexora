@@ -29,6 +29,8 @@ class DemoDataService
 
     public function clear(): int
     {
+        $this->ensureNoLiveReferences();
+
         return DB::transaction(function (): int {
             $deleted = 0;
 
@@ -67,5 +69,30 @@ class DemoDataService
             'tasks' => DemoDataRecord::where('model_type', Task::class)->count(),
             'technicians' => DemoDataRecord::where('model_type', User::class)->count(),
         ];
+    }
+
+    /**
+     * Demo technicians and customers can be picked in normal dropdowns. Refuse to wipe them while
+     * real (non-demo) service jobs or tasks still point at them, instead of failing mid-transaction.
+     */
+    private function ensureNoLiveReferences(): void
+    {
+        $demoUserIds = DemoDataRecord::where('model_type', User::class)->pluck('model_id');
+        $demoCustomerIds = DemoDataRecord::where('model_type', Customer::class)->pluck('model_id');
+        $demoJobIds = DemoDataRecord::where('model_type', ServiceJob::class)->pluck('model_id');
+        $demoTaskIds = DemoDataRecord::where('model_type', Task::class)->pluck('model_id');
+
+        $liveJobs = ServiceJob::query()->whereNotIn('id', $demoJobIds)
+            ->where(fn ($query) => $query->whereIn('assigned_to', $demoUserIds)->orWhereIn('customer_id', $demoCustomerIds))
+            ->count();
+        $liveTasks = Task::query()->whereNotIn('id', $demoTaskIds)
+            ->where(fn ($query) => $query->whereIn('assigned_to', $demoUserIds)->orWhereIn('customer_id', $demoCustomerIds))
+            ->count();
+
+        abort_if($liveJobs + $liveTasks > 0, 422, sprintf(
+            'Demo data is still referenced by %d live service job(s) and %d live task(s). Reassign them to a real technician/customer before clearing demo data.',
+            $liveJobs,
+            $liveTasks,
+        ));
     }
 }

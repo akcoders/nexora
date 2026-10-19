@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
+import '../../core/i18n/t.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -90,7 +91,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                   const SizedBox(height: 28),
                   Text(
-                    'CLASSIC',
+                    'NEXORA',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
@@ -99,7 +100,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ).animate().fadeIn(delay: 250.ms).slideY(begin: .35),
                   const SizedBox(height: 8),
                   Text(
-                    'THE ART OF COOLING',
+                    'FIELD SERVICE',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: Colors.white70,
                       letterSpacing: 1.8,
@@ -121,7 +122,7 @@ class _SplashScreenState extends State<SplashScreen> {
               left: 0,
               right: 0,
               bottom: 36,
-              child: Text(
+              child: T(
                 'Reliable service, connected teams',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white60, fontSize: 12),

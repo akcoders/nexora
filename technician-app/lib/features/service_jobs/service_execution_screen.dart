@@ -12,6 +12,7 @@ import '../../core/theme/app_theme.dart';
 import 'inspection_screen.dart';
 import 'service_job_detail_screen.dart';
 import 'signature_capture.dart';
+import '../../core/i18n/t.dart';
 
 class ServiceExecutionScreen extends StatefulWidget {
   const ServiceExecutionScreen({
@@ -69,7 +70,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                 padding: EdgeInsets.fromLTRB(18, 0, 18, 10),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
+                  child: T(
                     'Add work performed',
                     style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
                   ),
@@ -124,7 +125,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add material used'),
+          title: const T('Add material used'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -138,7 +139,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                   items: [
                     const DropdownMenuItem<int?>(
                       value: null,
-                      child: Text('Other / non-inventory material'),
+                      child: T('Other / non-inventory material'),
                     ),
                     ...products.map(
                       (raw) => DropdownMenuItem<int?>(
@@ -228,7 +229,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const T('Cancel'),
             ),
             FilledButton(
               onPressed: () {
@@ -246,7 +247,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                       : remark.text.trim(),
                 });
               },
-              child: const Text('Add'),
+              child: const T('Add'),
             ),
           ],
         ),
@@ -320,7 +321,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
     final signer = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Customer name'),
+        title: const T('Customer name'),
         content: TextField(
           controller: name,
           autofocus: true,
@@ -330,11 +331,11 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, name.text.trim()),
-            child: const Text('Continue'),
+            child: const T('Continue'),
           ),
         ],
       ),
@@ -420,7 +421,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perform service'),
+        title: const T('Perform service'),
         actions: [
           IconButton(
             onPressed: submitting ? null : load,
@@ -495,7 +496,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                   child: OutlinedButton.icon(
                     onPressed: submitting ? null : () => capturePhoto('during'),
                     icon: const Icon(LucideIcons.camera, size: 17),
-                    label: const Text('During'),
+                    label: const T('During'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -503,7 +504,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                   child: OutlinedButton.icon(
                     onPressed: submitting ? null : () => capturePhoto('after'),
                     icon: const Icon(LucideIcons.camera, size: 17),
-                    label: const Text('After'),
+                    label: const T('After'),
                   ),
                 ),
               ],

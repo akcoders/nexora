@@ -13,6 +13,7 @@ class ProductController extends Controller
 {
     public function storeCategory(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('products.create'), 403);
         ProductCategory::create($request->validate(['name' => ['required', 'string', 'max:255', 'unique:product_categories,name']]));
 
         return back()->with('success', 'Product category created.');
@@ -36,6 +37,7 @@ class ProductController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('products.create'), 403);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'product_category_id' => ['nullable', 'exists:product_categories,id'],
@@ -55,8 +57,9 @@ class ProductController extends Controller
         return back()->with('success', 'Product created successfully.');
     }
 
-    public function destroy(Product $product): RedirectResponse
+    public function destroy(Request $request, Product $product): RedirectResponse
     {
+        abort_unless($request->user()->can('products.delete'), 403);
         $product->delete();
 
         return back()->with('success', 'Product removed.');

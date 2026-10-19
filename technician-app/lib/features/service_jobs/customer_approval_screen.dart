@@ -10,6 +10,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'service_job_detail_screen.dart';
 import 'signature_capture.dart';
+import '../../core/i18n/t.dart';
 
 class CustomerApprovalScreen extends StatefulWidget {
   const CustomerApprovalScreen({
@@ -95,11 +96,11 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Submit'),
+            child: const T('Submit'),
           ),
         ],
       ),
@@ -132,7 +133,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
     final money = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Customer approval')),
+      appBar: AppBar(title: const T('Customer approval')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
         children: [
@@ -145,7 +146,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
                   Row(
                     children: [
                       const Expanded(
-                        child: Text(
+                        child: T(
                           'Service estimate',
                           style: TextStyle(
                             fontSize: 18,
@@ -231,7 +232,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
                           ),
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
-                    title: const Text(
+                    title: const T(
                       'Customer reviewed the services, price and tax',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -299,7 +300,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
                           onPressed: submitting
                               ? null
                               : () => otherDecision('request_change'),
-                          child: const Text('Request changes'),
+                          child: const T('Request changes'),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -308,7 +309,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
                           onPressed: submitting
                               ? null
                               : () => otherDecision('decline'),
-                          child: const Text(
+                          child: const T(
                             'Decline',
                             style: TextStyle(color: AppColors.danger),
                           ),

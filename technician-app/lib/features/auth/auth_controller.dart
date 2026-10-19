@@ -2,15 +2,17 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/i18n/app_language.dart';
 import '../../core/network/api_client.dart';
 import '../../core/notifications/push_notification_service.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController(this.api, this.storage, this.push);
+  AuthController(this.api, this.storage, this.push, [this.language]);
 
   final ApiClient api;
   final FlutterSecureStorage storage;
   final PushNotificationService push;
+  final AppLanguageController? language;
   bool loading = false;
   bool authenticated = false;
   Map<String, dynamic>? user;
@@ -22,6 +24,7 @@ class AuthController extends ChangeNotifier {
       final response = await api.dio.get('auth/me');
       user = Map<String, dynamic>.from(response.data['user']);
       authenticated = true;
+      language?.syncFromUser(user);
       await push.identify(user?['id']);
     } catch (_) {
       await storage.delete(key: 'auth_token');
@@ -40,6 +43,7 @@ class AuthController extends ChangeNotifier {
       await storage.write(key: 'auth_token', value: response.data['token']);
       user = Map<String, dynamic>.from(response.data['user']);
       authenticated = true;
+      language?.syncFromUser(user);
       await push.identify(user?['id']);
       return null;
     } on DioException catch (error) {
@@ -60,6 +64,7 @@ class AuthController extends ChangeNotifier {
     } catch (_) {}
     await storage.delete(key: 'auth_token');
     await push.logout();
+    await language?.clear();
     authenticated = false;
     user = null;
     notifyListeners();

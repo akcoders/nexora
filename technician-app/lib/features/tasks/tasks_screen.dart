@@ -8,6 +8,7 @@ import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
 import '../service_jobs/service_job_detail_screen.dart';
+import '../../core/i18n/t.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({
@@ -111,7 +112,7 @@ class _TasksScreenState extends State<TasksScreen>
           onPressed: widget.onOpenMenu,
           icon: const Icon(LucideIcons.menu),
         ),
-        title: const Text('My tasks'),
+        title: const T('My tasks'),
         actions: [
           IconButton(
             onPressed: refresh,
@@ -750,7 +751,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
@@ -873,21 +874,18 @@ class _TaskDetailsState extends State<_TaskDetails> {
           ),
         ),
         const SizedBox(height: 22),
-        const Text(
+        const T(
           'Activity',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 10),
         if (actions.isEmpty)
-          const Text(
-            'No activity yet.',
-            style: TextStyle(color: AppColors.muted),
-          )
+          const T('No activity yet.', style: TextStyle(color: AppColors.muted))
         else
           ...actions.map((item) => _ActionTile(action: item)),
         if (canAct) ...[
           const SizedBox(height: 22),
-          const Text(
+          const T(
             'Take action',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
@@ -897,12 +895,12 @@ class _TaskDetailsState extends State<_TaskDetails> {
               ButtonSegment(
                 value: 'close',
                 icon: Icon(LucideIcons.checkCircle2),
-                label: Text('Close'),
+                label: T('Close'),
               ),
               ButtonSegment(
                 value: 'assign',
                 icon: Icon(LucideIcons.forward),
-                label: Text('Assign next'),
+                label: T('Assign next'),
               ),
             ],
             selected: {action},
@@ -959,7 +957,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Text(
+              child: T(
                 'You can view this workflow as an observer. Only the current assignee can take action.',
                 style: TextStyle(color: AppColors.muted),
               ),

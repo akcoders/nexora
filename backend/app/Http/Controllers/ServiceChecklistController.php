@@ -23,6 +23,7 @@ class ServiceChecklistController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('checklists.create'), 403);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'product_category_id' => ['nullable', 'exists:product_categories,id'],
@@ -60,8 +61,9 @@ class ServiceChecklistController extends Controller
         return back()->with('success', 'Service checklist created.');
     }
 
-    public function destroy(ServiceChecklist $checklist): RedirectResponse
+    public function destroy(Request $request, ServiceChecklist $checklist): RedirectResponse
     {
+        abort_unless($request->user()->can('checklists.delete'), 403);
         $checklist->delete();
 
         return back()->with('success', 'Checklist removed.');

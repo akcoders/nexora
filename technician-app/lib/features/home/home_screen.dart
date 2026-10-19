@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
 import '../service_jobs/service_job_detail_screen.dart';
 import '../service_jobs/service_jobs_screen.dart';
+import '../../core/i18n/t.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -91,18 +92,18 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(LucideIcons.logOut, color: AppColors.danger),
-        title: const Text('Confirm checkout'),
-        content: const Text(
+        title: const T('Confirm checkout'),
+        content: const T(
           'Your current location and checkout time will be recorded. Continue?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Check out'),
+            child: const T('Check out'),
           ),
         ],
       ),
@@ -121,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Checkout recorded successfully.'),
+            content: T('Checkout recorded successfully.'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -218,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Icon(LucideIcons.mapPin, color: Colors.white70, size: 18),
                       SizedBox(width: 7),
-                      Text(
+                      T(
                         'TODAY\'S ATTENDANCE',
                         style: TextStyle(
                           color: Colors.white70,
@@ -259,20 +260,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: () => widget.onNavigate(2),
                       style: _whiteButton(AppColors.primary),
                       icon: const Icon(LucideIcons.camera, size: 18),
-                      label: const Text('Check in now'),
+                      label: const T('Check in now'),
                     )
                   else if (!hasCheckedOut)
                     FilledButton.icon(
                       onPressed: () => widget.onNavigate(2),
                       style: _whiteButton(const Color(0xFF15803D)),
                       icon: const Icon(LucideIcons.camera, size: 18),
-                      label: const Text('Selfie & check out'),
+                      label: const T('Selfie & check out'),
                     ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            Text(
+            T(
               'Today at a glance',
               style: Theme.of(
                 context,
@@ -306,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                T(
                   'Today’s service visits',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -353,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         SizedBox(width: 12),
                         Expanded(
-                          child: Text(
+                          child: T(
                             'No service visit scheduled today. Open all assigned jobs.',
                             style: TextStyle(color: AppColors.muted),
                           ),
@@ -384,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                T(
                   'Priority task',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -392,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 TextButton(
                   onPressed: () => widget.onNavigate(1),
-                  child: const Text('View all'),
+                  child: const T('View all'),
                 ),
               ],
             ),
@@ -400,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Card(
                 child: Padding(
                   padding: EdgeInsets.all(22),
-                  child: Text(
+                  child: T(
                     'No active tasks. You are all caught up.',
                     style: TextStyle(color: AppColors.muted),
                   ),

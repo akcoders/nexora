@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\EmployeeMasterOptions;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -17,7 +20,9 @@ class ProfileController extends Controller
     public function edit(Request $request): View
     {
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $request->user()->load('employeeProfile'),
+            'languages' => EmployeeMasterOptions::switcherLanguagesFor($request->user()),
+            'preferredLanguage' => EmployeeMasterOptions::preferredLanguageFor($request->user()),
         ]);
     }
 
@@ -35,6 +40,27 @@ class ProfileController extends Controller
         $request->user()->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
+    }
+
+    /**
+     * Persist the interface language chosen from the language switcher.
+     */
+    public function updateLanguage(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'language' => ['required', 'string', Rule::in(EmployeeMasterOptions::languageNames())],
+        ]);
+
+        $request->user()->forceFill(['preferred_language' => $validated['language']])->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'language' => $validated['language'],
+                'code' => EmployeeMasterOptions::languageCode($validated['language']),
+            ]);
+        }
+
+        return Redirect::back()->with('success', 'Interface language updated to '.$validated['language'].'.');
     }
 
     /**

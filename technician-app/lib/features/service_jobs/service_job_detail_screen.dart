@@ -13,6 +13,7 @@ import 'estimate_screen.dart';
 import 'inspection_screen.dart';
 import 'payment_screen.dart';
 import 'service_execution_screen.dart';
+import '../../core/i18n/t.dart';
 
 class ServiceJobDetailScreen extends StatefulWidget {
   const ServiceJobDetailScreen({super.key, required this.serviceJobId});
@@ -170,7 +171,7 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              const T(
                 'Customer contact result',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
@@ -178,32 +179,32 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
               FilledButton.icon(
                 onPressed: () => Navigator.pop(context, 'confirm'),
                 icon: const Icon(LucideIcons.calendarCheck),
-                label: const Text('Confirm visit'),
+                label: const T('Confirm visit'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () => Navigator.pop(context, 'reschedule'),
                 icon: const Icon(LucideIcons.calendarClock),
-                label: const Text('Reschedule'),
+                label: const T('Reschedule'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () => Navigator.pop(context, 'no_answer'),
                 icon: const Icon(LucideIcons.phoneOff),
-                label: const Text('No answer'),
+                label: const T('No answer'),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: () => Navigator.pop(context, 'customer_declined'),
                 icon: const Icon(LucideIcons.circleX),
-                label: const Text('Customer declined'),
+                label: const T('Customer declined'),
               ),
               if (masters['capabilities']?['cancel'] == true) ...[
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: () => Navigator.pop(context, 'cancel'),
                   icon: const Icon(LucideIcons.ban),
-                  label: const Text('Cancel job'),
+                  label: const T('Cancel job'),
                 ),
               ],
             ],
@@ -304,11 +305,11 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Continue'),
+            child: const T('Continue'),
           ),
         ],
       ),
@@ -350,18 +351,18 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(LucideIcons.badgeCheck, color: AppColors.success),
-        title: const Text('Complete service?'),
-        content: const Text(
+        title: const T('Complete service?'),
+        content: const T(
           'The job will be closed and a customer feedback link will be generated.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not yet'),
+            child: const T('Not yet'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Complete service'),
+            child: const T('Complete service'),
           ),
         ],
       ),
@@ -473,7 +474,7 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
                           child: OutlinedButton.icon(
                             onPressed: callCustomer,
                             icon: const Icon(LucideIcons.phone, size: 18),
-                            label: const Text('Call'),
+                            label: const T('Call'),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -481,7 +482,7 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
                           child: OutlinedButton.icon(
                             onPressed: openDirections,
                             icon: const Icon(LucideIcons.navigation, size: 18),
-                            label: const Text('Directions'),
+                            label: const T('Directions'),
                           ),
                         ),
                       ],
@@ -547,14 +548,14 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
                             color: AppColors.success,
                           ),
                           SizedBox(width: 10),
-                          Text(
+                          T(
                             'Service completed',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      const T(
                         'The service report, proforma and feedback request are available from the ERP.',
                         style: TextStyle(color: AppColors.muted, height: 1.4),
                       ),
@@ -566,7 +567,7 @@ class _ServiceJobDetailScreenState extends State<ServiceJobDetailScreen> {
                             mode: LaunchMode.externalApplication,
                           ),
                           icon: const Icon(LucideIcons.star, size: 17),
-                          label: const Text('Open customer feedback link'),
+                          label: const T('Open customer feedback link'),
                         ),
                       ],
                     ],
@@ -764,7 +765,7 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            const T(
               'Service summary',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),

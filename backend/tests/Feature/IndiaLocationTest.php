@@ -11,6 +11,7 @@ use Database\Seeders\IndiaLocationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class IndiaLocationTest extends TestCase
@@ -43,7 +44,7 @@ class IndiaLocationTest extends TestCase
 
     public function test_customer_district_must_belong_to_the_selected_state_and_country_is_always_india(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create()->givePermissionTo(Permission::findOrCreate('customers.create', 'web'));
         $group = CustomerGroup::create(['code' => 'GRP-LOC', 'name' => 'Location Customers', 'status' => 'active']);
         $payload = [
             'name' => 'Lakeside Clinics',

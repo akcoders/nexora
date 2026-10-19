@@ -80,20 +80,6 @@ class ServiceJobController extends Controller
             abort_unless($request->user()->can('service_jobs.cancel'), 403, 'You are not allowed to cancel service jobs.');
         }
 
-        $serviceJob->visits()->create([
-            'technician_id' => $request->user()->id,
-            'type' => 'contact',
-            'outcome' => $validated['outcome'],
-            'scheduled_at' => $validated['scheduled_at'] ?? null,
-            'occurred_at' => now(),
-            'reason' => $validated['reason'] ?? null,
-            'remark' => $validated['remark'] ?? null,
-        ]);
-
-        if ($validated['outcome'] === 'reschedule') {
-            $serviceJob->update(['scheduled_at' => $validated['scheduled_at']]);
-        }
-
         $toStatus = match ($validated['outcome']) {
             'confirm' => 'confirmed',
             'reschedule' => 'rescheduled',
@@ -101,9 +87,28 @@ class ServiceJobController extends Controller
             'customer_declined' => 'customer_declined',
             'cancel' => 'cancelled',
         };
-        if ($serviceJob->status !== $toStatus) {
-            $serviceJob = $workflow->transition($serviceJob, $toStatus, $request->user(), $validated);
-        }
+
+        $serviceJob = DB::transaction(function () use ($request, $serviceJob, $validated, $toStatus, $workflow): ServiceJob {
+            if ($serviceJob->status !== $toStatus) {
+                $serviceJob = $workflow->transition($serviceJob, $toStatus, $request->user(), $validated);
+            }
+
+            $serviceJob->visits()->create([
+                'technician_id' => $request->user()->id,
+                'type' => 'contact',
+                'outcome' => $validated['outcome'],
+                'scheduled_at' => $validated['scheduled_at'] ?? null,
+                'occurred_at' => now(),
+                'reason' => $validated['reason'] ?? null,
+                'remark' => $validated['remark'] ?? null,
+            ]);
+
+            if ($validated['outcome'] === 'reschedule') {
+                $serviceJob->update(['scheduled_at' => $validated['scheduled_at']]);
+            }
+
+            return $serviceJob;
+        });
 
         return response()->json(['message' => 'Customer contact recorded.', 'job' => $this->loadJob($serviceJob, $workflow)]);
     }
@@ -246,6 +251,7 @@ class ServiceJobController extends Controller
     {
         $this->authorizeAction($request, $serviceJob, 'service_jobs.create_estimate');
         abort_unless($estimate->service_job_id === $serviceJob->id, 404);
+        abort_unless($estimate->status === 'pending_approval', 422, 'Only the estimate that is awaiting approval can be decided. Status: '.str($estimate->status)->headline().'.');
         $validated = $request->validate([
             'decision' => ['required', Rule::in(['accept', 'request_change', 'decline'])],
             'customer_name' => ['required_if:decision,accept', 'nullable', 'string', 'max:255'],
@@ -347,6 +353,9 @@ class ServiceJobController extends Controller
         if (filled($validated['service_inspection_id'] ?? null)) {
             abort_unless($serviceJob->inspections()->whereKey($validated['service_inspection_id'])->exists(), 404);
         }
+        if (filled($validated['service_inspection_item_id'] ?? null)) {
+            abort_unless(ServiceInspectionItem::query()->whereKey($validated['service_inspection_item_id'])->whereHas('inspection', fn ($query) => $query->where('service_job_id', $serviceJob->id))->exists(), 404, 'The checklist item does not belong to this service job.');
+        }
         $photo = $serviceJob->photos()->create([
             'service_inspection_id' => $validated['service_inspection_id'] ?? null,
             'service_inspection_item_id' => $validated['service_inspection_item_id'] ?? null,
@@ -383,7 +392,14 @@ class ServiceJobController extends Controller
         abort_unless($serviceJob->photos()->where('category', 'after')->exists(), 422, 'Add at least one after-service photo.');
         abort_unless($serviceJob->signatures()->where('type', 'completion')->exists(), 422, 'Capture customer completion signature.');
         $actualTotal = round((float) $serviceJob->performedServices()->sum('line_total') + (float) $serviceJob->materials()->sum('line_total'), 2);
-        if ($actualTotal <= 0 && $serviceJob->currentEstimate) {
+        $approvedEstimate = $serviceJob->estimates()->where('status', 'accepted')->latest('decided_at')->first();
+        if ($approvedEstimate) {
+            // Honour the discount the customer signed for; never bill above the approved estimate for the same work.
+            $actualTotal = round(max(0, $actualTotal - (float) $approvedEstimate->discount_amount), 2);
+            if ($actualTotal <= 0 || abs($actualTotal - (float) $approvedEstimate->final_amount) < 0.01) {
+                $actualTotal = (float) $approvedEstimate->final_amount;
+            }
+        } elseif ($actualTotal <= 0 && $serviceJob->currentEstimate) {
             $actualTotal = (float) $serviceJob->currentEstimate->final_amount;
         }
         $serviceJob->update(['final_amount' => $actualTotal]);
@@ -467,6 +483,8 @@ class ServiceJobController extends Controller
             ->where(fn ($query) => $query->whereNull('service_type_id')->orWhere('service_type_id', $serviceJob->service_type_id))
             ->where(fn ($query) => $query->whereNull('equipment_type')->orWhere('equipment_type', $equipmentType))
             ->with(['items' => fn ($query) => $query->where('active', true)->orderBy('sort_order')])
+            ->orderByRaw('(CASE WHEN service_type_id IS NULL THEN 0 ELSE 1 END) + (CASE WHEN equipment_type IS NULL THEN 0 ELSE 1 END) DESC')
+            ->orderByDesc('id')
             ->first();
         abort_unless($checklist, 422, 'No active checklist is configured for this service.');
 

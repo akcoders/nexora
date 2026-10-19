@@ -98,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/maintenance/{task}', SystemMaintenanceController::class)->whereIn('task', ['migrate', 'seed', 'optimize', 'all'])->name('settings.maintenance');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/language', [ProfileController::class, 'updateLanguage'])->name('profile.language');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 

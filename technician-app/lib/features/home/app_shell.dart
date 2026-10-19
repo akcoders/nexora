@@ -3,6 +3,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/i18n/app_language.dart';
+import '../../core/i18n/t.dart';
 import '../../core/theme/app_theme.dart';
 import '../attendance/attendance_screen.dart';
 import '../auth/auth_controller.dart';
@@ -87,6 +89,17 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user ?? const {};
+    // Rebuild the bottom bar when the interface language changes.
+    context.watch<AppLanguageController>();
+    for (final label in const [
+      'Home',
+      'Work',
+      'Attendance',
+      'Alerts',
+      'Profile',
+    ]) {
+      context.read<AppLanguageController>().translate(label);
+    }
     return Scaffold(
       key: scaffoldKey,
       drawer: Drawer(
@@ -207,6 +220,34 @@ class _AppShellState extends State<AppShell> {
           ),
         ),
       ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: index,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        onDestinationSelected: (value) => navigate(value),
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(LucideIcons.house),
+            selectedIcon: const Icon(LucideIcons.house),
+            label: context.tr('Home'),
+          ),
+          NavigationDestination(
+            icon: const Icon(LucideIcons.briefcaseBusiness),
+            label: context.tr('Work'),
+          ),
+          NavigationDestination(
+            icon: const Icon(LucideIcons.calendarCheck),
+            label: context.tr('Attendance'),
+          ),
+          NavigationDestination(
+            icon: const Icon(LucideIcons.bell),
+            label: context.tr('Alerts'),
+          ),
+          NavigationDestination(
+            icon: const Icon(LucideIcons.userRound),
+            label: context.tr('Profile'),
+          ),
+        ],
+      ),
       body: IndexedStack(
         index: index,
         children: [
@@ -233,7 +274,7 @@ class _MenuLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(20, 18, 20, 7),
-    child: Text(
+    child: T(
       value,
       style: const TextStyle(
         color: AppColors.muted,
@@ -269,7 +310,7 @@ class _MenuItem extends StatelessWidget {
       selectedTileColor: const Color(0xFFEFF6FF),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       leading: Icon(icon, color: color),
-      title: Text(
+      title: T(
         label,
         style: TextStyle(fontWeight: FontWeight.w700, color: color),
       ),

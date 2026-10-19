@@ -318,8 +318,14 @@ class DatabaseSeeder extends Seeder
                 ['allocated' => $type->annual_quota],
             ));
         });
-        Holiday::firstOrCreate(['holiday_date' => now()->startOfYear()->addMonths(7)->day(15)->toDateString()], ['name' => 'Independence Day', 'type' => 'national']);
-        Holiday::firstOrCreate(['holiday_date' => now()->startOfYear()->addMonths(9)->day(2)->toDateString()], ['name' => 'Gandhi Jayanti', 'type' => 'national']);
+        collect([
+            [now()->startOfYear()->addMonths(7)->day(15), 'Independence Day'],
+            [now()->startOfYear()->addMonths(9)->day(2), 'Gandhi Jayanti'],
+        ])->each(function (array $holiday): void {
+            if (Holiday::whereDate('holiday_date', $holiday[0]->toDateString())->doesntExist()) {
+                Holiday::create(['holiday_date' => $holiday[0]->toDateString(), 'name' => $holiday[1], 'type' => 'national']);
+            }
+        });
 
         if ($technician->notifications()->doesntExist()) {
             $technician->notify(new TaskAssignedNotification($task));

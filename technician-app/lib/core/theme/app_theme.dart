@@ -77,11 +77,60 @@ class AppTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      navigationBarTheme: const NavigationBarThemeData(
+      tabBarTheme: TabBarThemeData(
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            colors: [AppColors.primary, AppColors.secondary],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: .25),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: AppColors.muted,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
+        splashFactory: NoSplash.splashFactory,
+        tabAlignment: TabAlignment.start,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
-        indicatorColor: Color(0xFFDBEAFE),
-        elevation: 8,
-        height: 70,
+        indicatorColor: const Color(0xFFDBEAFE),
+        elevation: 12,
+        height: 68,
+        shadowColor: AppColors.ink.withValues(alpha: .12),
+        surfaceTintColor: Colors.transparent,
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 11,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w800
+                : FontWeight.w600,
+            color: states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.muted,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? AppColors.primary
+                : AppColors.muted,
+          ),
+        ),
       ),
     );
   }

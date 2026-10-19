@@ -6,7 +6,7 @@
     <div class="mb-4"><a href="{{ route('service-jobs.index') }}" class="small d-inline-flex align-items-center gap-1"><i data-lucide="arrow-left" style="width:15px"></i>Service jobs</a></div>
     @if($errors->any())<div class="alert alert-danger"><strong>Please correct the highlighted fields.</strong><ul class="mb-0 mt-2 small">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
 
-    <form method="POST" action="{{ route('service-jobs.store') }}" id="serviceJobForm">
+    <form method="POST" action="{{ route('service-jobs.store') }}" id="serviceJobForm" class="nx-form-theme-emerald">
         @csrf
         <div class="row g-4">
             <div class="col-xl-8">

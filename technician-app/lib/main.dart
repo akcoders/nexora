@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 
+import 'core/i18n/app_language.dart';
 import 'core/network/api_client.dart';
 import 'core/notifications/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
@@ -15,8 +16,9 @@ Future<void> main() async {
   const storage = FlutterSecureStorage();
   final api = ApiClient(storage);
   final push = PushNotificationService(api);
-  await push.initialize();
-  runApp(NexoraApp(storage: storage, api: api, push: push));
+  final language = AppLanguageController(api, storage);
+  await Future.wait([push.initialize(), language.restore()]);
+  runApp(NexoraApp(storage: storage, api: api, push: push, language: language));
 }
 
 class NexoraApp extends StatelessWidget {
@@ -25,11 +27,13 @@ class NexoraApp extends StatelessWidget {
     required this.storage,
     required this.api,
     required this.push,
+    required this.language,
   });
 
   final FlutterSecureStorage storage;
   final ApiClient api;
   final PushNotificationService push;
+  final AppLanguageController language;
 
   @override
   Widget build(BuildContext context) {
@@ -38,15 +42,16 @@ class NexoraApp extends StatelessWidget {
         Provider<FlutterSecureStorage>.value(value: storage),
         Provider<ApiClient>.value(value: api),
         Provider<PushNotificationService>.value(value: push),
+        ChangeNotifierProvider<AppLanguageController>.value(value: language),
         ChangeNotifierProvider(
-          create: (_) => AuthController(api, storage, push),
+          create: (_) => AuthController(api, storage, push, language),
         ),
       ],
       child: MaterialApp(
-        title: 'Classic Field Service',
+        title: 'Nexora',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        restorationScopeId: 'classic_field_service',
+        restorationScopeId: 'nexora',
         home: const SplashScreen(),
         routes: {
           '/login': (_) => const LoginScreen(),
