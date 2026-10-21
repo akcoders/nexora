@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'service_job_detail_screen.dart';
+import '../../core/i18n/t.dart';
 
 class EstimateScreen extends StatefulWidget {
   const EstimateScreen({
@@ -105,16 +106,16 @@ class _EstimateScreenState extends State<EstimateScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create estimate')),
+      appBar: AppBar(title: const T('Create estimate')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 124),
         children: [
-          const Text(
+          const T(
             'Select work required',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 5),
-          const Text(
+          const T(
             'Approved master prices and taxes are applied automatically.',
             style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
@@ -156,7 +157,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            const Text(
+                            const T(
                               'Quantity',
                               style: TextStyle(color: AppColors.muted),
                             ),
@@ -233,7 +234,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    const T(
                       'ESTIMATED TOTAL',
                       style: TextStyle(
                         color: AppColors.muted,

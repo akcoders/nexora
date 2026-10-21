@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/i18n/t.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key, required this.onOpenMenu});
@@ -63,7 +64,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to refresh attendance.')),
+          const SnackBar(content: T('Unable to refresh attendance.')),
         );
       }
     }
@@ -137,7 +138,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Attendance check-in'),
+          title: const T('Attendance check-in'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -192,13 +193,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: const T('Cancel'),
             ),
             FilledButton(
               onPressed: photo == null
                   ? null
                   : () => Navigator.pop(context, true),
-              child: const Text('Check in'),
+              child: const T('Check in'),
             ),
           ],
         ),
@@ -246,7 +247,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           icon: const Icon(LucideIcons.logOut, color: AppColors.danger),
-          title: const Text('Confirm checkout'),
+          title: const T('Confirm checkout'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -301,13 +302,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: const T('Cancel'),
             ),
             FilledButton(
               onPressed: photo == null
                   ? null
                   : () => Navigator.pop(context, true),
-              child: const Text('Check out'),
+              child: const T('Check out'),
             ),
           ],
         ),
@@ -380,7 +381,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           onPressed: widget.onOpenMenu,
           icon: const Icon(LucideIcons.menu),
         ),
-        title: const Text('Attendance'),
+        title: const T('Attendance'),
         actions: [
           IconButton(onPressed: load, icon: const Icon(LucideIcons.refreshCw)),
         ],
@@ -456,13 +457,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           FilledButton.icon(
                             onPressed: checkIn,
                             icon: const Icon(LucideIcons.camera),
-                            label: const Text('Take selfie & check in'),
+                            label: const T('Take selfie & check in'),
                           )
                         else if (!checkedOut)
                           FilledButton.icon(
                             onPressed: checkOut,
                             icon: const Icon(LucideIcons.logOut),
-                            label: const Text('Check out'),
+                            label: const T('Check out'),
                           ),
                       ],
                     ),
@@ -477,7 +478,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           Row(
                             children: [
                               const Expanded(
-                                child: Text(
+                                child: T(
                                   'Assigned premises',
                                   style: TextStyle(fontWeight: FontWeight.w800),
                                 ),
@@ -615,7 +616,7 @@ class _AttendanceCalendar extends StatelessWidget {
             Row(
               children: [
                 const Expanded(
-                  child: Text(
+                  child: T(
                     'Attendance calendar',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),

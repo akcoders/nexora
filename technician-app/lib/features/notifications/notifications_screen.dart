@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../service_jobs/service_job_detail_screen.dart';
+import '../../core/i18n/t.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key, required this.onOpenMenu});
@@ -103,7 +104,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         onPressed: widget.onOpenMenu,
         icon: const Icon(LucideIcons.menu),
       ),
-      title: const Text('Notifications'),
+      title: const T('Notifications'),
       actions: [
         TextButton(
           onPressed: marking || notifications.isEmpty ? null : markAllRead,
@@ -281,7 +282,7 @@ class _NotificationState extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onRetry,
             icon: const Icon(LucideIcons.refreshCw),
-            label: const Text('Retry'),
+            label: const T('Retry'),
           ),
         ],
       ),

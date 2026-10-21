@@ -10,6 +10,9 @@ use App\Models\CustomerGroup;
 use App\Models\Product;
 use App\Models\ServiceMasterOption;
 use App\Models\User;
+use App\Rules\IndianDistrict;
+use App\Rules\IndianState;
+use App\Services\IndiaLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,8 +36,10 @@ class CustomerController extends Controller
         return view('customers.index', compact('customers'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        abort_unless($request->user()->can('customers.create'), 403);
+
         return view('customers.create', [
             'groups' => CustomerGroup::where('status', 'active')->orderBy('name')->get(),
             'users' => User::where('status', 'active')->orderBy('name')->get(),
@@ -64,6 +69,7 @@ class CustomerController extends Controller
 
     public function storeFloorPlan(StoreCustomerFloorPlanRequest $request, Customer $customer): RedirectResponse
     {
+        abort_unless($request->user()->can('customers.update'), 403);
         $data = $request->validated();
         unset($data['image']);
 
@@ -86,6 +92,7 @@ class CustomerController extends Controller
 
     public function storeEquipment(StoreCustomerEquipmentRequest $request, Customer $customer): RedirectResponse
     {
+        abort_unless($request->user()->can('customers.update'), 403);
         $equipment = $customer->equipments()->create($request->validated());
 
         ActivityLog::create([
@@ -106,6 +113,8 @@ class CustomerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('customers.create'), 403);
+        $this->forceIndianCountry($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'customer_group_id' => ['required', Rule::exists('customer_groups', 'id')->where('status', 'active')],
@@ -122,16 +131,46 @@ class CustomerController extends Controller
             'landmark' => ['nullable', 'string', 'max:255'],
             'area' => ['nullable', 'string', 'max:255'],
             'city' => ['required', 'string', 'max:120'],
-            'district' => ['nullable', 'string', 'max:120'],
-            'state' => ['required', 'string', 'max:120'],
+            'state' => ['required', 'string', 'max:120', new IndianState],
+            'district' => ['required', 'string', 'max:120', new IndianDistrict],
             'pin_code' => ['required', 'regex:/^[0-9]{6}$/'],
-            'country' => ['required', 'string', 'max:120'],
+            'country' => ['required', Rule::in([IndiaLocations::COUNTRY])],
             'email_1' => ['required_without:email_2', 'nullable', 'email'],
             'email_2' => ['nullable', 'email'],
             'gstin' => ['nullable', 'regex:/^[0-9A-Za-z]{15}$/'],
             'pan' => ['nullable', 'regex:/^[0-9A-Za-z]{10}$/'],
             'contact_no_1' => ['required_without:contact_no_2', 'nullable', 'string', 'max:20'],
             'contact_no_2' => ['nullable', 'string', 'max:20'],
+            'classification' => ['nullable', Rule::in(['strategic', 'regular', 'transactional', 'one_time'])],
+            'sources' => ['nullable', 'array'],
+            'sources.*' => ['string', 'max:60'],
+            'business_potential' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'site_access_instructions' => ['nullable', 'string', 'max:2000'],
+            'billing_address' => ['nullable', 'string', 'max:2000'],
+            'remarks' => ['nullable', 'string', 'max:5000'],
+            'gst_registration_type' => ['nullable', Rule::in(['regular', 'composition', 'unregistered'])],
+            'tan' => ['nullable', 'regex:/^[A-Za-z]{4}[0-9]{5}[A-Za-z]$/'],
+            'tds_percent' => ['nullable', 'numeric', 'between:0,100'],
+            'udyam_no' => ['nullable', 'string', 'max:40'],
+            'msme_type' => ['nullable', Rule::in(['micro', 'small', 'medium'])],
+            'owner_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'sales_person_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'credit' => ['nullable', 'array'],
+            'credit.credit_limit' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            'credit.credit_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'credit.payment_mode' => ['nullable', 'string', 'max:40'],
+            'credit.advance_required' => ['nullable', 'boolean'],
+            'credit.tds_applicable' => ['nullable', 'boolean'],
+            'credit.retention_applicable' => ['nullable', 'boolean'],
+            'credit.retention_percent' => ['nullable', 'numeric', 'between:0,100'],
+            'credit.billing_cycle' => ['nullable', 'string', 'max:40'],
+            'credit.invoice_submission_method' => ['nullable', 'string', 'max:40'],
+            'credit.po_mandatory' => ['nullable', 'boolean'],
+            'credit.eway_bill_applicable' => ['nullable', 'boolean'],
+            'credit.default_payment_terms' => ['nullable', 'string', 'max:2000'],
             'contacts' => ['required', 'array', 'min:1'],
             'contacts.*.name' => ['required', 'string', 'max:255'],
             'contacts.*.designation' => ['nullable', 'string', 'max:120'],
@@ -153,10 +192,10 @@ class CustomerController extends Controller
             'branches.*.landmark' => ['nullable', 'string', 'max:255'],
             'branches.*.area' => ['nullable', 'string', 'max:255'],
             'branches.*.city' => ['required_with:branches', 'string', 'max:120'],
-            'branches.*.district' => ['nullable', 'string', 'max:120'],
-            'branches.*.state' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.state' => ['required_with:branches', 'string', 'max:120', new IndianState],
+            'branches.*.district' => ['required_with:branches', 'string', 'max:120', new IndianDistrict],
             'branches.*.pin_code' => ['required_with:branches', 'regex:/^[0-9]{6}$/'],
-            'branches.*.country' => ['required_with:branches', 'string', 'max:120'],
+            'branches.*.country' => ['required_with:branches', Rule::in([IndiaLocations::COUNTRY])],
             'branches.*.contact_no_1' => ['nullable', 'string', 'max:20'],
             'branches.*.contact_no_2' => ['nullable', 'string', 'max:20'],
             'branches.*.email_1' => ['nullable', 'email'],
@@ -209,7 +248,7 @@ class CustomerController extends Controller
         $customer = DB::transaction(function () use ($request, $validated) {
             $nextId = (Customer::withTrashed()->max('id') ?? 0) + 1;
             $customer = Customer::create(array_merge(
-                $request->only([
+                collect($validated)->only([
                     'customer_group_id', 'name', 'mother_tongue', 'types', 'segments', 'priority', 'status', 'branch_type',
                     'classification', 'sources', 'business_potential', 'address_line_1', 'address_line_2',
                     'landmark', 'area', 'city', 'district', 'state', 'pin_code', 'country', 'latitude',
@@ -217,7 +256,7 @@ class CustomerController extends Controller
                     'site_access_instructions', 'billing_address', 'remarks', 'gstin', 'pan',
                     'gst_registration_type', 'tan', 'tds_percent', 'udyam_no', 'msme_type',
                     'owner_id', 'sales_person_id', 'manager_id',
-                ]),
+                ])->all(),
                 ['code' => 'CUST'.str_pad((string) $nextId, 5, '0', STR_PAD_LEFT), 'created_by' => $request->user()->id]
             ));
 
@@ -244,7 +283,17 @@ class CustomerController extends Controller
                 }
             }
 
-            $customer->creditTerms()->create($request->input('credit', []));
+            $credit = $validated['credit'] ?? [];
+            $customer->creditTerms()->create(array_merge($credit, [
+                'credit_limit' => (float) ($credit['credit_limit'] ?? 0),
+                'credit_days' => (int) ($credit['credit_days'] ?? 0),
+                'retention_percent' => (float) ($credit['retention_percent'] ?? 0),
+                'advance_required' => (bool) ($credit['advance_required'] ?? false),
+                'tds_applicable' => (bool) ($credit['tds_applicable'] ?? false),
+                'retention_applicable' => (bool) ($credit['retention_applicable'] ?? false),
+                'po_mandatory' => (bool) ($credit['po_mandatory'] ?? false),
+                'eway_bill_applicable' => (bool) ($credit['eway_bill_applicable'] ?? false),
+            ]));
 
             foreach ($request->file('documents', []) as $index => $file) {
                 $customer->documents()->create([
@@ -268,5 +317,17 @@ class CustomerController extends Controller
         });
 
         return redirect()->route('customers.index')->with('success', "{$customer->name} created successfully.");
+    }
+
+    /** Addresses are India-only, so the country is always stored as India whatever was posted. */
+    private function forceIndianCountry(Request $request): void
+    {
+        $request->merge(['country' => IndiaLocations::COUNTRY]);
+        if (is_array($branches = $request->input('branches'))) {
+            $request->merge(['branches' => array_map(
+                fn (mixed $branch): mixed => is_array($branch) ? ['country' => IndiaLocations::COUNTRY] + $branch : $branch,
+                $branches,
+            )]);
+        }
     }
 }

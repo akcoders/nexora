@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/i18n/t.dart';
 
 class HrSelfServiceScreen extends StatefulWidget {
   const HrSelfServiceScreen({super.key});
@@ -60,7 +61,7 @@ class _HrSelfServiceScreenState extends State<HrSelfServiceScreen> {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('My HR'),
+          title: const T('My HR'),
           actions: [
             IconButton(
               onPressed: load,
@@ -70,11 +71,11 @@ class _HrSelfServiceScreenState extends State<HrSelfServiceScreen> {
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'Overview'),
-              Tab(text: 'Holidays'),
-              Tab(text: 'Leave'),
-              Tab(text: 'Vouchers'),
-              Tab(text: 'Payslips'),
+              Tab(child: T('Overview')),
+              Tab(child: T('Holidays')),
+              Tab(child: T('Leave')),
+              Tab(child: T('Vouchers')),
+              Tab(child: T('Payslips')),
             ],
           ),
         ),
@@ -146,7 +147,7 @@ class _Overview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        const T(
           'Leave balance',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
@@ -199,7 +200,7 @@ class _Holidays extends StatelessWidget {
             date == null ? '' : DateFormat('EEEE, d MMMM yyyy').format(date),
           ),
           trailing: item['optional'] == true
-              ? const Chip(label: Text('Optional'))
+              ? const Chip(label: T('Optional'))
               : null,
         ),
       );
@@ -225,7 +226,7 @@ class _LeavePanel extends StatelessWidget {
         FilledButton.icon(
           onPressed: () => _leaveDialog(context),
           icon: const Icon(LucideIcons.calendarPlus),
-          label: const Text('Apply for leave'),
+          label: const T('Apply for leave'),
         ),
         const SizedBox(height: 16),
         ...requests.map(
@@ -268,7 +269,7 @@ class _LeavePanel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                const T(
                   'Apply for leave',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
@@ -362,7 +363,7 @@ class _LeavePanel extends StatelessWidget {
                           reason.text.trim().isEmpty
                       ? null
                       : () => Navigator.pop(context, true),
-                  child: const Text('Submit request'),
+                  child: const T('Submit request'),
                 ),
               ],
             ),
@@ -413,7 +414,7 @@ class _VoucherPanel extends StatelessWidget {
       FilledButton.icon(
         onPressed: () => _dialog(context),
         icon: const Icon(LucideIcons.receiptIndianRupee),
-        label: const Text('Add expense voucher'),
+        label: const T('Add expense voucher'),
       ),
       const SizedBox(height: 16),
       ...items.map(
@@ -451,7 +452,7 @@ class _VoucherPanel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                const T(
                   'Expense voucher',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
@@ -506,7 +507,7 @@ class _VoucherPanel extends StatelessWidget {
                   onPressed: receipt == null
                       ? null
                       : () => Navigator.pop(context, true),
-                  child: const Text('Submit voucher'),
+                  child: const T('Submit voucher'),
                 ),
               ],
             ),
@@ -561,7 +562,7 @@ class _Payslips extends StatelessWidget {
             );
             if (!opened && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Unable to open salary slip.')),
+                const SnackBar(content: T('Unable to open salary slip.')),
               );
             }
           },
@@ -595,7 +596,7 @@ class _Payslips extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                   SizedBox(width: 3),
-                  Text(
+                  T(
                     'PDF',
                     style: TextStyle(
                       color: AppColors.primary,

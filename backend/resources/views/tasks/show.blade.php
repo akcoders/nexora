@@ -59,9 +59,9 @@
                     <p class="small text-secondary">Add a clear remark, then close this item or hand it to the next owner.</p>
                     <form method="POST" action="{{ route('tasks.action', $task) }}">
                         @csrf
-                        <label class="form-label">Remark *</label><textarea class="form-control mb-3" name="remark" rows="4" placeholder="Work completed, outcome or next step" required></textarea>
+                        <label class="form-label">Remark *</label><textarea class="form-control mb-3" name="remark" rows="4" placeholder="Work completed, outcome or next step" required maxlength="3000"></textarea>
                         <label class="form-label">Action *</label><select class="form-select mb-3" name="action" id="taskAction" required><option value="assign">Assign next</option><option value="close">Close {{ $isTicket ? 'ticket' : 'workflow' }}</option></select>
-                        <div id="nextAssignee" class="mb-3"><label class="form-label">Next assignee</label><select class="form-select" name="assigned_to"><option value="">Select user</option>@foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
+                        <div id="nextAssignee" class="mb-3"><label class="form-label">Next assignee</label><select class="form-select" name="assigned_to" data-v="required_if:action,assign"><option value="">Select user</option>@foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
                         <button class="btn btn-primary w-100">Submit action</button>
                     </form>
                 </aside>

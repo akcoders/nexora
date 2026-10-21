@@ -20,7 +20,7 @@ class CompanyMasterTest extends TestCase
             'organization_id' => 'CCSPL-BR-002', 'code' => 'CCSPL-PUN', 'short_name' => 'Classic Pune',
             'legal_name' => 'Classic Cooling Systems Pune', 'company_type' => 'branch', 'parent_id' => Company::where('company_type', 'head_office')->value('id'),
             'industry' => 'HVAC', 'business_models' => ['service', 'amc'], 'status' => 'active',
-            'address' => ['city' => 'Pune', 'state' => 'Maharashtra', 'country' => 'India'],
+            'address' => ['city' => 'Pune', 'district' => 'Pune', 'state' => 'Maharashtra', 'country' => 'India'],
             'sites' => [['site_id' => 'CCSPL-PUN-S01', 'code' => 'PUN-WH', 'name' => 'Pune Warehouse', 'type' => 'warehouse']],
         ])->assertRedirect(route('companies.index'));
 

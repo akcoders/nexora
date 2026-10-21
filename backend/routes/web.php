@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoDataController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\HrController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PremisesController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\ServiceFeedbackController;
 use App\Http\Controllers\ServiceJobController;
 use App\Http\Controllers\ServiceMasterController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SystemMaintenanceController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +39,7 @@ Route::get('/salary-slips/{payrollEntry}', SalarySlipController::class)->middlew
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/locations/india', [LocationController::class, 'india'])->name('locations.india');
     Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('/customers/{customer}/floor-plans', [CustomerController::class, 'storeFloorPlan'])->name('customers.floor-plans.store');
     Route::post('/customers/{customer}/equipment', [CustomerController::class, 'storeEquipment'])->name('customers.equipment.store');
@@ -92,8 +95,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/demo-data', [DemoDataController::class, 'store'])->name('settings.demo-data.store');
     Route::delete('/settings/demo-data', [DemoDataController::class, 'destroy'])->name('settings.demo-data.destroy');
+    Route::post('/settings/maintenance/{task}', SystemMaintenanceController::class)->whereIn('task', ['migrate', 'seed', 'optimize', 'all'])->name('settings.maintenance');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/language', [ProfileController::class, 'updateLanguage'])->name('profile.language');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 

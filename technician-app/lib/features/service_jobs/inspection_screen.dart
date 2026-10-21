@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'service_job_detail_screen.dart';
+import '../../core/i18n/t.dart';
 
 class InspectionScreen extends StatefulWidget {
   const InspectionScreen({
@@ -129,7 +130,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
     final remark = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Inspection remark'),
+        title: const T('Inspection remark'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -141,11 +142,11 @@ class _InspectionScreenState extends State<InspectionScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
+            child: const T('Save'),
           ),
         ],
       ),
@@ -183,7 +184,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Photo added.'),
+            content: T('Photo added.'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -395,7 +396,7 @@ class _InspectionItemCard extends StatelessWidget {
                   ),
                 ),
                 if (definition['required'] == true)
-                  const Text(
+                  const T(
                     'REQUIRED',
                     style: TextStyle(
                       color: AppColors.danger,
@@ -406,7 +407,7 @@ class _InspectionItemCard extends StatelessWidget {
                 if (pending)
                   const Padding(
                     padding: EdgeInsets.only(left: 7),
-                    child: Text(
+                    child: T(
                       'NOT SYNCED',
                       style: TextStyle(
                         color: AppColors.warning,
@@ -467,7 +468,7 @@ class _InspectionItemCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: saving ? null : onPhoto,
                       icon: const Icon(LucideIcons.camera, size: 16),
-                      label: const Text('Required photo'),
+                      label: const T('Required photo'),
                     ),
                 ],
               ),

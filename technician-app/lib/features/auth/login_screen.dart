@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import 'auth_controller.dart';
+import '../../core/i18n/t.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -63,14 +64,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Image.asset('assets/images/classic-app-icon.png'),
                 ),
                 const SizedBox(height: 44),
-                Text(
+                T(
                   'Welcome back',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                const T(
                   'Sign in to view your attendance and assigned tasks.',
                   style: TextStyle(color: AppColors.muted, height: 1.5),
                 ),
@@ -111,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {},
-                    child: const Text('Forgot password?'),
+                    child: const T('Forgot password?'),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -129,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Sign in'),
+                            T('Sign in'),
                             SizedBox(width: 10),
                             Icon(Icons.arrow_forward, size: 19),
                           ],
@@ -137,8 +138,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 26),
                 const Center(
-                  child: Text(
-                    'Secure access for Classic Cooling field teams',
+                  child: T(
+                    'Secure access for Nexora field teams',
                     style: TextStyle(color: AppColors.muted, fontSize: 12),
                   ),
                 ),

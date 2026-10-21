@@ -85,10 +85,11 @@ class AttendanceController extends Controller
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'selfie' => ['required', 'image', 'max:5120'],
+            'selfie' => ['nullable', 'image', 'max:5120'],
             'remark' => ['nullable', 'string', 'max:1000'],
         ]);
-        $attendance = Attendance::where('user_id', $request->user()->id)->whereDate('attendance_date', today())->firstOrFail();
+        $attendance = Attendance::where('user_id', $request->user()->id)->whereDate('attendance_date', today())->first();
+        abort_unless($attendance, 422, 'Check in before checking out.');
         abort_if($attendance->checked_out_at, 422, 'Already checked out.');
         [$premises, $distance] = $this->nearestPremises($request, (float) $validated['latitude'], (float) $validated['longitude']);
         $inside = $distance <= $premises->radius_meters;
@@ -101,7 +102,7 @@ class AttendanceController extends Controller
             'checkout_premises_id' => $premises->id,
             'checkout_distance_meters' => round($distance),
             'checkout_inside_premises' => $inside,
-            'checkout_selfie_path' => $request->file('selfie')->store('attendance/'.today()->format('Y/m'), 'public'),
+            'checkout_selfie_path' => $request->file('selfie')?->store('attendance/'.today()->format('Y/m'), 'public'),
             'remark' => filled($validated['remark'] ?? null) ? trim(($attendance->remark ? $attendance->remark."\n" : '').'Checkout: '.$validated['remark']) : $attendance->remark,
             'status' => $inside ? $attendance->status : 'pending',
             'day_status' => $policy->checkoutDayStatus($attendance, $checkedOutAt),

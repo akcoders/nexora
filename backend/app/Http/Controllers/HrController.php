@@ -7,6 +7,7 @@ use App\Models\Holiday;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
+use App\Models\User;
 use App\Services\OneSignalService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -64,7 +65,13 @@ class HrController extends Controller
         $validated['paid'] = $request->boolean('paid');
         $validated['requires_document'] = $request->boolean('requires_document');
         $validated['active'] = true;
-        LeaveType::create($validated);
+        $leaveType = LeaveType::create($validated);
+        User::query()->where('status', 'active')->each(function (User $user) use ($leaveType): void {
+            LeaveBalance::firstOrCreate(
+                ['user_id' => $user->id, 'leave_type_id' => $leaveType->id, 'year' => now()->year],
+                ['allocated' => $leaveType->annual_quota],
+            );
+        });
 
         return back()->with('success', 'Leave type created.');
     }
@@ -79,12 +86,11 @@ class HrController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $leaveRequest, $validated): void {
-            $balance = LeaveBalance::query()
-                ->where('user_id', $leaveRequest->user_id)
-                ->where('leave_type_id', $leaveRequest->leave_type_id)
-                ->where('year', $leaveRequest->from_date->year)
-                ->lockForUpdate()
-                ->firstOrFail();
+            $balance = LeaveBalance::query()->firstOrCreate(
+                ['user_id' => $leaveRequest->user_id, 'leave_type_id' => $leaveRequest->leave_type_id, 'year' => $leaveRequest->from_date->year],
+                ['allocated' => $leaveRequest->leaveType?->annual_quota ?? 0],
+            );
+            $balance = LeaveBalance::query()->whereKey($balance->id)->lockForUpdate()->firstOrFail();
             $balance->update([
                 'pending' => max(0, (float) $balance->pending - (float) $leaveRequest->total_days),
                 'used' => (float) $balance->used + ($validated['decision'] === 'approved' ? (float) $leaveRequest->total_days : 0),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/i18n/t.dart';
 
 Future<Uint8List?> showSignatureCapture(
   BuildContext context, {
@@ -48,7 +49,7 @@ class _SignatureDialogState extends State<_SignatureDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          const T(
             'Sign inside the box',
             style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
@@ -79,7 +80,7 @@ class _SignatureDialogState extends State<_SignatureDialog> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: saving ? null : () => setState(() => points.clear()),
-              child: const Text('Clear'),
+              child: const T('Clear'),
             ),
           ),
         ],
@@ -88,7 +89,7 @@ class _SignatureDialogState extends State<_SignatureDialog> {
     actions: [
       TextButton(
         onPressed: saving ? null : () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: const T('Cancel'),
       ),
       FilledButton(
         onPressed: saving || points.whereType<Offset>().length < 3

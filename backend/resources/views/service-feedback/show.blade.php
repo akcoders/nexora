@@ -22,9 +22,21 @@
         .check input { width: 20px; height: 20px; }
         button { width: 100%; border: 0; border-radius: 13px; padding: 15px; margin-top: 14px; background: #1e40af; color: white; font: inherit; font-weight: 750; cursor: pointer; }
         .error { color: #b91c1c; font-size: 13px; margin-top: 6px; }
+        .nx-error { color: #b91c1c; font-size: 13px; margin-top: 6px; }
+        .nx-error::before { content: '\26A0\FE0E'; margin-right: 5px; }
+        textarea.is-invalid { border-color: #dc2626; }
+        .stars input.is-invalid ~ label { color: #fca5a5; }
         .thanks { text-align: center; padding: 18px 0; }
         .thanks .logo { margin: 0 auto 18px; background: #16a34a; }
     </style>
+    @php
+        try {
+            $validationScript = app(\Illuminate\Foundation\Vite::class)('resources/js/validation.js');
+        } catch (\Throwable) {
+            $validationScript = '';
+        }
+    @endphp
+    {!! $validationScript !!}
 </head>
 <body>
 <main class="card">
@@ -35,7 +47,7 @@
         <div class="job"><strong>{{ $feedback->serviceJob->job_no }}</strong><br>{{ $feedback->serviceJob->complaint }}<br><span style="color:#64748b">Technician: {{ $feedback->serviceJob->technician?->name ?? 'Nexora Team' }}</span></div>
         <form method="POST" action="{{ route('service-feedback.store', $feedback->token) }}">@csrf
             <label class="title">Rate your experience</label>
-            <div class="stars">@for($rating = 5; $rating >= 1; $rating--)<input id="rating-{{ $rating }}" name="rating" value="{{ $rating }}" type="radio" {{ old('rating') == $rating ? 'checked' : '' }} required><label for="rating-{{ $rating }}">★</label>@endfor</div>
+            <div class="stars">@for($rating = 5; $rating >= 1; $rating--)<input id="rating-{{ $rating }}" name="rating" value="{{ $rating }}" type="radio" {{ old('rating') == $rating ? 'checked' : '' }} required data-msg-required="Please choose a star rating."><label for="rating-{{ $rating }}">★</label>@endfor</div>
             @error('rating')<div class="error">{{ $message }}</div>@enderror
             <label class="title" for="comments">Comments (optional)</label><textarea id="comments" name="comments" maxlength="2000" placeholder="Tell us what went well or what we can improve">{{ old('comments') }}</textarea>
             <label class="check"><input type="checkbox" name="issue_still_exists" value="1" {{ old('issue_still_exists') ? 'checked' : '' }}> The service issue still exists</label>

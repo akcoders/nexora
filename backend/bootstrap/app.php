@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -26,4 +27,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Business-rule aborts (422/409/400 with a message) on normal web requests go back to the
+        // form with a flash message instead of a bare framework error page.
+        $exceptions->render(function (HttpExceptionInterface $exception, Request $request) {
+            $status = $exception->getStatusCode();
+            if ($request->is('api/*') || $request->expectsJson() || $request->isMethod('GET') || ! in_array($status, [400, 409, 422], true) || blank($exception->getMessage())) {
+                return null;
+            }
+
+            return redirect()->back()->withInput($request->except(['password', 'password_confirmation', 'current_password']))->with('error', $exception->getMessage());
+        });
     })->create();

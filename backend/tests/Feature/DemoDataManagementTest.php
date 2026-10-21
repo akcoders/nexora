@@ -6,6 +6,8 @@ use App\Models\Attendance;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\DemoDataRecord;
+use App\Models\PayrollEntry;
+use App\Models\PayrollRun;
 use App\Models\ServiceJob;
 use App\Models\Task;
 use App\Models\User;
@@ -50,6 +52,29 @@ class DemoDataManagementTest extends TestCase
         $this->assertDatabaseMissing('service_jobs', ['job_no' => 'DEMO-SRV-010']);
         $this->assertSame(0, DemoDataRecord::count());
         $this->assertSame(0, app(DemoDataService::class)->stats()['scenarios']);
+    }
+
+    public function test_clearing_demo_data_removes_demo_payroll_entries_but_keeps_real_entries(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@nexora.test')->firstOrFail();
+        $demoTechnician = User::where('email', 'demo.tech01@nexora.test')->firstOrFail();
+        $realTechnician = User::where('email', 'technician@nexora.test')->firstOrFail();
+        $payrollRun = PayrollRun::factory()->create(['generated_by' => $admin->id]);
+        $demoEntry = PayrollEntry::factory()->create([
+            'payroll_run_id' => $payrollRun->id,
+            'user_id' => $demoTechnician->id,
+        ]);
+        $realEntry = PayrollEntry::factory()->create([
+            'payroll_run_id' => $payrollRun->id,
+            'user_id' => $realTechnician->id,
+        ]);
+
+        $this->actingAs($admin)->delete(route('settings.demo-data.destroy'))->assertRedirect();
+
+        $this->assertDatabaseMissing('payroll_entries', ['id' => $demoEntry->id]);
+        $this->assertDatabaseHas('payroll_entries', ['id' => $realEntry->id]);
+        $this->assertDatabaseMissing('users', ['id' => $demoTechnician->id]);
     }
 
     public function test_super_admin_can_reset_all_ten_demo_scenarios(): void

@@ -11,6 +11,7 @@ class PremisesController extends Controller
 {
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('attendance.create') || $request->user()->can('attendance.update'), 403);
         $data = $this->validatedPremises($request);
         $technicians = $data['technicians'] ?? [];
         unset($data['technicians']);
@@ -22,6 +23,7 @@ class PremisesController extends Controller
 
     public function update(Request $request, Premises $premises): RedirectResponse
     {
+        abort_unless($request->user()->can('attendance.update'), 403);
         $data = $this->validatedPremises($request);
         $technicians = $data['technicians'] ?? [];
         unset($data['technicians']);

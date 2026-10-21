@@ -44,6 +44,9 @@ class RolePermissionController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,name'],
         ]);
+        if (in_array($role->name, ['Admin', 'Manager', 'Technician', 'Viewer'], true) && $validated['name'] !== $role->name) {
+            return back()->with('error', 'System roles (Admin, Manager, Technician, Viewer) cannot be renamed because the apps rely on their names. You can still change their permissions.');
+        }
         $role->update(['name' => $validated['name']]);
         $role->syncPermissions($validated['permissions'] ?? []);
 

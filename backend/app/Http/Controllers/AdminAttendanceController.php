@@ -45,6 +45,10 @@ class AdminAttendanceController extends Controller
 
     public function review(Request $request, Attendance $attendance): RedirectResponse
     {
+        abort_unless($request->user()->can('attendance.approve'), 403);
+        if ($attendance->status !== 'pending') {
+            return back()->with('error', 'This attendance was already '.$attendance->status.' and cannot be reviewed again.');
+        }
         $data = $request->validate([
             'decision' => ['required', Rule::in(['approved', 'rejected'])],
             'remark' => ['required', 'string', 'max:1000'],

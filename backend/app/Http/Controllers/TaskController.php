@@ -47,6 +47,7 @@ class TaskController extends Controller
 
     public function store(Request $request, OneSignalService $oneSignal): RedirectResponse
     {
+        abort_unless($request->user()->can('tasks.create') || $request->user()->can('tasks.assign'), 403);
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'task_type' => ['required', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
@@ -96,6 +97,11 @@ class TaskController extends Controller
 
     public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse
     {
+        $user = $request->user();
+        abort_unless($user->can('tasks.update') || $user->can('tasks.assign') || $task->assigned_to === $user->id || $task->created_by === $user->id, 403);
+        if ($task->status === 'closed' && ! $user->can('tasks.update')) {
+            return back()->with('error', 'This task is already closed.');
+        }
         $data = $request->validate([
             'action' => ['required', Rule::in(['close', 'assign'])],
             'remark' => ['required', 'string', 'max:3000'],

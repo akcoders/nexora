@@ -36,8 +36,8 @@ class ServiceJobWorkflow
     private const TRANSITIONS = [
         'assigned' => ['contacted', 'confirmed', 'rescheduled', 'no_answer', 'customer_declined', 'cancelled'],
         'contacted' => ['confirmed', 'rescheduled', 'no_answer', 'customer_declined', 'cancelled'],
-        'no_answer' => ['contacted', 'confirmed', 'rescheduled', 'cancelled'],
-        'rescheduled' => ['contacted', 'confirmed', 'cancelled'],
+        'no_answer' => ['contacted', 'confirmed', 'rescheduled', 'customer_declined', 'cancelled'],
+        'rescheduled' => ['contacted', 'confirmed', 'no_answer', 'customer_declined', 'cancelled'],
         'confirmed' => ['on_the_way', 'rescheduled', 'cancelled'],
         'on_the_way' => ['arrived', 'on_hold', 'cancelled'],
         'arrived' => ['inspection_in_progress', 'cancelled'],

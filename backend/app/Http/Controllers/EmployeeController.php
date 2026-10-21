@@ -7,6 +7,8 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveType;
 use App\Models\Premises;
 use App\Models\User;
+use App\Services\EmployeeMasterOptions;
+use App\Services\IndiaLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +45,7 @@ class EmployeeController extends Controller
             'metrics' => [
                 'total' => User::whereHas('employeeProfile')->count(),
                 'active' => User::whereHas('employeeProfile')->where('status', 'active')->count(),
-                'probation' => User::whereHas('employeeProfile', fn ($query) => $query->where('employment_details->employment_status', 'probation'))->count(),
+                'probation' => User::whereHas('employeeProfile', fn ($query) => $query->where('employment_type', 'probation'))->count(),
                 'payroll' => EmployeeProfile::where('gross_monthly_salary', '>', 0)->count(),
             ],
         ]);
@@ -72,6 +74,7 @@ class EmployeeController extends Controller
                 'department' => $validated['department'] ?? null,
                 'designation' => $validated['designation'] ?? null,
                 'status' => $validated['user_status'],
+                'preferred_language' => $this->preferredLanguage($validated),
             ]);
             $user->assignRole($validated['role']);
             $user->premises()->sync($validated['premises'] ?? []);
@@ -121,10 +124,11 @@ class EmployeeController extends Controller
                 'name' => $this->fullName($validated),
                 'email' => $validated['work_email'],
                 'phone' => $validated['phone'] ?? null,
-                'employee_code' => $validated['employee_code'],
+                'employee_code' => ($validated['employee_code'] ?? null) ?: ($employee->employee_code ?: $this->nextEmployeeCode()),
                 'department' => $validated['department'] ?? null,
                 'designation' => $validated['designation'] ?? null,
                 'status' => $validated['user_status'],
+                'preferred_language' => $this->preferredLanguage($validated),
             ]);
             $employee->syncRoles([$validated['role']]);
             $employee->premises()->sync($validated['premises'] ?? []);
@@ -154,7 +158,8 @@ class EmployeeController extends Controller
             'nationality' => ['nullable', 'string', 'max:80'],
             'religion' => ['nullable', 'string', 'max:80'],
             'languages' => ['nullable', 'array'],
-            'languages.*' => ['string', 'max:50'],
+            'languages.*' => ['string', Rule::in(EmployeeMasterOptions::languageNames())],
+            'preferred_language' => ['nullable', 'string', Rule::in(EmployeeMasterOptions::languageNames())],
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
             'work_email' => ['required', 'email', Rule::unique('users', 'email')->ignore($employee)],
             'personal_email' => ['nullable', 'email'],
@@ -189,6 +194,16 @@ class EmployeeController extends Controller
             'emergency_family' => ['nullable', 'array'],
             'employment_details' => ['nullable', 'array'],
             'verification' => ['nullable', 'array'],
+            'verification.police_verification' => ['nullable', Rule::in(EmployeeMasterOptions::verificationStatusKeys())],
+            'verification.police_verification_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'verification.police_verification_reference' => ['nullable', 'string', 'max:120'],
+            'verification.police_verification_remarks' => ['nullable', 'string', 'max:1000'],
+            'verification.background_check' => ['nullable', Rule::in(EmployeeMasterOptions::verificationStatusKeys())],
+            'verification.background_check_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'verification.background_check_agency' => ['nullable', 'string', 'max:120'],
+            'verification.background_check_remarks' => ['nullable', 'string', 'max:1000'],
+            'verification.uan' => ['nullable', 'string', 'max:30'],
+            'verification.esic' => ['nullable', 'string', 'max:30'],
             'compensation' => ['nullable', 'array'],
             'bank_details' => ['nullable', 'array'],
             'benefits_allowances' => ['nullable', 'array'],
@@ -201,6 +216,9 @@ class EmployeeController extends Controller
             'remarks' => ['nullable', 'string', 'max:5000'],
             'documents' => ['nullable', 'array', 'max:20'],
             'documents.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx', 'max:8192'],
+            ...IndiaLocations::optionalAddressRules('current_address.'),
+            ...IndiaLocations::optionalAddressRules('permanent_address.'),
+            ...IndiaLocations::optionalAddressRules('company_accommodation_address.'),
         ]);
     }
 
@@ -231,12 +249,12 @@ class EmployeeController extends Controller
             'blood_group' => $validated['blood_group'] ?? null,
             'nationality' => ($validated['nationality'] ?? null) ?: 'Indian',
             'religion' => $validated['religion'] ?? null,
-            'languages' => $validated['languages'] ?? [],
+            'languages' => $this->knownLanguages($validated),
             'identity_documents' => $validated['identity_documents'] ?? [],
             'personal_email' => $validated['personal_email'] ?? null,
-            'current_address' => $validated['current_address'] ?? [],
-            'permanent_address' => $validated['permanent_address'] ?? [],
-            'company_accommodation_address' => $validated['company_accommodation_address'] ?? [],
+            'current_address' => IndiaLocations::withCountry($validated['current_address'] ?? null),
+            'permanent_address' => IndiaLocations::withCountry($validated['permanent_address'] ?? null),
+            'company_accommodation_address' => IndiaLocations::withCountry($validated['company_accommodation_address'] ?? null),
             'emergency_family' => $validated['emergency_family'] ?? [],
             'date_of_joining' => $validated['date_of_joining'] ?? null,
             'employment_type' => $validated['employment_type'] ?? null,
@@ -279,12 +297,46 @@ class EmployeeController extends Controller
             'roles' => Role::query()->orderBy('name')->get(),
             'premises' => Premises::query()->where('active', true)->orderBy('name')->get(),
             'managers' => User::query()->where('status', 'active')->when($employee, fn ($query) => $query->where('id', '!=', $employee->id))->orderBy('name')->get(['id', 'name', 'employee_code']),
+            'languages' => EmployeeMasterOptions::languages(),
+            'verificationStatuses' => EmployeeMasterOptions::verificationStatuses(),
         ];
     }
 
     private function fullName(array $validated): string
     {
         return collect([$validated['first_name'], $validated['middle_name'] ?? null, $validated['last_name'] ?? null])->filter()->join(' ');
+    }
+
+    /**
+     * Known languages, always including the preferred app language.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return list<string>
+     */
+    private function knownLanguages(array $validated): array
+    {
+        $languages = array_values(array_unique(array_filter($validated['languages'] ?? [])));
+        $preferred = $this->preferredLanguage($validated);
+
+        if ($preferred && ! in_array($preferred, $languages, true)) {
+            $languages[] = $preferred;
+        }
+
+        return $languages;
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function preferredLanguage(array $validated): ?string
+    {
+        $preferred = $validated['preferred_language'] ?? null;
+
+        if ($preferred) {
+            return $preferred;
+        }
+
+        $languages = array_values(array_filter($validated['languages'] ?? []));
+
+        return $languages[0] ?? null;
     }
 
     private function nextEmployeeCode(): string

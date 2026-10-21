@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'service_job_detail_screen.dart';
+import '../../core/i18n/t.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({
@@ -66,7 +67,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(LucideIcons.indianRupee, color: AppColors.success),
-        title: const Text('Confirm payment entry'),
+        title: const T('Confirm payment entry'),
         content: Text(
           method == 'credit'
               ? 'Mark this amount as credit / pay later?'
@@ -75,11 +76,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const T('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
+            child: const T('Confirm'),
           ),
         ],
       ),
@@ -118,7 +119,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final money = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment')),
+      appBar: AppBar(title: const T('Payment')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
         children: [
@@ -133,7 +134,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                const T(
                   'AMOUNT DUE',
                   style: TextStyle(
                     color: Colors.white70,
@@ -159,7 +160,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
+          const T(
             'Payment method',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),

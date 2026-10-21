@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'service_job_detail_screen.dart';
+import '../../core/i18n/t.dart';
 
 class ServiceJobsScreen extends StatefulWidget {
   const ServiceJobsScreen({super.key});
@@ -55,7 +56,7 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My service jobs'),
+        title: const T('My service jobs'),
         actions: [
           IconButton(
             onPressed: refresh,
@@ -66,9 +67,9 @@ class _ServiceJobsScreenState extends State<ServiceJobsScreen>
           controller: tabs,
           isScrollable: true,
           tabs: const [
-            Tab(text: 'Today'),
-            Tab(text: 'Open'),
-            Tab(text: 'Completed'),
+            Tab(child: T('Today')),
+            Tab(child: T('Open')),
+            Tab(child: T('Completed')),
           ],
           labelColor: AppColors.primary,
           indicatorColor: AppColors.primary,
@@ -369,7 +370,7 @@ class _ServiceEmpty extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onRefresh,
             icon: const Icon(LucideIcons.refreshCw),
-            label: const Text('Retry'),
+            label: const T('Retry'),
           ),
         ],
       ),

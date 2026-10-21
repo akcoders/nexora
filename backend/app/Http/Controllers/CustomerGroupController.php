@@ -24,7 +24,7 @@ class CustomerGroupController extends Controller
         abort_unless($request->user()->can('customers.create'), 403);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:150', Rule::unique('customer_groups')->whereNull('deleted_at')],
+            'name' => ['required', 'string', 'max:150', Rule::unique('customer_groups')],
             'description' => ['nullable', 'string', 'max:1000'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
@@ -40,7 +40,7 @@ class CustomerGroupController extends Controller
         abort_unless($request->user()->can('customers.update'), 403);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:150', Rule::unique('customer_groups')->ignore($customerGroup)->whereNull('deleted_at')],
+            'name' => ['required', 'string', 'max:150', Rule::unique('customer_groups')->ignore($customerGroup)],
             'description' => ['nullable', 'string', 'max:1000'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);

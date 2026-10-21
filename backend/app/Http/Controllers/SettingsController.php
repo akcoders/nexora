@@ -11,8 +11,10 @@ use Illuminate\Support\Facades\Crypt;
 
 class SettingsController extends Controller
 {
-    public function index(DemoDataService $demoData): View
+    public function index(Request $request, DemoDataService $demoData): View
     {
+        abort_unless($request->user()->can('settings.read') || $request->user()->can('settings.update'), 403);
+
         return view('settings.index', [
             'settings' => Setting::pluck('value', 'key'),
             'demoStats' => $demoData->stats(),
@@ -22,6 +24,7 @@ class SettingsController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->can('settings.update'), 403);
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
             'company_short_name' => ['required', 'string', 'max:80'],

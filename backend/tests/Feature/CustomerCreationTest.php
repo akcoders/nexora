@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class CustomerCreationTest extends TestCase
@@ -18,6 +19,7 @@ class CustomerCreationTest extends TestCase
     {
         parent::setUp();
 
+        Permission::findOrCreate('customers.create', 'web');
         $this->group = CustomerGroup::create([
             'code' => 'GRP-TEST',
             'name' => 'Test Customers',
@@ -27,7 +29,7 @@ class CustomerCreationTest extends TestCase
 
     public function test_authenticated_user_can_create_a_single_branch_customer(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create()->givePermissionTo('customers.create');
 
         $response = $this->actingAs($user)->post('/customers', [
             'name' => 'Acme Cooling Limited',
@@ -40,6 +42,7 @@ class CustomerCreationTest extends TestCase
             'address_line_1' => '101 Business Park',
             'city' => 'Mumbai',
             'state' => 'Maharashtra',
+            'district' => 'Mumbai City',
             'pin_code' => '400001',
             'contact_no_1' => '9876543210',
             'email_1' => 'facility@acme.test',
@@ -59,7 +62,7 @@ class CustomerCreationTest extends TestCase
 
     public function test_multi_branch_customer_requires_a_branch(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create()->givePermissionTo('customers.create');
 
         $this->actingAs($user)->post('/customers', [
             'name' => 'Branchless Limited',
@@ -71,6 +74,7 @@ class CustomerCreationTest extends TestCase
             'address_line_1' => '12 Corporate Avenue',
             'city' => 'Pune',
             'state' => 'Maharashtra',
+            'district' => 'Pune',
             'pin_code' => '411001',
             'country' => 'India',
             'contact_no_1' => '9876543210',
@@ -81,7 +85,7 @@ class CustomerCreationTest extends TestCase
 
     public function test_multi_branch_customer_stores_branch_address_gst_and_contact_person(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create()->givePermissionTo('customers.create');
 
         $response = $this->actingAs($user)->post('/customers', [
             'name' => 'Northstar Facilities',
@@ -93,6 +97,7 @@ class CustomerCreationTest extends TestCase
             'address_line_1' => '1 Head Office Road',
             'city' => 'Delhi',
             'state' => 'Delhi',
+            'district' => 'New Delhi',
             'pin_code' => '110001',
             'country' => 'India',
             'contact_no_1' => '9876543210',

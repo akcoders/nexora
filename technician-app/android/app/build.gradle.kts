@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "in.webignitors.nexora_technician"
     compileSdk = 37
+    compileSdkMinor = 0
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

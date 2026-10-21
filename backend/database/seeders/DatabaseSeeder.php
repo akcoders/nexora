@@ -35,6 +35,8 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        $this->call(IndiaLocationSeeder::class);
+
         $permissions = collect(['customers', 'products', 'checklists', 'users', 'attendance', 'tasks', 'reports', 'settings', 'employees', 'companies', 'roles', 'hr', 'leaves', 'vouchers', 'payroll'])
             ->flatMap(fn (string $module) => collect(['create', 'read', 'update', 'delete', 'approve', 'assign', 'export'])
                 ->map(fn (string $action) => "$module.$action"));
@@ -56,25 +58,33 @@ class DatabaseSeeder extends Seeder
         $managerRole->syncPermissions(Permission::whereIn('name', ['attendance.read', 'attendance.approve', 'attendance.export', 'tasks.read', 'tasks.assign', 'reports.read', 'reports.export', 'service_jobs.read', 'service_jobs.assign', 'service_jobs.approve', 'service_jobs.view_financials', 'employees.read', 'hr.read', 'leaves.read', 'leaves.approve', 'vouchers.read', 'vouchers.approve'])->get());
         $technicianRole->syncPermissions(Permission::whereIn('name', ['service_jobs.read', 'service_jobs.inspect', 'service_jobs.create_estimate', 'service_jobs.perform', 'service_jobs.payment', 'service_jobs.complete'])->get());
 
-        $admin = User::updateOrCreate(['email' => 'admin@nexora.test'], [
+        $admin = User::firstOrNew(['email' => 'admin@nexora.test']);
+        $admin->fill([
             'name' => 'Nexora Admin',
-            'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'employee_code' => 'NX-ADMIN-001',
             'department' => 'Administration',
             'designation' => 'Administrator',
         ]);
+        if (! $admin->exists) {
+            $admin->password = Hash::make('password');
+        }
+        $admin->save();
         $admin->syncRoles([$superAdmin]);
 
-        $technician = User::updateOrCreate(['email' => 'technician@nexora.test'], [
+        $technician = User::firstOrNew(['email' => 'technician@nexora.test']);
+        $technician->fill([
             'name' => 'Aarav Sharma',
-            'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'employee_code' => 'NX-TECH-001',
             'phone' => '9876543210',
             'department' => 'Service',
             'designation' => 'HVAC Technician',
         ]);
+        if (! $technician->exists) {
+            $technician->password = Hash::make('password');
+        }
+        $technician->save();
         $technician->syncRoles([$technicianRole]);
 
         $premises = Premises::firstOrCreate(['name' => 'Nexora Head Office'], [
@@ -308,8 +318,14 @@ class DatabaseSeeder extends Seeder
                 ['allocated' => $type->annual_quota],
             ));
         });
-        Holiday::firstOrCreate(['holiday_date' => now()->startOfYear()->addMonths(7)->day(15)->toDateString()], ['name' => 'Independence Day', 'type' => 'national']);
-        Holiday::firstOrCreate(['holiday_date' => now()->startOfYear()->addMonths(9)->day(2)->toDateString()], ['name' => 'Gandhi Jayanti', 'type' => 'national']);
+        collect([
+            [now()->startOfYear()->addMonths(7)->day(15), 'Independence Day'],
+            [now()->startOfYear()->addMonths(9)->day(2), 'Gandhi Jayanti'],
+        ])->each(function (array $holiday): void {
+            if (Holiday::whereDate('holiday_date', $holiday[0]->toDateString())->doesntExist()) {
+                Holiday::create(['holiday_date' => $holiday[0]->toDateString(), 'name' => $holiday[1], 'type' => 'national']);
+            }
+        });
 
         if ($technician->notifications()->doesntExist()) {
             $technician->notify(new TaskAssignedNotification($task));
