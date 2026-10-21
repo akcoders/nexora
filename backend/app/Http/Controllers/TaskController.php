@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateTaskPriorityRequest;
+use App\Http\Resources\TaskBoardCardResource;
 use App\Models\Customer;
 use App\Models\Task;
-use App\Models\TaskMember;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\OneSignalService;
@@ -17,8 +18,6 @@ use Illuminate\Validation\Rule;
 
 class TaskController extends Controller
 {
-    public const PRIORITIES = ['normal', 'high', 'very_high'];
-
     /** Recently closed items shown in the board's Closed lane. */
     private const BOARD_CLOSED_LIMIT = 40;
 
@@ -42,7 +41,7 @@ class TaskController extends Controller
 
         return view('tasks.index', [
             'tasks' => $tasks,
-            'users' => User::where('status', 'active')->orderBy('name')->get(),
+            'users' => User::active()->orderBy('name')->get(),
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
             'openCount' => Task::where('status', '!=', 'closed')->count(),
             'workflowOpenCount' => Task::where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
@@ -66,7 +65,7 @@ class TaskController extends Controller
                 'exists:customers,id',
             ],
             'category' => ['nullable', 'string', 'max:100'],
-            'priority' => ['required', Rule::in(self::PRIORITIES)],
+            'priority' => ['required', Rule::in(Task::PRIORITIES)],
             'due_at' => ['nullable', 'date'],
             'assigned_to' => ['required', 'exists:users,id'],
             'observers' => ['nullable', 'array'],
@@ -105,32 +104,18 @@ class TaskController extends Controller
     {
         if (! $request->expectsJson()) {
             return view('tasks.board', [
-                'users' => User::where('status', 'active')->orderBy('name')->get(),
+                'users' => User::active()->orderBy('name')->get(),
                 'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
             ]);
         }
 
         $user = $request->user();
-        $relations = ['customer', 'assignee', 'latestAction.user'];
-        $open = Task::with($relations)->withCount(['actions', 'members as observers_count' => fn ($query) => $query->where('role', 'observer')])
-            ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
-            ->where('status', '!=', 'closed')
-            ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
-            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('due_at')
-            ->get();
-        $closed = Task::with($relations)->withCount(['actions', 'members as observers_count' => fn ($query) => $query->where('role', 'observer')])
-            ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
-            ->where('status', 'closed')
-            ->latest('closed_at')
-            ->limit(self::BOARD_CLOSED_LIMIT)
-            ->get();
-        $watching = TaskMember::where('user_id', $user->id)->where('role', 'observer')->pluck('task_id')->flip();
+        $open = Task::workItems()->open()->withBoardData($user)->byUrgency()->get();
+        $closed = Task::workItems()->closed()->withBoardData($user)->latest('closed_at')->limit(self::BOARD_CLOSED_LIMIT)->get();
 
         return response()->json([
-            'tasks' => $open->concat($closed)->map(fn (Task $task) => $this->boardCard($task, $user, $watching->has($task->id)))->values(),
-            'users' => User::where('status', 'active')->orderBy('name')->get(['id', 'name', 'designation'])
-                ->map(fn (User $member) => ['id' => $member->id, 'name' => $member->name, 'designation' => $member->designation]),
+            'tasks' => TaskBoardCardResource::collection($open->concat($closed))->resolve($request),
+            'users' => User::active()->orderBy('name')->get(['id', 'name', 'designation']),
             'me' => $user->id,
             'closed_limit' => self::BOARD_CLOSED_LIMIT,
             'can_reopen' => $user->can('tasks.update'),
@@ -138,26 +123,13 @@ class TaskController extends Controller
         ]);
     }
 
-    public function priority(Request $request, Task $task): JsonResponse|RedirectResponse
+    public function priority(UpdateTaskPriorityRequest $request, Task $task): JsonResponse|RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($this->canReprioritise($task, $user), 403);
-        abort_if($task->status === 'closed', 422, 'Closed items cannot be re-prioritised.');
-        $data = $request->validate([
-            'priority' => ['required', Rule::in(self::PRIORITIES)],
-            'remark' => ['nullable', 'string', 'max:3000'],
-        ]);
-
-        if ($data['priority'] !== $task->priority) {
-            DB::transaction(function () use ($task, $data, $user) {
-                $summary = 'Priority changed from '.str($task->priority)->headline().' to '.str($data['priority'])->headline().'.';
-                $task->actions()->create(['user_id' => $user->id, 'action' => 'priority', 'remark' => trim($summary.' '.($data['remark'] ?? ''))]);
-                $task->update(['priority' => $data['priority']]);
-            });
-        }
+        abort_if($task->isClosed(), 422, 'Closed items cannot be re-prioritised.');
+        $task->changePriority($request->validated('priority'), $request->user(), $request->validated('remark'));
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => $task->task_no.' priority updated.', 'task' => $this->freshCard($task, $user)]);
+            return response()->json(['message' => $task->task_no.' priority updated.', 'task' => $this->boardCard($request, $task)]);
         }
 
         return back()->with('success', 'Priority updated.');
@@ -167,15 +139,15 @@ class TaskController extends Controller
     {
         return view('tasks.show', [
             'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'members.user']),
-            'users' => User::where('status', 'active')->orderBy('name')->get(),
+            'users' => User::active()->orderBy('name')->get(),
         ]);
     }
 
     public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        abort_unless($this->canAct($task, $user), 403);
-        if ($task->status === 'closed' && ! $user->can('tasks.update')) {
+        abort_unless($user->can('act', $task), 403);
+        if ($task->isClosed() && ! $user->can('reopen', $task)) {
             abort_if($request->expectsJson(), 422, 'This task is already closed.');
 
             return back()->with('error', 'This task is already closed.');
@@ -205,59 +177,17 @@ class TaskController extends Controller
         if ($request->expectsJson()) {
             $message = $data['action'] === 'close' ? $task->task_no.' closed.' : $task->task_no.' assigned to '.$task->fresh()->assignee->name.'.';
 
-            return response()->json(['message' => $message, 'task' => $this->freshCard($task, $user)]);
+            return response()->json(['message' => $message, 'task' => $this->boardCard($request, $task)]);
         }
 
         return back()->with('success', 'Task action recorded.');
     }
 
-    private function canAct(Task $task, User $user): bool
+    /** @return array<string, mixed> */
+    private function boardCard(Request $request, Task $task): array
     {
-        return $user->can('tasks.update') || $user->can('tasks.assign') || $task->assigned_to === $user->id || $task->created_by === $user->id;
-    }
+        $task = Task::withBoardData($request->user())->findOrFail($task->id);
 
-    private function canReprioritise(Task $task, User $user): bool
-    {
-        return $user->can('tasks.update') || $user->can('tasks.assign') || $task->created_by === $user->id;
-    }
-
-    private function freshCard(Task $task, User $user): array
-    {
-        $task = $task->fresh(['customer', 'assignee', 'latestAction.user'])->loadCount(['actions', 'members as observers_count' => fn ($query) => $query->where('role', 'observer')]);
-
-        return $this->boardCard($task, $user, $task->members()->where('user_id', $user->id)->where('role', 'observer')->exists());
-    }
-
-    /** Compact card payload consumed by the Kanban board script. */
-    private function boardCard(Task $task, User $user, bool $watching): array
-    {
-        $isOpen = $task->status !== 'closed';
-
-        return [
-            'id' => $task->id,
-            'task_no' => $task->task_no,
-            'title' => $task->title,
-            'type' => $task->task_type,
-            'status' => $isOpen ? 'pending' : 'closed',
-            'priority' => $task->priority,
-            'category' => $task->category,
-            'customer' => $task->customer?->name,
-            'assignee' => $task->assignee ? ['id' => $task->assignee->id, 'name' => $task->assignee->name, 'designation' => $task->assignee->designation] : null,
-            'due_at' => $task->due_at?->toIso8601String(),
-            'due_label' => $task->due_at?->format('d M, h:i A'),
-            'overdue' => $isOpen && $task->due_at?->isPast(),
-            'closed_at' => $task->closed_at?->toIso8601String(),
-            'actions_count' => (int) $task->actions_count,
-            'observers_count' => (int) ($task->observers_count ?? 0),
-            'latest' => $task->latestAction ? ['action' => $task->latestAction->action, 'by' => $task->latestAction->user?->name, 'remark' => str($task->latestAction->remark)->limit(110)->toString(), 'at' => $task->latestAction->created_at->diffForHumans()] : null,
-            'mine' => $task->assigned_to === $user->id,
-            'created_by_me' => $task->created_by === $user->id,
-            'watching' => $watching,
-            'can_act' => $this->canAct($task, $user) && ($isOpen || $user->can('tasks.update')),
-            'can_prioritise' => $isOpen && $this->canReprioritise($task, $user),
-            'url' => route('tasks.show', $task),
-            'action_url' => route('tasks.action', $task),
-            'priority_url' => route('tasks.priority', $task),
-        ];
+        return (new TaskBoardCardResource($task))->resolve($request);
     }
 }
