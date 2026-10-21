@@ -4,7 +4,7 @@
     <x-slot name="pageTitle">{{ $isTicket ? 'Customer ticket' : 'Internal workflow' }}</x-slot>
     <x-slot name="breadcrumb">{{ $isTicket ? 'Tickets' : 'Workflow' }} / {{ $task->task_no }}</x-slot>
 
-    <a href="{{ route('tasks.index', ['type' => $task->task_type]) }}" class="small d-inline-flex align-items-center gap-1 mb-3"><i data-lucide="arrow-left" style="width:15px"></i>All {{ $isTicket ? 'tickets' : 'workflows' }}</a>
+    <div class="d-flex flex-wrap gap-3 mb-3"><a href="{{ route('tasks.index', ['type' => $task->task_type]) }}" class="small d-inline-flex align-items-center gap-1"><i data-lucide="arrow-left" style="width:15px"></i>All {{ $isTicket ? 'tickets' : 'workflows' }}</a><a href="{{ route('tasks.board', ['type' => $task->task_type]) }}" class="small d-inline-flex align-items-center gap-1"><i data-lucide="square-kanban" style="width:15px"></i>Kanban board</a></div>
     @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
 
     <div class="row g-4">
@@ -39,8 +39,8 @@
                 <div class="d-grid gap-4">
                     @foreach($task->actions as $action)
                         <div class="d-flex gap-3">
-                            <span class="nx-metric-icon flex-shrink-0" style="width:38px;height:38px"><i data-lucide="{{ $action->action === 'close' ? 'circle-check-big' : ($action->action === 'assign' ? 'forward' : 'plus') }}" style="width:18px"></i></span>
-                            <div class="flex-grow-1"><div class="d-flex justify-content-between"><strong>{{ str($action->action)->headline() }}</strong><small class="text-secondary">{{ $action->created_at->format('d M, h:i A') }}</small></div><div class="small text-secondary mb-1">by {{ $action->user?->name }} @if($action->assignee) · assigned to {{ $action->assignee->name }} @endif</div><div class="small">{{ $action->remark }}</div></div>
+                            <span class="nx-metric-icon flex-shrink-0" style="width:38px;height:38px"><i data-lucide="{{ match ($action->action) { 'close' => 'circle-check-big', 'assign' => 'forward', 'priority' => 'flag', default => 'plus' } }}" style="width:18px"></i></span>
+                            <div class="flex-grow-1"><div class="d-flex justify-content-between"><strong>{{ $action->action === 'priority' ? 'Priority changed' : str($action->action)->headline() }}</strong><small class="text-secondary">{{ $action->created_at->format('d M, h:i A') }}</small></div><div class="small text-secondary mb-1">by {{ $action->user?->name }} @if($action->assignee) · assigned to {{ $action->assignee->name }} @endif</div><div class="small">{{ $action->remark }}</div></div>
                         </div>
                     @endforeach
                 </div>
