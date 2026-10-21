@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateTaskPriorityRequest;
+use App\Http\Resources\TaskBoardCardResource;
 use App\Models\Customer;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\OneSignalService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +18,9 @@ use Illuminate\Validation\Rule;
 
 class TaskController extends Controller
 {
+    /** Recently closed items shown in the board's Closed lane. */
+    private const BOARD_CLOSED_LIMIT = 40;
+
     public function index(Request $request): View
     {
         $tasks = Task::with(['customer', 'assignee', 'creator', 'latestAction.user', 'latestAction.assignee'])
@@ -64,7 +70,10 @@ class TaskController extends Controller
             'assigned_to' => ['required', 'exists:users,id'],
             'observers' => ['nullable', 'array'],
             'observers.*' => ['exists:users,id'],
+            'return_to' => ['nullable', Rule::in(['board'])],
         ]);
+        $returnTo = $data['return_to'] ?? null;
+        unset($data['return_to']);
 
         $task = DB::transaction(function () use ($request, $data) {
             $observers = $data['observers'] ?? [];
@@ -84,7 +93,46 @@ class TaskController extends Controller
         $label = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
         $oneSignal->sendToUser($task->assignee, 'New '.ucfirst($label).' assigned', $task->title, ['type' => $label.'_task', 'task_id' => $task->id]);
 
+        if ($returnTo === 'board') {
+            return redirect()->route('tasks.board', ['type' => $task->task_type])->with('success', $task->task_no.' created and added to the board.');
+        }
+
         return redirect()->route('tasks.show', $task)->with('success', 'Task created successfully.');
+    }
+
+    public function board(Request $request): View|JsonResponse
+    {
+        if (! $request->expectsJson()) {
+            return view('tasks.board', [
+                'users' => User::active()->orderBy('name')->get(),
+                'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
+            ]);
+        }
+
+        $user = $request->user();
+        $open = Task::workItems()->open()->withBoardData($user)->byUrgency()->get();
+        $closed = Task::workItems()->closed()->withBoardData($user)->latest('closed_at')->limit(self::BOARD_CLOSED_LIMIT)->get();
+
+        return response()->json([
+            'tasks' => TaskBoardCardResource::collection($open->concat($closed))->resolve($request),
+            'users' => User::active()->orderBy('name')->get(['id', 'name', 'designation']),
+            'me' => $user->id,
+            'closed_limit' => self::BOARD_CLOSED_LIMIT,
+            'can_reopen' => $user->can('tasks.update'),
+            'generated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    public function priority(UpdateTaskPriorityRequest $request, Task $task): JsonResponse|RedirectResponse
+    {
+        abort_if($task->isClosed(), 422, 'Closed items cannot be re-prioritised.');
+        $task->changePriority($request->validated('priority'), $request->user(), $request->validated('remark'));
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $task->task_no.' priority updated.', 'task' => $this->boardCard($request, $task)]);
+        }
+
+        return back()->with('success', 'Priority updated.');
     }
 
     public function show(Task $task): View
@@ -95,11 +143,13 @@ class TaskController extends Controller
         ]);
     }
 
-    public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse
+    public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse|JsonResponse
     {
         $user = $request->user();
         abort_unless($user->can('tasks.update') || $user->can('tasks.assign') || $task->assigned_to === $user->id || $task->created_by === $user->id, 403);
         if ($task->status === 'closed' && ! $user->can('tasks.update')) {
+            abort_if($request->expectsJson(), 422, 'This task is already closed.');
+
             return back()->with('error', 'This task is already closed.');
         }
         $data = $request->validate([
@@ -124,6 +174,20 @@ class TaskController extends Controller
             $oneSignal->sendToUser($task->fresh()->assignee, ucfirst($type).' assigned to you', $task->title, ['type' => $type.'_task', 'task_id' => $task->id]);
         }
 
+        if ($request->expectsJson()) {
+            $message = $data['action'] === 'close' ? $task->task_no.' closed.' : $task->task_no.' assigned to '.$task->fresh()->assignee->name.'.';
+
+            return response()->json(['message' => $message, 'task' => $this->boardCard($request, $task)]);
+        }
+
         return back()->with('success', 'Task action recorded.');
+    }
+
+    /** @return array<string, mixed> */
+    private function boardCard(Request $request, Task $task): array
+    {
+        $task = Task::withBoardData($request->user())->findOrFail($task->id);
+
+        return (new TaskBoardCardResource($task))->resolve($request);
     }
 }

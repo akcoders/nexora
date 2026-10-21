@@ -43,6 +43,93 @@ class EmployeeMasterOptions
         'not_required' => ['label' => 'Not required', 'tone' => 'info'],
     ];
 
+    /**
+     * Departments with the designations offered for each. The names include every
+     * department and designation the seeders and earlier free-text entries used.
+     *
+     * @var array<string, list<string>>
+     */
+    private const DEPARTMENTS = [
+        'Service' => ['HVAC Technician', 'Senior Technician', 'Helper', 'Service Engineer', 'Service Supervisor', 'Service Manager'],
+        'Installation & Projects' => ['Installation Technician', 'Project Engineer', 'Site Supervisor', 'Project Manager'],
+        'Sales' => ['Sales Executive', 'Sales Engineer', 'Sales Manager'],
+        'Customer Support' => ['Customer Support Executive', 'Call Coordinator', 'Service Coordinator'],
+        'Stores' => ['Storekeeper', 'Inventory Executive', 'Purchase Executive'],
+        'Accounts' => ['Accountant', 'Accounts Executive', 'Finance Manager'],
+        'HR' => ['HR Executive', 'HR Manager', 'Recruiter'],
+        'Administration' => ['Administrator', 'Admin Executive', 'Office Assistant', 'Driver'],
+        'Operations' => ['Operations Executive', 'Operations Manager', 'Branch Manager'],
+        'Management' => ['Director', 'General Manager', 'Chief Executive Officer'],
+    ];
+
+    /**
+     * Fixed dropdown lists used by the employee onboarding form. Values are stored as shown,
+     * except where a list maps a stored key to a label.
+     *
+     * @var array<string, array<int|string, string>>
+     */
+    private const LISTS = [
+        'salutations' => ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr'],
+        'genders' => ['male' => 'Male', 'female' => 'Female', 'transgender' => 'Transgender', 'other' => 'Other'],
+        'marital_statuses' => ['unmarried' => 'Unmarried', 'married' => 'Married', 'other' => 'Other'],
+        'blood_groups' => ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+        'nationalities' => ['Indian', 'Nepalese', 'Bhutanese', 'Bangladeshi', 'Sri Lankan', 'Other'],
+        'religions' => ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Buddhist', 'Jain', 'Parsi', 'Jewish', 'Other', 'Prefer not to say'],
+        'relations' => ['Spouse', 'Father', 'Mother', 'Brother', 'Sister', 'Son', 'Daughter', 'Friend', 'Other'],
+        'employment_types' => ['permanent' => 'Permanent', 'probation' => 'Probation', 'contract' => 'Contract', 'intern' => 'Intern', 'consultant' => 'Consultant'],
+        'employee_categories' => ['Field staff', 'Office staff', 'Supervisory', 'Management', 'Contract workforce', 'Apprentice / trainee'],
+        'job_grades' => ['G1' => 'G1 · Helper / trainee', 'G2' => 'G2 · Technician / executive', 'G3' => 'G3 · Senior technician', 'G4' => 'G4 · Supervisor / engineer', 'G5' => 'G5 · Manager', 'G6' => 'G6 · Senior manager', 'G7' => 'G7 · Leadership'],
+        'user_statuses' => ['active' => 'Active', 'inactive' => 'Inactive', 'on_leave' => 'On leave', 'suspended' => 'Suspended'],
+        'currencies' => ['INR' => 'INR · Indian rupee', 'USD' => 'USD · US dollar', 'AED' => 'AED · UAE dirham', 'EUR' => 'EUR · Euro', 'GBP' => 'GBP · British pound'],
+        'pay_frequencies' => ['monthly' => 'Monthly', 'weekly' => 'Weekly', 'daily' => 'Daily'],
+        'pay_groups' => ['Staff', 'Field workforce', 'Contract labour', 'Management', 'Interns & trainees'],
+        'yes_no' => ['yes' => 'Yes', 'no' => 'No'],
+        'qualifications' => ['Below 10th', '10th (SSC)', '12th (HSC)', 'ITI', 'Diploma', 'Graduate', 'Engineering graduate', 'Post graduate', 'Doctorate'],
+        'ppe_sizes' => ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+        'safety_training' => ['Completed', 'Scheduled', 'Refresher due', 'Not completed', 'Not required'],
+        'medical_fitness' => ['Fit', 'Fit with restrictions', 'Temporarily unfit', 'Check-up pending'],
+        'issue_statuses' => ['Issued', 'Not issued', 'Returned'],
+        'access_statuses' => ['Granted', 'Requested', 'Revoked', 'Not required'],
+    ];
+
+    /** @return array<string, list<string>> department => designations */
+    public static function departments(): array
+    {
+        return self::DEPARTMENTS;
+    }
+
+    /** @return list<string> */
+    public static function designations(): array
+    {
+        return array_values(array_unique(array_merge(...array_values(self::DEPARTMENTS))));
+    }
+
+    /**
+     * Options of a fixed list as value => label.
+     *
+     * @return array<string, string>
+     */
+    public static function options(string $list): array
+    {
+        $options = self::LISTS[$list] ?? throw new \InvalidArgumentException("Unknown employee option list [{$list}].");
+
+        return array_is_list($options) ? array_combine($options, $options) : $options;
+    }
+
+    /**
+     * Values accepted for a list. A value already saved on the record stays valid even when
+     * it is no longer offered, so older free-text entries do not block saving the form.
+     *
+     * @param  array<int|string, string>|string  $list  list name or explicit values
+     * @return list<string>
+     */
+    public static function allowed(array|string $list, ?string $current = null): array
+    {
+        $values = is_string($list) ? array_map('strval', array_keys(self::options($list))) : array_values($list);
+
+        return filled($current) && ! in_array($current, $values, true) ? [...$values, $current] : $values;
+    }
+
     /** @return array<string, string> language name => Google Translate code */
     public static function languages(): array
     {

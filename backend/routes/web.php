@@ -69,8 +69,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/premises/{premises}', [PremisesController::class, 'update'])->name('premises.update');
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
+    Route::get('/tasks/board', [TaskController::class, 'board'])->name('tasks.board');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
     Route::post('/tasks/{task}/action', [TaskController::class, 'action'])->name('tasks.action');
+    Route::post('/tasks/{task}/priority', [TaskController::class, 'priority'])->name('tasks.priority');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
     Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
