@@ -41,7 +41,7 @@ class TaskController extends Controller
 
         return view('tasks.index', [
             'tasks' => $tasks,
-            'users' => User::active()->orderBy('name')->get(),
+            'users' => User::where('status', 'active')->orderBy('name')->get(),
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
             'openCount' => Task::where('status', '!=', 'closed')->count(),
             'workflowOpenCount' => Task::where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
@@ -65,7 +65,7 @@ class TaskController extends Controller
                 'exists:customers,id',
             ],
             'category' => ['nullable', 'string', 'max:100'],
-            'priority' => ['required', Rule::in(Task::PRIORITIES)],
+            'priority' => ['required', Rule::in(['normal', 'high', 'very_high'])],
             'due_at' => ['nullable', 'date'],
             'assigned_to' => ['required', 'exists:users,id'],
             'observers' => ['nullable', 'array'],
@@ -139,15 +139,15 @@ class TaskController extends Controller
     {
         return view('tasks.show', [
             'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'members.user']),
-            'users' => User::active()->orderBy('name')->get(),
+            'users' => User::where('status', 'active')->orderBy('name')->get(),
         ]);
     }
 
     public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse|JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->can('act', $task), 403);
-        if ($task->isClosed() && ! $user->can('reopen', $task)) {
+        abort_unless($user->can('tasks.update') || $user->can('tasks.assign') || $task->assigned_to === $user->id || $task->created_by === $user->id, 403);
+        if ($task->status === 'closed' && ! $user->can('tasks.update')) {
             abort_if($request->expectsJson(), 422, 'This task is already closed.');
 
             return back()->with('error', 'This task is already closed.');
