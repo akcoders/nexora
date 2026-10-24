@@ -30,6 +30,11 @@ class CustomerFloorPlan extends Model
         return $this->hasMany(CustomerEquipment::class);
     }
 
+    public function rooms(): HasMany
+    {
+        return $this->hasMany(CustomerRoom::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

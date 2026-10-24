@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCustomerEquipmentRequest;
 use App\Http\Requests\StoreCustomerFloorPlanRequest;
+use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\ActivityLog;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
+use App\Models\CustomerRoom;
 use App\Models\Product;
 use App\Models\ServiceMasterOption;
 use App\Models\User;
@@ -17,6 +19,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
@@ -54,8 +57,8 @@ class CustomerController extends Controller
             'branches.contacts',
             'creditTerms',
             'documents',
-            'floorPlans' => fn ($query) => $query->with(['branch', 'equipments.branch'])->latest(),
-            'equipments' => fn ($query) => $query->with(['branch', 'product', 'floorPlan'])->latest(),
+            'floorPlans' => fn ($query) => $query->with(['branch', 'rooms.equipments.product', 'equipments.branch'])->orderBy('building_name')->orderBy('floor_number')->orderBy('id'),
+            'equipments' => fn ($query) => $query->with(['branch', 'product', 'floorPlan', 'room'])->latest(),
             'serviceJobs' => fn ($query) => $query->with(['technician', 'serviceType', 'equipment'])->latest()->limit(10),
         ]);
 
@@ -67,33 +70,123 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function storeFloorPlan(StoreCustomerFloorPlanRequest $request, Customer $customer): RedirectResponse
+    public function edit(Request $request, Customer $customer): View
     {
         abort_unless($request->user()->can('customers.update'), 403);
-        $data = $request->validated();
-        unset($data['image']);
+        $customer->load('creditTerms');
 
-        $floorPlan = $customer->floorPlans()->create(array_merge($data, [
-            'image_path' => $request->file('image')->store("customers/{$customer->id}/floor-plans", 'public'),
-            'created_by' => $request->user()->id,
-        ]));
-
-        ActivityLog::create([
-            'user_id' => $request->user()->id,
-            'event' => 'customer.floor_plan_added',
-            'subject_type' => Customer::class,
-            'subject_id' => $customer->id,
-            'properties' => ['floor_plan_id' => $floorPlan->id, 'name' => $floorPlan->name],
-            'ip_address' => $request->ip(),
+        return view('customers.edit', [
+            'customer' => $customer,
+            'groups' => CustomerGroup::where('status', 'active')->orderBy('name')->get(),
+            'users' => User::where('status', 'active')->orderBy('name')->get(),
         ]);
+    }
 
-        return redirect()->route('customers.show', $customer)->with('success', 'Floor plan uploaded successfully.');
+    public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse
+    {
+        $data = $request->safe()->except('credit');
+        $data['segments'] = $request->validated('segments', []);
+
+        DB::transaction(function () use ($request, $customer, $data): void {
+            $customer->update($data);
+
+            $credit = $request->validated('credit', []);
+            foreach (['advance_required', 'tds_applicable', 'retention_applicable', 'po_mandatory', 'eway_bill_applicable'] as $field) {
+                $credit[$field] = $request->boolean("credit.$field");
+            }
+            $customer->creditTerms()->updateOrCreate([], $credit);
+
+            ActivityLog::create([
+                'user_id' => $request->user()->id,
+                'event' => 'customer.updated',
+                'subject_type' => Customer::class,
+                'subject_id' => $customer->id,
+                'properties' => ['code' => $customer->code, 'name' => $customer->name],
+                'ip_address' => $request->ip(),
+            ]);
+        });
+
+        return redirect()->route('customers.show', $customer)->with('success', "{$customer->name} updated successfully.");
+    }
+
+    public function storeFloorPlan(StoreCustomerFloorPlanRequest $request, Customer $customer): RedirectResponse
+    {
+        $data = $request->validated();
+
+        if ($request->hasFile('image')) {
+            $floorPlan = $customer->floorPlans()->create([
+                'customer_branch_id' => $data['customer_branch_id'] ?? null,
+                'name' => $data['name'],
+                'floor_label' => $data['floor_label'] ?? null,
+                'image_path' => $request->file('image')->store("customers/{$customer->id}/floor-plans", 'public'),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $request->user()->id,
+            ]);
+
+            ActivityLog::create([
+                'user_id' => $request->user()->id,
+                'event' => 'customer.floor_plan_added',
+                'subject_type' => Customer::class,
+                'subject_id' => $customer->id,
+                'properties' => ['floor_plan_id' => $floorPlan->id, 'name' => $floorPlan->name],
+                'ip_address' => $request->ip(),
+            ]);
+
+            return redirect()->route('customers.show', $customer)->with('success', 'Floor plan uploaded successfully.');
+        }
+
+        $buildingUuid = (string) Str::uuid();
+        DB::transaction(function () use ($request, $customer, $data, $buildingUuid): void {
+            foreach ($data['floors'] as $floorIndex => $floorData) {
+                $floor = $customer->floorPlans()->create([
+                    'customer_branch_id' => $data['customer_branch_id'] ?? null,
+                    'building_uuid' => $buildingUuid,
+                    'building_name' => $data['building_name'],
+                    'name' => $data['building_name'].' · '.$floorData['name'],
+                    'floor_label' => $floorData['name'],
+                    'floor_number' => $floorIndex + 1,
+                    'notes' => $data['notes'] ?? null,
+                    'created_by' => $request->user()->id,
+                ]);
+
+                collect($floorData['rooms'])
+                    ->map(fn (string $room): string => trim($room))
+                    ->filter()
+                    ->unique(fn (string $room): string => Str::lower($room))
+                    ->values()
+                    ->each(fn (string $room, int $roomIndex) => $floor->rooms()->create([
+                        'customer_id' => $customer->id,
+                        'name' => $room,
+                        'sort_order' => $roomIndex,
+                    ]));
+            }
+
+            ActivityLog::create([
+                'user_id' => $request->user()->id,
+                'event' => 'customer.building_layout_added',
+                'subject_type' => Customer::class,
+                'subject_id' => $customer->id,
+                'properties' => ['building_uuid' => $buildingUuid, 'name' => $data['building_name'], 'floors' => count($data['floors'])],
+                'ip_address' => $request->ip(),
+            ]);
+        });
+
+        return redirect()->route('customers.show', $customer)->with('success', 'Building floors and rooms created successfully.');
     }
 
     public function storeEquipment(StoreCustomerEquipmentRequest $request, Customer $customer): RedirectResponse
     {
-        abort_unless($request->user()->can('customers.update'), 403);
-        $equipment = $customer->equipments()->create($request->validated());
+        $data = $request->validated();
+        if (! empty($data['customer_room_id'])) {
+            $room = CustomerRoom::with('floor')->findOrFail($data['customer_room_id']);
+            $data['customer_floor_plan_id'] = $room->customer_floor_plan_id;
+            $data['customer_branch_id'] = $room->floor->customer_branch_id;
+            $data['location'] = $room->name;
+            $data['plan_x'] = null;
+            $data['plan_y'] = null;
+        }
+
+        $equipment = $customer->equipments()->create($data);
 
         ActivityLog::create([
             'user_id' => $request->user()->id,

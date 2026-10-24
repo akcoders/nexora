@@ -130,4 +130,25 @@ class AdminOperationsTest extends TestCase
             ->assertSee('Edit premises')
             ->assertSee('Updated Office');
     }
+
+    public function test_admin_can_edit_a_service_checklist_and_replace_its_items(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@nexora.test')->firstOrFail();
+        $checklist = ServiceChecklist::where('name', 'Quarterly Split AC Service')->firstOrFail();
+
+        $this->actingAs($admin)->put(route('checklists.update', $checklist), [
+            'name' => 'Updated Quarterly AC Service',
+            'phase' => 'both',
+            'frequency' => 'Quarterly',
+            'estimated_minutes' => 75,
+            'items' => "Inspect filters [photo]\nMeasure airflow",
+        ])->assertRedirect()->assertSessionHas('success', 'Service checklist updated.');
+
+        $checklist->refresh();
+        $this->assertSame('Updated Quarterly AC Service', $checklist->name);
+        $this->assertSame('both', $checklist->phase);
+        $this->assertSame(2, $checklist->items()->count());
+        $this->assertTrue($checklist->items()->where('label', 'Inspect filters')->firstOrFail()->photo_required);
+    }
 }

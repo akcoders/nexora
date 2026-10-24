@@ -47,6 +47,11 @@ class CustomerEquipment extends Model
         return $this->belongsTo(CustomerFloorPlan::class, 'customer_floor_plan_id');
     }
 
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(CustomerRoom::class, 'customer_room_id');
+    }
+
     public function serviceJobs(): HasMany
     {
         return $this->hasMany(ServiceJob::class);

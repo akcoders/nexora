@@ -20,6 +20,7 @@ class CustomerCreationTest extends TestCase
         parent::setUp();
 
         Permission::findOrCreate('customers.create', 'web');
+        Permission::findOrCreate('customers.update', 'web');
         $this->group = CustomerGroup::create([
             'code' => 'GRP-TEST',
             'name' => 'Test Customers',
@@ -142,6 +143,48 @@ class CustomerCreationTest extends TestCase
             'customer_branch_id' => $branch->id,
             'name' => 'Branch Manager',
             'email' => 'manager.mumbai@northstar.test',
+        ]);
+    }
+
+    public function test_authorized_user_can_edit_customer_account_and_credit_details(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.update');
+        $customer = Customer::factory()->create([
+            'customer_group_id' => $this->group->id,
+            'name' => 'Old Customer Name',
+        ]);
+
+        $this->actingAs($user)->get(route('customers.edit', $customer))
+            ->assertOk()
+            ->assertSee('Edit customer');
+
+        $this->actingAs($user)->put(route('customers.update', $customer), [
+            'name' => 'Updated Customer Name',
+            'customer_group_id' => $this->group->id,
+            'types' => ['corporate'],
+            'segments' => ['office'],
+            'priority' => 'high',
+            'status' => 'active',
+            'address_line_1' => '88 Business Park',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'district' => 'Mumbai City',
+            'pin_code' => '400001',
+            'country' => 'India',
+            'contact_no_1' => '9876543210',
+            'email_1' => 'updated@example.test',
+            'credit' => ['credit_limit' => 250000, 'credit_days' => 45, 'po_mandatory' => 1],
+        ])->assertRedirect(route('customers.show', $customer));
+
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'name' => 'Updated Customer Name',
+            'email_1' => 'updated@example.test',
+        ]);
+        $this->assertDatabaseHas('customer_credit_terms', [
+            'customer_id' => $customer->id,
+            'credit_days' => 45,
+            'po_mandatory' => 1,
         ]);
     }
 }

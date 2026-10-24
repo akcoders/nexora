@@ -15,7 +15,7 @@ class ServiceChecklistController extends Controller
     public function index(): View
     {
         return view('checklists.index', [
-            'checklists' => ServiceChecklist::with(['category', 'items'])->latest()->paginate(12),
+            'checklists' => ServiceChecklist::with(['category', 'serviceType', 'items'])->latest()->paginate(12),
             'categories' => ProductCategory::orderBy('name')->get(),
             'serviceTypes' => ServiceType::query()->where('active', true)->orderBy('name')->get(),
         ]);
@@ -24,7 +24,43 @@ class ServiceChecklistController extends Controller
     public function store(Request $request): RedirectResponse
     {
         abort_unless($request->user()->can('checklists.create'), 403);
-        $data = $request->validate([
+        $data = $this->validateChecklist($request);
+        $data['phase'] ??= 'pre';
+
+        DB::transaction(function () use ($data) {
+            $checklist = ServiceChecklist::create(collect($data)->except('items')->all());
+            $this->replaceItems($checklist, $data['items']);
+        });
+
+        return back()->with('success', 'Service checklist created.');
+    }
+
+    public function update(Request $request, ServiceChecklist $checklist): RedirectResponse
+    {
+        abort_unless($request->user()->can('checklists.update'), 403);
+        $data = $this->validateChecklist($request);
+        $data['phase'] ??= 'pre';
+
+        DB::transaction(function () use ($checklist, $data): void {
+            $checklist->update(collect($data)->except('items')->all());
+            $this->replaceItems($checklist, $data['items']);
+        });
+
+        return back()->with('success', 'Service checklist updated.');
+    }
+
+    public function destroy(Request $request, ServiceChecklist $checklist): RedirectResponse
+    {
+        abort_unless($request->user()->can('checklists.delete'), 403);
+        $checklist->delete();
+
+        return back()->with('success', 'Checklist removed.');
+    }
+
+    /** @return array<string, mixed> */
+    private function validateChecklist(Request $request): array
+    {
+        return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'product_category_id' => ['nullable', 'exists:product_categories,id'],
             'phase' => ['nullable', 'in:pre,post,both'],
@@ -32,18 +68,21 @@ class ServiceChecklistController extends Controller
             'equipment_type' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],
             'frequency' => ['nullable', 'string', 'max:100'],
-            'estimated_minutes' => ['nullable', 'integer', 'min:1'],
+            'estimated_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'required_skill' => ['nullable', 'string', 'max:255'],
             'safety_notes' => ['nullable', 'string', 'max:3000'],
-            'items' => ['required', 'string'],
+            'items' => ['required', 'string', 'max:20000'],
         ]);
+    }
 
-        DB::transaction(function () use ($data) {
-            $items = collect(preg_split('/\r\n|\r|\n/', $data['items']))->map(fn ($item) => trim($item))->filter();
-            unset($data['items']);
-            $data['phase'] ??= 'pre';
-            $checklist = ServiceChecklist::create($data);
-            $items->each(function (string $line, int $index) use ($checklist): void {
+    private function replaceItems(ServiceChecklist $checklist, string $itemsText): void
+    {
+        $checklist->items()->delete();
+        collect(preg_split('/\r\n|\r|\n/', $itemsText))
+            ->map(fn (string $item): string => trim($item))
+            ->filter()
+            ->values()
+            ->each(function (string $line, int $index) use ($checklist): void {
                 $photoRequired = str_ends_with(strtolower($line), '[photo]');
                 $label = trim(preg_replace('/\s*\[photo\]\s*$/i', '', $line));
                 $checklist->items()->create([
@@ -56,16 +95,5 @@ class ServiceChecklistController extends Controller
                     'sort_order' => $index,
                 ]);
             });
-        });
-
-        return back()->with('success', 'Service checklist created.');
-    }
-
-    public function destroy(Request $request, ServiceChecklist $checklist): RedirectResponse
-    {
-        abort_unless($request->user()->can('checklists.delete'), 403);
-        $checklist->delete();
-
-        return back()->with('success', 'Checklist removed.');
     }
 }

@@ -88,4 +88,25 @@ class DemoDataManagementTest extends TestCase
         $this->assertSame(10, DemoDataRecord::distinct('scenario_key')->count('scenario_key'));
         $this->assertDatabaseHas('service_jobs', ['job_no' => 'DEMO-SRV-010', 'status' => 'completed']);
     }
+
+    public function test_clearing_demo_data_removes_live_work_that_references_demo_records(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@nexora.test')->firstOrFail();
+        $demoTechnician = User::where('email', 'demo.tech01@nexora.test')->firstOrFail();
+        $demoCustomer = Customer::where('code', 'CUST00001')->firstOrFail();
+        $liveJob = ServiceJob::factory()->create([
+            'job_no' => 'SRV-LIVE-DEMO-REF',
+            'customer_id' => $demoCustomer->id,
+            'assigned_to' => $demoTechnician->id,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->actingAs($admin)->delete(route('settings.demo-data.destroy'))->assertRedirect();
+
+        $this->assertDatabaseMissing('service_jobs', ['id' => $liveJob->id]);
+        $this->assertDatabaseMissing('customers', ['id' => $demoCustomer->id]);
+        $this->assertDatabaseMissing('users', ['id' => $demoTechnician->id]);
+        $this->assertSame(0, DemoDataRecord::count());
+    }
 }

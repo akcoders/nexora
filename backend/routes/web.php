@@ -40,7 +40,7 @@ Route::get('/salary-slips/{payrollEntry}', SalarySlipController::class)->middlew
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/locations/india', [LocationController::class, 'india'])->name('locations.india');
-    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show']);
+    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::post('/customers/{customer}/floor-plans', [CustomerController::class, 'storeFloorPlan'])->name('customers.floor-plans.store');
     Route::post('/customers/{customer}/equipment', [CustomerController::class, 'storeEquipment'])->name('customers.equipment.store');
     Route::resource('customer-groups', CustomerGroupController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/product-categories', [ProductController::class, 'storeCategory'])->name('product-categories.store');
     Route::get('/service-checklists', [ServiceChecklistController::class, 'index'])->name('checklists.index');
     Route::post('/service-checklists', [ServiceChecklistController::class, 'store'])->name('checklists.store');
+    Route::put('/service-checklists/{checklist}', [ServiceChecklistController::class, 'update'])->name('checklists.update');
     Route::delete('/service-checklists/{checklist}', [ServiceChecklistController::class, 'destroy'])->name('checklists.destroy');
     Route::get('/service-masters', [ServiceMasterController::class, 'index'])->name('service-masters.index');
     Route::post('/service-masters/service-types', [ServiceMasterController::class, 'storeServiceType'])->name('service-masters.service-types.store');

@@ -35,7 +35,8 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap align-items-start gap-2">
-                <button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#floorPlanModal"><i data-lucide="map" style="width:17px"></i>Upload floor plan</button>
+                @can('customers.update')<a class="btn btn-light border" href="{{ route('customers.edit', $customer) }}"><i data-lucide="pencil" style="width:17px"></i>Edit customer</a>@endcan
+                <button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#floorPlanModal"><i data-lucide="building-2" style="width:17px"></i>Add building layout</button>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#unitModal"><i data-lucide="plus" style="width:17px"></i>Add AC unit</button>
             </div>
         </div>
@@ -89,30 +90,47 @@
         </div>
 
         <div class="tab-pane fade" id="customerAssets">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4"><div><h3 class="h5 fw-bold mb-1">Customer equipment map</h3><div class="small text-secondary">Place each unit on its floor plan, or keep it as a standalone asset card.</div></div><div class="d-flex gap-2"><button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#floorPlanModal"><i data-lucide="upload" style="width:17px"></i>Floor plan</button><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#unitModal"><i data-lucide="plus" style="width:17px"></i>Add unit</button></div></div>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4"><div><h3 class="h5 fw-bold mb-1">Building, floors & rooms</h3><div class="small text-secondary">Create every floor and room, then assign one or more AC units to any room.</div></div><div class="d-flex gap-2"><button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#floorPlanModal"><i data-lucide="building-2" style="width:17px"></i>Add layout</button><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#unitModal"><i data-lucide="plus" style="width:17px"></i>Add AC unit</button></div></div>
 
-            @forelse($customer->floorPlans as $plan)
-                <section class="nx-card p-3 p-lg-4 mb-4">
-                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><div><h4 class="h6 fw-bold mb-1">{{ $plan->name }}</h4><div class="small text-secondary">{{ $plan->floor_label ?: 'Floor plan' }}{{ $plan->branch ? ' · '.$plan->branch->name : ' · Head office' }}</div></div><span class="badge rounded-pill badge-soft-primary align-self-start">{{ $plan->equipments->count() }} units mapped</span></div>
-                    <div class="nx-floor-plan">
-                        <img src="{{ asset('storage/'.$plan->image_path) }}" alt="{{ $plan->name }} floor plan">
-                        @foreach($plan->equipments as $unit)
-                            @if($unit->plan_x !== null && $unit->plan_y !== null)
-                                <button type="button" class="nx-unit-pin" style="left:{{ $unit->plan_x }}%;top:{{ $unit->plan_y }}%" data-bs-toggle="tooltip" data-bs-title="{{ $unit->equipment_type }} · {{ $unit->location }}{{ $unit->serial_no ? ' · '.$unit->serial_no : '' }}"><i data-lucide="air-vent"></i><span>{{ $unit->location }}</span></button>
-                            @endif
+            @forelse($customer->floorPlans->whereNotNull('building_uuid')->groupBy('building_uuid') as $floors)
+                @php($building = $floors->first())
+                <section class="nx-card p-3 p-lg-4 mb-4 nx-building-layout">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4"><div><div class="nx-overline">BUILDING</div><h4 class="h5 fw-bold mb-1">{{ $building->building_name }}</h4><div class="small text-secondary">{{ $building->branch?->name ?? 'Head office' }} · {{ $floors->count() }} {{ Str::plural('floor', $floors->count()) }}</div></div><span class="badge rounded-pill badge-soft-primary">{{ $floors->sum(fn ($floor) => $floor->rooms->sum(fn ($room) => $room->equipments->count())) }} AC units</span></div>
+                    <div class="d-grid gap-3">
+                        @foreach($floors as $floor)
+                            <article class="nx-floor-structure">
+                                <div class="nx-floor-structure-head"><span class="nx-branch-icon"><i data-lucide="layers-3"></i></span><div><strong>{{ $floor->floor_label }}</strong><div class="small text-secondary">{{ $floor->rooms->count() }} {{ Str::plural('room', $floor->rooms->count()) }}</div></div></div>
+                                <div class="nx-room-grid">
+                                    @foreach($floor->rooms as $room)
+                                        <div class="nx-room-card">
+                                            <div class="d-flex align-items-center justify-content-between gap-2"><div class="d-flex align-items-center gap-2"><i data-lucide="door-open"></i><strong>{{ $room->name }}</strong></div><span class="badge bg-light text-secondary">{{ $room->equipments->count() }} AC</span></div>
+                                            <div class="d-grid gap-2 mt-3">
+                                                @forelse($room->equipments as $unit)
+                                                    <div class="nx-room-unit"><span class="nx-unit-mini-icon"><i data-lucide="air-vent"></i></span><div class="min-w-0"><strong class="d-block text-truncate">{{ collect([$unit->brand, $unit->model])->filter()->join(' ') ?: $unit->equipment_type }}</strong><small class="text-secondary">{{ $unit->capacity ?: 'Capacity not set' }}{{ $unit->serial_no ? ' · '.$unit->serial_no : '' }}</small></div></div>
+                                                @empty
+                                                    <div class="small text-secondary">No AC units assigned.</div>
+                                                @endforelse
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </article>
                         @endforeach
                     </div>
-                    @if($plan->equipments->isNotEmpty())<div class="row g-3 mt-1">@foreach($plan->equipments as $unit)<div class="col-md-6 col-xl-4"><div class="nx-unit-mini"><span class="nx-unit-mini-icon"><i data-lucide="air-vent"></i></span><div class="min-w-0"><strong class="d-block text-truncate">{{ $unit->brand ?: $unit->equipment_type }} {{ $unit->model }}</strong><small class="text-secondary d-block text-truncate">{{ $unit->location }} · {{ $unit->capacity ?: 'Capacity not set' }}</small></div><span class="badge rounded-pill {{ $unit->active ? 'badge-soft-success' : 'bg-light text-secondary' }}">{{ $unit->active ? 'Active' : 'Inactive' }}</span></div></div>@endforeach</div>@endif
                 </section>
             @empty
-                <div class="nx-empty-panel mb-4"><span class="nx-empty-icon"><i data-lucide="map"></i></span><div><h4 class="h6 fw-bold mb-1">No floor plan uploaded</h4><p class="small text-secondary mb-0">Upload a JPG, PNG or WebP plan to visually map units by room.</p></div><button class="btn btn-light border ms-lg-auto" data-bs-toggle="modal" data-bs-target="#floorPlanModal">Upload floor plan</button></div>
+                <div class="nx-empty-panel mb-4"><span class="nx-empty-icon"><i data-lucide="building-2"></i></span><div><h4 class="h6 fw-bold mb-1">No building layout yet</h4><p class="small text-secondary mb-0">Define the number of floors and room names; no image upload is needed.</p></div><button class="btn btn-light border ms-lg-auto" data-bs-toggle="modal" data-bs-target="#floorPlanModal">Create building layout</button></div>
             @endforelse
 
-            <div class="d-flex align-items-center justify-content-between mb-3"><div><div class="nx-overline">STANDALONE ASSETS</div><h4 class="h6 fw-bold mb-0">Units without floor plan</h4></div><span class="small text-secondary">{{ $unmappedEquipment->count() }} units</span></div>
+            @foreach($customer->floorPlans->whereNull('building_uuid')->whereNotNull('image_path') as $plan)
+                <section class="nx-card p-3 p-lg-4 mb-4"><div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><div><div class="nx-overline">LEGACY IMAGE PLAN</div><h4 class="h6 fw-bold mb-1">{{ $plan->name }}</h4><div class="small text-secondary">{{ $plan->floor_label ?: 'Floor plan' }}</div></div><span class="badge rounded-pill bg-light text-secondary">{{ $plan->equipments->count() }} units</span></div><div class="nx-floor-plan"><img src="{{ asset('storage/'.$plan->image_path) }}" alt="{{ $plan->name }} floor plan">@foreach($plan->equipments as $unit)@if($unit->plan_x !== null && $unit->plan_y !== null)<span class="nx-unit-pin" style="left:{{ $unit->plan_x }}%;top:{{ $unit->plan_y }}%"><i data-lucide="air-vent"></i><span>{{ $unit->location }}</span></span>@endif @endforeach</div></section>
+            @endforeach
+
+            <div class="d-flex align-items-center justify-content-between mb-3"><div><div class="nx-overline">STANDALONE ASSETS</div><h4 class="h6 fw-bold mb-0">Units not assigned to a room</h4></div><span class="small text-secondary">{{ $unmappedEquipment->count() }} units</span></div>
             <div class="row g-4">
                 @forelse($unmappedEquipment as $unit)
                     <div class="col-md-6 col-xl-4"><article class="nx-equipment-card h-100"><div class="nx-equipment-visual"><img src="{{ asset('images/ac-unit-card.png') }}" alt="AC unit"><span class="badge rounded-pill {{ $unit->active ? 'badge-soft-success' : 'bg-light text-secondary' }}">{{ $unit->active ? 'Active' : 'Inactive' }}</span></div><div class="p-3 p-lg-4"><div class="small text-primary fw-bold mb-1">{{ strtoupper($unit->equipment_type) }}</div><h5 class="h6 fw-bold mb-2">{{ collect([$unit->brand, $unit->model])->filter()->join(' ') ?: 'AC unit' }}</h5><div class="nx-unit-specs"><span><i data-lucide="map-pin"></i>{{ $unit->location }}</span><span><i data-lucide="gauge"></i>{{ $unit->capacity ?: 'Capacity not set' }}</span><span><i data-lucide="scan-barcode"></i>{{ $unit->serial_no ?: 'No serial number' }}</span><span><i data-lucide="building"></i>{{ $unit->branch?->name ?? 'Head office' }}</span></div></div></article></div>
-                @empty<div class="col-12"><div class="nx-empty-panel"><span class="nx-empty-icon"><i data-lucide="air-vent"></i></span><div><h4 class="h6 fw-bold mb-1">No standalone units</h4><p class="small text-secondary mb-0">Units without a floor plan will appear here with an AC visual.</p></div><button class="btn btn-primary ms-lg-auto" data-bs-toggle="modal" data-bs-target="#unitModal">Add first unit</button></div></div>@endforelse
+                @empty<div class="col-12"><div class="nx-empty-panel"><span class="nx-empty-icon"><i data-lucide="air-vent"></i></span><div><h4 class="h6 fw-bold mb-1">Every unit has a room</h4><p class="small text-secondary mb-0">New standalone units will appear here until assigned.</p></div><button class="btn btn-primary ms-lg-auto" data-bs-toggle="modal" data-bs-target="#unitModal">Add another unit</button></div></div>@endforelse
             </div>
         </div>
 
@@ -131,58 +149,121 @@
         </div>
     </div>
 
-    <div class="modal fade" id="floorPlanModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" method="POST" action="{{ route('customers.floor-plans.store', $customer) }}" enctype="multipart/form-data">@csrf<input type="hidden" name="form_context" value="floor_plan"><div class="modal-header"><div><h5 class="modal-title">Upload floor plan</h5><small class="text-secondary">Map AC units visually by room or area.</small></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-12"><label class="form-label">Plan name *</label><input class="form-control" name="name" value="{{ old('name') }}" placeholder="Corporate office floor plan" required></div><div class="col-md-6"><label class="form-label">Floor / level</label><input class="form-control" name="floor_label" value="{{ old('floor_label') }}" placeholder="Ground floor" maxlength="100"></div><div class="col-md-6"><label class="form-label">Branch</label><select class="form-select" name="customer_branch_id"><option value="">Head office</option>@foreach($customer->branches as $branch)<option value="{{ $branch->id }}" @selected(old('customer_branch_id') == $branch->id)>{{ $branch->name }}</option>@endforeach</select></div><div class="col-12"><label class="form-label">Floor plan image *</label><input class="form-control" type="file" name="image" accept="image/png,image/jpeg,image/webp" required data-max-size="10240"><div class="form-text">PNG, JPG or WebP · maximum 10 MB</div></div><div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="2" placeholder="Optional access or layout notes">{{ old('notes') }}</textarea></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i data-lucide="upload" style="width:17px"></i>Upload plan</button></div></form></div></div>
+    <div class="modal fade" id="floorPlanModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <form class="modal-content" method="POST" action="{{ route('customers.floor-plans.store', $customer) }}">
+                @csrf
+                <input type="hidden" name="form_context" value="floor_plan">
+                <div class="modal-header"><div><h5 class="modal-title">Create building layout</h5><small class="text-secondary">Set the floors, name every room, then assign as many AC units as needed.</small></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-5"><label class="form-label">Building name *</label><input class="form-control" name="building_name" value="{{ old('building_name') }}" placeholder="Main building" required maxlength="150"></div>
+                        <div class="col-md-4"><label class="form-label">Branch</label><select class="form-select" name="customer_branch_id"><option value="">Head office</option>@foreach($customer->branches as $branch)<option value="{{ $branch->id }}" @selected(old('customer_branch_id') == $branch->id)>{{ $branch->name }}</option>@endforeach</select></div>
+                        <div class="col-md-3"><label class="form-label">Number of floors *</label><input class="form-control" type="number" id="floorCount" value="{{ count(old('floors', [['name' => 'Ground floor', 'rooms' => ['Room 1']]])) }}" min="1" max="50" required></div>
+                    </div>
+                    <div class="d-grid gap-3" id="floorBuilder"></div>
+                    <div class="mt-3"><label class="form-label">Layout notes</label><textarea class="form-control" name="notes" rows="2" placeholder="Optional building access or layout notes">{{ old('notes') }}</textarea></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i data-lucide="building-2" style="width:17px"></i>Create layout</button></div>
+            </form>
+        </div>
+    </div>
 
-    <div class="modal fade" id="unitModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><form class="modal-content" method="POST" action="{{ route('customers.equipment.store', $customer) }}">@csrf<input type="hidden" name="form_context" value="unit"><input type="hidden" name="plan_x" id="planX" value="{{ old('plan_x') }}"><input type="hidden" name="plan_y" id="planY" value="{{ old('plan_y') }}"><div class="modal-header"><div><h5 class="modal-title">Add AC unit</h5><small class="text-secondary">Register equipment and optionally pin it on a floor plan.</small></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-md-6"><label class="form-label">Equipment type *</label><select class="form-select" name="equipment_type" required><option value="">Select type</option>@forelse($equipmentTypes as $type)<option value="{{ $type->label }}" @selected(old('equipment_type') === $type->label)>{{ $type->label }}</option>@empty @foreach(['Split AC','Window AC','Cassette AC','Ductable AC','VRV / VRF','Chiller'] as $type)<option value="{{ $type }}" @selected(old('equipment_type') === $type)>{{ $type }}</option>@endforeach @endforelse</select></div><div class="col-md-6"><label class="form-label">Product master</label><select class="form-select" name="product_id"><option value="">Not linked</option>@foreach($products as $product)<option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>{{ $product->name }}{{ $product->brand ? ' · '.$product->brand : '' }}{{ $product->model ? ' · '.$product->model : '' }}</option>@endforeach</select></div><div class="col-md-4"><label class="form-label">Brand</label><input class="form-control" name="brand" value="{{ old('brand') }}" placeholder="Daikin" maxlength="120"></div><div class="col-md-4"><label class="form-label">Model</label><input class="form-control" name="model" value="{{ old('model') }}" placeholder="FTKF50" maxlength="120"></div><div class="col-md-4"><label class="form-label">Serial number</label><input class="form-control" name="serial_no" value="{{ old('serial_no') }}" maxlength="100"></div><div class="col-md-4"><label class="form-label">Capacity</label><select class="form-select" name="capacity"><option value="">Select capacity</option>@foreach($equipmentCapacities as $capacity)<option value="{{ $capacity->label }}" @selected(old('capacity') === $capacity->label)>{{ $capacity->label }}</option>@endforeach</select></div><div class="col-md-4"><label class="form-label">Branch</label><select class="form-select" name="customer_branch_id" id="unitBranch"><option value="">Head office</option>@foreach($customer->branches as $branch)<option value="{{ $branch->id }}" @selected(old('customer_branch_id') == $branch->id)>{{ $branch->name }}</option>@endforeach</select></div><div class="col-md-4"><label class="form-label">Room / location *</label><input class="form-control" name="location" value="{{ old('location') }}" placeholder="Conference Room" required maxlength="180"></div><div class="col-md-6"><label class="form-label">Installed on</label><input class="form-control" type="date" name="installed_at" value="{{ old('installed_at') }}" data-v="not_future"></div><div class="col-md-6"><label class="form-label">Warranty until</label><input class="form-control" type="date" name="warranty_ends_at" value="{{ old('warranty_ends_at') }}" data-v="after_or_equal:installed_at"></div><div class="col-12"><hr class="my-1"><label class="form-label">Floor plan placement</label><select class="form-select" name="customer_floor_plan_id" id="unitFloorPlan"><option value="">No floor plan — show as standalone card</option>@foreach($customer->floorPlans as $plan)<option value="{{ $plan->id }}" data-image="{{ asset('storage/'.$plan->image_path) }}" data-branch="{{ $plan->customer_branch_id }}" @selected(old('customer_floor_plan_id') == $plan->id)>{{ $plan->name }}{{ $plan->floor_label ? ' · '.$plan->floor_label : '' }}</option>@endforeach</select></div><div class="col-12"><div class="nx-plan-picker d-none" id="planPicker"><div class="small fw-semibold mb-2"><i data-lucide="mouse-pointer-click" style="width:15px"></i> Tap the exact unit position on the plan</div><div class="nx-plan-picker-canvas" id="planCanvas"><img id="planPreview" alt="Selected floor plan"><span id="planMarker" class="nx-plan-marker d-none"><i data-lucide="air-vent"></i></span></div><div class="small text-secondary mt-2" id="planCoordinates">No position selected</div></div></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i data-lucide="plus" style="width:17px"></i>Add unit</button></div></form></div></div>
+    <div class="modal fade" id="unitModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <form class="modal-content" method="POST" action="{{ route('customers.equipment.store', $customer) }}">
+                @csrf
+                <input type="hidden" name="form_context" value="unit">
+                <div class="modal-header"><div><h5 class="modal-title">Add AC unit</h5><small class="text-secondary">Assign the unit to a room or keep it as a standalone asset.</small></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><div class="row g-3">
+                    <div class="col-md-6"><label class="form-label">Equipment type *</label><select class="form-select" name="equipment_type" required><option value="">Select type</option>@forelse($equipmentTypes as $type)<option value="{{ $type->label }}" @selected(old('equipment_type') === $type->label)>{{ $type->label }}</option>@empty @foreach(['Split AC','Window AC','Cassette AC','Ductable AC','VRV / VRF','Chiller'] as $type)<option value="{{ $type }}" @selected(old('equipment_type') === $type)>{{ $type }}</option>@endforeach @endforelse</select></div>
+                    <div class="col-md-6"><label class="form-label">Product master</label><select class="form-select" name="product_id"><option value="">Not linked</option>@foreach($products as $product)<option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>{{ $product->name }}{{ $product->brand ? ' · '.$product->brand : '' }}{{ $product->model ? ' · '.$product->model : '' }}</option>@endforeach</select></div>
+                    <div class="col-md-4"><label class="form-label">Brand</label><input class="form-control" name="brand" value="{{ old('brand') }}" placeholder="Daikin" maxlength="120"></div>
+                    <div class="col-md-4"><label class="form-label">Model</label><input class="form-control" name="model" value="{{ old('model') }}" placeholder="FTKF50" maxlength="120"></div>
+                    <div class="col-md-4"><label class="form-label">Serial number</label><input class="form-control" name="serial_no" value="{{ old('serial_no') }}" maxlength="120"></div>
+                    <div class="col-md-4"><label class="form-label">Capacity</label><select class="form-select" name="capacity"><option value="">Select capacity</option>@foreach($equipmentCapacities as $capacity)<option value="{{ $capacity->label }}" @selected(old('capacity') === $capacity->label)>{{ $capacity->label }}</option>@endforeach</select></div>
+                    <div class="col-md-8"><label class="form-label">Building / floor / room</label><select class="form-select" name="customer_room_id" id="unitRoom"><option value="">Standalone unit (no room)</option>@foreach($customer->floorPlans->whereNotNull('building_uuid')->groupBy('building_uuid') as $floors)<optgroup label="{{ $floors->first()->building_name }}">@foreach($floors as $floor)@foreach($floor->rooms as $room)<option value="{{ $room->id }}" data-branch="{{ $floor->customer_branch_id }}" @selected(old('customer_room_id') == $room->id)>{{ $floor->floor_label }} · {{ $room->name }} ({{ $room->equipments->count() }} AC)</option>@endforeach @endforeach</optgroup>@endforeach</select><div class="form-text">Rooms can contain multiple AC units.</div></div>
+                    <div class="col-md-6" id="standaloneLocation"><label class="form-label">Standalone location *</label><input class="form-control" name="location" value="{{ old('location') }}" placeholder="Reception or outdoor area" maxlength="180"></div>
+                    <div class="col-md-6"><label class="form-label">Branch</label><select class="form-select" name="customer_branch_id" id="unitBranch"><option value="">Head office</option>@foreach($customer->branches as $branch)<option value="{{ $branch->id }}" @selected(old('customer_branch_id') == $branch->id)>{{ $branch->name }}</option>@endforeach</select></div>
+                    <div class="col-md-6"><label class="form-label">Installed on</label><input class="form-control" type="date" name="installed_at" value="{{ old('installed_at') }}" data-v="not_future"></div>
+                    <div class="col-md-6"><label class="form-label">Warranty until</label><input class="form-control" type="date" name="warranty_ends_at" value="{{ old('warranty_ends_at') }}" data-v="after_or_equal:installed_at"></div>
+                </div></div>
+                <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i data-lucide="plus" style="width:17px"></i>Add AC unit</button></div>
+            </form>
+        </div>
+    </div>
 
     @push('scripts')
         <script>
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(element => new bootstrap.Tooltip(element));
 
-            const floorSelect = document.getElementById('unitFloorPlan');
-            const picker = document.getElementById('planPicker');
-            const canvas = document.getElementById('planCanvas');
-            const preview = document.getElementById('planPreview');
-            const marker = document.getElementById('planMarker');
-            const xInput = document.getElementById('planX');
-            const yInput = document.getElementById('planY');
-            const coordinates = document.getElementById('planCoordinates');
+            const initialFloors = {{ Js::from(old('floors', [['name' => 'Ground floor', 'rooms' => ['Room 1']]])) }};
+            const floorCount = document.getElementById('floorCount');
+            const floorBuilder = document.getElementById('floorBuilder');
+            const unitRoom = document.getElementById('unitRoom');
+            const standaloneLocation = document.getElementById('standaloneLocation');
             const branch = document.getElementById('unitBranch');
 
-            function renderFloorPlan(reset = true) {
-                const option = floorSelect.options[floorSelect.selectedIndex];
-                const image = option?.dataset.image;
-                picker.classList.toggle('d-none', !image);
-                if (!image) {
-                    xInput.value = '';
-                    yInput.value = '';
-                    marker.classList.add('d-none');
-                    return;
-                }
-                preview.src = image;
-                branch.value = option.dataset.branch || '';
-                if (reset && (!xInput.value || !yInput.value)) {
-                    xInput.value = 50;
-                    yInput.value = 50;
-                }
-                marker.style.left = `${xInput.value}%`;
-                marker.style.top = `${yInput.value}%`;
-                marker.classList.remove('d-none');
-                coordinates.textContent = `Position: ${Number(xInput.value).toFixed(1)}% × ${Number(yInput.value).toFixed(1)}%`;
+            function escapeHtml(value) {
+                const element = document.createElement('div');
+                element.textContent = value ?? '';
+                return element.innerHTML.replaceAll('"', '&quot;');
             }
 
-            floorSelect?.addEventListener('change', () => {
-                xInput.value = '';
-                yInput.value = '';
-                renderFloorPlan();
+            function currentFloors() {
+                return Array.from(floorBuilder.querySelectorAll('[data-layout-floor]')).map(floor => ({
+                    name: floor.querySelector('[data-floor-name]').value,
+                    rooms: Array.from(floor.querySelectorAll('[data-room-name]')).map(room => room.value),
+                }));
+            }
+
+            function renderFloors(floors) {
+                const count = Math.max(1, Math.min(50, Number(floorCount.value) || 1));
+                const values = Array.from({ length: count }, (_, index) => floors[index] || {
+                    name: index === 0 ? 'Ground floor' : `Floor ${index}`,
+                    rooms: ['Room 1'],
+                });
+                floorBuilder.innerHTML = values.map((floor, floorIndex) => {
+                    const rooms = floor.rooms?.length ? floor.rooms : ['Room 1'];
+                    return `<section class="nx-layout-floor" data-layout-floor="${floorIndex}">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"><div class="d-flex align-items-center gap-2"><span class="nx-branch-icon"><i data-lucide="layers-3"></i></span><strong>Floor ${floorIndex + 1}</strong></div><button class="btn btn-sm btn-outline-primary" type="button" data-add-room="${floorIndex}"><i data-lucide="plus" style="width:15px"></i>Add room</button></div>
+                        <label class="form-label">Floor name *</label><input class="form-control mb-3" data-floor-name name="floors[${floorIndex}][name]" value="${escapeHtml(floor.name)}" required maxlength="100">
+                        <div class="d-grid gap-2" data-room-list>${rooms.map((room, roomIndex) => `<div class="input-group" data-room-row><span class="input-group-text"><i data-lucide="door-open" style="width:16px"></i></span><input class="form-control" data-room-name name="floors[${floorIndex}][rooms][${roomIndex}]" value="${escapeHtml(room)}" placeholder="Room name" required maxlength="150"><button class="btn btn-outline-danger" type="button" data-remove-room aria-label="Remove room"><i data-lucide="x" style="width:16px"></i></button></div>`).join('')}</div>
+                    </section>`;
+                }).join('');
+                window.refreshIcons?.();
+            }
+
+            floorCount?.addEventListener('change', () => renderFloors(currentFloors()));
+            floorBuilder?.addEventListener('click', event => {
+                const addButton = event.target.closest('[data-add-room]');
+                if (addButton) {
+                    const floor = addButton.closest('[data-layout-floor]');
+                    const floorIndex = Number(floor.dataset.layoutFloor);
+                    const roomList = floor.querySelector('[data-room-list]');
+                    const roomIndex = roomList.querySelectorAll('[data-room-row]').length;
+                    roomList.insertAdjacentHTML('beforeend', `<div class="input-group" data-room-row><span class="input-group-text"><i data-lucide="door-open" style="width:16px"></i></span><input class="form-control" data-room-name name="floors[${floorIndex}][rooms][${roomIndex}]" placeholder="Room name" required maxlength="150"><button class="btn btn-outline-danger" type="button" data-remove-room aria-label="Remove room"><i data-lucide="x" style="width:16px"></i></button></div>`);
+                    window.refreshIcons?.();
+                }
+                const removeButton = event.target.closest('[data-remove-room]');
+                if (removeButton) {
+                    const list = removeButton.closest('[data-room-list]');
+                    if (list.querySelectorAll('[data-room-row]').length > 1) removeButton.closest('[data-room-row]').remove();
+                }
             });
-            canvas?.addEventListener('click', event => {
-                const rect = canvas.getBoundingClientRect();
-                xInput.value = Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100)).toFixed(2);
-                yInput.value = Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100)).toFixed(2);
-                renderFloorPlan(false);
-            });
-            renderFloorPlan(false);
+
+            function syncRoomSelection() {
+                const option = unitRoom?.options[unitRoom.selectedIndex];
+                const hasRoom = Boolean(option?.value);
+                standaloneLocation?.classList.toggle('d-none', hasRoom);
+                const locationInput = standaloneLocation?.querySelector('input');
+                if (locationInput) locationInput.required = !hasRoom;
+                if (hasRoom) branch.value = option.dataset.branch || '';
+            }
+
+            unitRoom?.addEventListener('change', syncRoomSelection);
+            renderFloors(initialFloors);
+            syncRoomSelection();
 
             @if($errors->any() && old('form_context'))
                 new bootstrap.Modal(document.getElementById('{{ old('form_context') === 'floor_plan' ? 'floorPlanModal' : 'unitModal' }}')).show();

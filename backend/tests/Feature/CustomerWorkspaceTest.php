@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\CustomerBranch;
 use App\Models\CustomerFloorPlan;
+use App\Models\CustomerRoom;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -24,7 +25,7 @@ class CustomerWorkspaceTest extends TestCase
 
         $this->actingAs($admin)->get(route('customers.show', $customer))
             ->assertOk()
-            ->assertSee('Customer equipment map')
+            ->assertSee('Building, floors & rooms', false)
             ->assertSee($customer->name);
 
         $this->actingAs($admin)->post(route('customers.floor-plans.store', $customer), [
@@ -88,5 +89,44 @@ class CustomerWorkspaceTest extends TestCase
             'customer_id' => $customer->id,
             'location' => 'Invalid Cross-Customer Unit',
         ]);
+    }
+
+    public function test_administrator_can_create_floors_and_rooms_and_assign_multiple_ac_units_to_one_room(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@nexora.test')->firstOrFail();
+        $customer = Customer::where('code', 'CUST00001')->firstOrFail();
+
+        $this->actingAs($admin)->post(route('customers.floor-plans.store', $customer), [
+            'building_name' => 'Corporate Tower',
+            'floors' => [
+                ['name' => 'Ground floor', 'rooms' => ['Reception', 'Conference Room']],
+                ['name' => 'First floor', 'rooms' => ['Server Room', 'Accounts']],
+            ],
+        ])->assertRedirect(route('customers.show', $customer));
+
+        $room = CustomerRoom::where('customer_id', $customer->id)->where('name', 'Conference Room')->firstOrFail();
+        foreach (['ROOM-AC-001', 'ROOM-AC-002'] as $serialNumber) {
+            $this->actingAs($admin)->post(route('customers.equipment.store', $customer), [
+                'equipment_type' => 'Split AC',
+                'serial_no' => $serialNumber,
+                'customer_room_id' => $room->id,
+            ])->assertRedirect(route('customers.show', $customer));
+        }
+
+        $this->assertSame(2, $customer->floorPlans()->where('building_name', 'Corporate Tower')->count());
+        $this->assertSame(4, CustomerRoom::where('customer_id', $customer->id)->count());
+        $this->assertSame(2, $room->equipments()->count());
+        $this->assertDatabaseHas('customer_equipments', [
+            'customer_room_id' => $room->id,
+            'customer_floor_plan_id' => $room->customer_floor_plan_id,
+            'location' => 'Conference Room',
+        ]);
+
+        $this->actingAs($admin)->get(route('customers.show', $customer))
+            ->assertOk()
+            ->assertSee('Corporate Tower')
+            ->assertSee('Conference Room')
+            ->assertSee('2 AC');
     }
 }

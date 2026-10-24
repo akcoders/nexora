@@ -38,4 +38,17 @@ class AttendanceEnhancementTest extends TestCase
         $this->assertSame($near->id, $attendance->checkout_premises_id);
         $this->assertNotNull($attendance->checkout_selfie_path);
     }
+
+    public function test_review_modal_requires_an_explicit_decision_and_close_is_not_a_submit_button(): void
+    {
+        $this->seed();
+        $admin = User::where('email', 'admin@nexora.test')->firstOrFail();
+        Attendance::query()->firstOrFail()->update(['status' => 'pending']);
+
+        $this->actingAs($admin)->get(route('attendance.index'))
+            ->assertOk()
+            ->assertSee('Closing this window will not save a decision.')
+            ->assertSee('<option value="" selected disabled>Select a decision</option>', false)
+            ->assertSee('class="btn-close" type="button"', false);
+    }
 }
