@@ -6,6 +6,8 @@
     @php
         $languages = ['Hindi','English','Marathi','Gujarati','Punjabi','Bengali','Tamil','Telugu','Kannada','Malayalam','Odia','Urdu','Other'];
         $credit = $customer->creditTerms;
+        $selectedType = old('types.0', $customer->types[0] ?? null);
+        $selectedSegment = old('segments.0', $customer->segments[0] ?? null);
     @endphp
 
     <form method="POST" action="{{ route('customers.update', $customer) }}" class="d-grid gap-4" novalidate>
@@ -25,6 +27,9 @@
         @if($errors->any())
             <div class="alert alert-danger mb-0"><strong>Customer could not be updated.</strong><div class="small mt-1">{{ $errors->first() }}</div></div>
         @endif
+        @if(count($customer->types ?? []) > 1 || count($customer->segments ?? []) > 1)
+            <div class="alert alert-warning mb-0">This customer has multiple saved types or segments from the old form. Review the selections below; saving will keep one customer type and at most one segment.</div>
+        @endif
 
         <section class="nx-card p-3 p-lg-4">
             <div class="mb-4"><div class="nx-overline">ACCOUNT</div><h3 class="h6 fw-bold mb-1">Customer identity</h3><div class="small text-secondary">Core relationship and account settings.</div></div>
@@ -32,8 +37,8 @@
                 <div class="col-md-6"><label class="form-label">Customer name *</label><input class="form-control" name="name" value="{{ old('name', $customer->name) }}" required maxlength="255"></div>
                 <div class="col-md-3"><label class="form-label">Customer group *</label><select class="form-select" name="customer_group_id" required><option value="">Select group</option>@foreach($groups as $group)<option value="{{ $group->id }}" @selected(old('customer_group_id', $customer->customer_group_id) == $group->id)>{{ $group->name }}</option>@endforeach</select></div>
                 <div class="col-md-3"><label class="form-label">Mother tongue</label><select class="form-select" name="mother_tongue"><option value="">Select language</option>@foreach($languages as $language)<option value="{{ $language }}" @selected(old('mother_tongue', $customer->mother_tongue) === $language)>{{ $language }}</option>@endforeach</select></div>
-                <div class="col-12"><label class="form-label d-block">Customer type *</label><div class="d-flex flex-wrap gap-2">@foreach(['individual','corporate','architect','consultant','agent','dealer','government'] as $type)<label class="nx-choice"><input type="checkbox" name="types[]" value="{{ $type }}" @checked(in_array($type, old('types', $customer->types ?? [])))><span>{{ str($type)->headline() }}</span></label>@endforeach</div></div>
-                <div class="col-12"><label class="form-label d-block">Segments</label><div class="d-flex flex-wrap gap-2">@foreach(['healthcare','education','industrials','builder','hospitality','office'] as $segment)<label class="nx-choice"><input type="checkbox" name="segments[]" value="{{ $segment }}" @checked(in_array($segment, old('segments', $customer->segments ?? [])))><span>{{ str($segment)->headline() }}</span></label>@endforeach</div></div>
+                <div class="col-12"><label class="form-label d-block">Customer type *</label><div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Customer type">@foreach(['individual','corporate','architect','consultant','agent','dealer','government'] as $type)<label class="nx-choice"><input type="radio" name="types[]" value="{{ $type }}" @checked($selectedType === $type)><span>{{ str($type)->headline() }}</span></label>@endforeach</div></div>
+                <div class="col-12"><label class="form-label d-block">Segment</label><div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Segment"><label class="nx-choice"><input type="radio" name="segments[]" value="" @checked(! $selectedSegment)><span>No segment</span></label>@foreach(['healthcare','education','industrials','builder','hospitality','office'] as $segment)<label class="nx-choice"><input type="radio" name="segments[]" value="{{ $segment }}" @checked($selectedSegment === $segment)><span>{{ str($segment)->headline() }}</span></label>@endforeach</div></div>
                 <div class="col-md-3"><label class="form-label">Priority *</label><select class="form-select" name="priority" required>@foreach(['normal','high','very_high'] as $option)<option value="{{ $option }}" @selected(old('priority', $customer->priority) === $option)>{{ str($option)->headline() }}</option>@endforeach</select></div>
                 <div class="col-md-3"><label class="form-label">Status *</label><select class="form-select" name="status" required>@foreach(['active','inactive','blacklisted'] as $option)<option value="{{ $option }}" @selected(old('status', $customer->status) === $option)>{{ str($option)->headline() }}</option>@endforeach</select></div>
                 <div class="col-md-3"><label class="form-label">Classification</label><select class="form-select" name="classification"><option value="">Not set</option>@foreach(['strategic','regular','transactional','one_time'] as $option)<option value="{{ $option }}" @selected(old('classification', $customer->classification) === $option)>{{ str($option)->headline() }}</option>@endforeach</select></div>

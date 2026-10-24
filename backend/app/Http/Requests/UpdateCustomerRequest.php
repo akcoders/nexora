@@ -21,10 +21,10 @@ class UpdateCustomerRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'customer_group_id' => ['required', Rule::exists('customer_groups', 'id')->where('status', 'active')],
             'mother_tongue' => ['nullable', 'string', 'max:50'],
-            'types' => ['required', 'array', 'min:1'],
+            'types' => ['required', 'array', 'size:1'],
             'types.*' => [Rule::in(['individual', 'corporate', 'architect', 'consultant', 'agent', 'dealer', 'government'])],
-            'segments' => ['nullable', 'array'],
-            'segments.*' => [Rule::in(['healthcare', 'education', 'industrials', 'builder', 'hospitality', 'office'])],
+            'segments' => ['nullable', 'array', 'max:1'],
+            'segments.*' => ['nullable', Rule::in(['healthcare', 'education', 'industrials', 'builder', 'hospitality', 'office'])],
             'priority' => ['required', Rule::in(['normal', 'high', 'very_high'])],
             'status' => ['required', Rule::in(['active', 'inactive', 'blacklisted'])],
             'classification' => ['nullable', Rule::in(['strategic', 'regular', 'transactional', 'one_time'])],
@@ -70,6 +70,14 @@ class UpdateCustomerRequest extends FormRequest
             'credit.po_mandatory' => ['nullable', 'boolean'],
             'credit.eway_bill_applicable' => ['nullable', 'boolean'],
             'credit.default_payment_terms' => ['nullable', 'string', 'max:2000'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'types.size' => 'Select exactly one customer type.',
+            'segments.max' => 'Select no more than one segment.',
         ];
     }
 

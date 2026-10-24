@@ -10,6 +10,8 @@
             'contacts' => [['name' => '']],
         ]]);
         $motherTongues = ['Hindi','English','Marathi','Gujarati','Punjabi','Bengali','Tamil','Telugu','Kannada','Malayalam','Odia','Urdu','Other'];
+        $selectedType = old('types.0');
+        $selectedSegment = old('segments.0');
     @endphp
 
     <form id="customerWizard" class="nx-customer-form" action="{{ route('customers.store') }}" method="POST" enctype="multipart/form-data" novalidate>
@@ -55,8 +57,8 @@
                             <div class="col-md-6"><label class="form-label">Customer name *</label><input class="form-control" name="name" value="{{ old('name') }}" placeholder="e.g. Tata AIA Life Insurance" required></div>
                             <div class="col-md-3"><label class="form-label">Customer group *</label><select class="form-select" name="customer_group_id" required><option value="">Select group</option>@foreach($groups as $group)<option value="{{ $group->id }}" @selected(old('customer_group_id') == $group->id)>{{ $group->name }}</option>@endforeach</select><div class="form-text"><a href="{{ route('customer-groups.index') }}" target="_blank">Manage groups</a></div></div>
                             <div class="col-md-3"><label class="form-label">Mother tongue</label><select class="form-select" name="mother_tongue"><option value="">Select language</option>@foreach($motherTongues as $language)<option value="{{ $language }}" @selected(old('mother_tongue') === $language)>{{ $language }}</option>@endforeach</select></div>
-                            <div class="col-12 nx-field-group" data-field-group="types"><label class="form-label d-block">Customer type *</label><div class="d-flex flex-wrap gap-2">@foreach(['individual','corporate','architect','consultant','agent','dealer','government'] as $type)<label class="nx-choice"><input type="checkbox" name="types[]" value="{{ $type }}" @checked(in_array($type, old('types', [])))><span>{{ str($type)->headline() }}</span></label>@endforeach</div></div>
-                            <div class="col-12"><label class="form-label d-block">Segments</label><div class="d-flex flex-wrap gap-2">@foreach(['healthcare','education','industrials','builder','hospitality','office'] as $segment)<label class="nx-choice"><input type="checkbox" name="segments[]" value="{{ $segment }}" @checked(in_array($segment, old('segments', [])))><span>{{ str($segment)->headline() }}</span></label>@endforeach</div></div>
+                            <div class="col-12 nx-field-group" data-field-group="types"><label class="form-label d-block">Customer type *</label><div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Customer type">@foreach(['individual','corporate','architect','consultant','agent','dealer','government'] as $type)<label class="nx-choice"><input type="radio" name="types[]" value="{{ $type }}" @checked($selectedType === $type)><span>{{ str($type)->headline() }}</span></label>@endforeach</div></div>
+                            <div class="col-12 nx-field-group" data-field-group="segments"><label class="form-label d-block">Segment</label><div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Segment"><label class="nx-choice"><input type="radio" name="segments[]" value="" @checked(! $selectedSegment)><span>No segment</span></label>@foreach(['healthcare','education','industrials','builder','hospitality','office'] as $segment)<label class="nx-choice"><input type="radio" name="segments[]" value="{{ $segment }}" @checked($selectedSegment === $segment)><span>{{ str($segment)->headline() }}</span></label>@endforeach</div></div>
                             <div class="col-md-4"><label class="form-label">Priority *</label><select class="form-select" name="priority" required>@foreach(['normal','high','very_high'] as $priority)<option value="{{ $priority }}" @selected(old('priority', 'normal') === $priority)>{{ str($priority)->headline() }}</option>@endforeach</select></div>
                             <div class="col-md-4"><label class="form-label">Status *</label><select class="form-select" name="status" id="customerStatus" required>@foreach(['active','inactive','blacklisted'] as $status)<option value="{{ $status }}" @selected(old('status', 'active') === $status)>{{ str($status)->headline() }}</option>@endforeach</select></div>
                             <div class="col-md-4"><label class="form-label">Branch type *</label><select class="form-select" name="branch_type" id="branchType" required><option value="single" @selected(old('branch_type', 'single') === 'single')>Single</option><option value="multi" @selected(old('branch_type') === 'multi')>Multiple branches</option></select></div>
@@ -224,7 +226,8 @@
         const bracketName = key => { const parts = key.split('.'); return parts.shift() + parts.map(part => `[${part}]`).join(''); };
         const findField = key => {
             const name = bracketName(key);
-            return [...form.elements].find(el => el.name === name || el.name === key || (key === 'types' && el.name === 'types[]'));
+            const base = key.split('.')[0];
+            return [...form.elements].find(el => el.name === name || el.name === key || (['types', 'segments'].includes(base) && el.name === `${base}[]`));
         };
 
         function clearFieldError(field) {

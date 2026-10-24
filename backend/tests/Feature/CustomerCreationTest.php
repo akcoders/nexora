@@ -28,6 +28,18 @@ class CustomerCreationTest extends TestCase
         ]);
     }
 
+    public function test_customer_creation_form_offers_single_choice_type_and_segment(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.create');
+
+        $this->actingAs($user)->get(route('customers.create'))
+            ->assertOk()
+            ->assertSee('type="radio" name="types[]"', false)
+            ->assertSee('type="radio" name="segments[]"', false)
+            ->assertDontSee('type="checkbox" name="types[]"', false)
+            ->assertDontSee('type="checkbox" name="segments[]"', false);
+    }
+
     public function test_authenticated_user_can_create_a_single_branch_customer(): void
     {
         $user = User::factory()->create()->givePermissionTo('customers.create');
@@ -37,6 +49,7 @@ class CustomerCreationTest extends TestCase
             'customer_group_id' => $this->group->id,
             'mother_tongue' => 'Hindi',
             'types' => ['corporate'],
+            'segments' => ['office'],
             'priority' => 'high',
             'status' => 'active',
             'branch_type' => 'single',
@@ -57,8 +70,63 @@ class CustomerCreationTest extends TestCase
         $this->assertSame('CUST00001', $customer->code);
         $this->assertCount(1, $customer->contacts);
         $this->assertSame('Hindi', $customer->mother_tongue);
+        $this->assertSame(['corporate'], $customer->types);
+        $this->assertSame(['office'], $customer->segments);
         $this->assertSame('Marathi', $customer->contacts->first()->mother_tongue);
         $this->assertSame(30, $customer->creditTerms->credit_days);
+    }
+
+    public function test_customer_creation_rejects_multiple_types_and_segments(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.create');
+
+        $this->actingAs($user)->post(route('customers.store'), [
+            'name' => 'Multiple Choice Customer',
+            'customer_group_id' => $this->group->id,
+            'types' => ['corporate', 'dealer'],
+            'segments' => ['office', 'hospitality'],
+            'priority' => 'normal',
+            'status' => 'active',
+            'branch_type' => 'single',
+            'address_line_1' => '12 Main Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'district' => 'Mumbai City',
+            'pin_code' => '400001',
+            'contact_no_1' => '9876543210',
+            'email_1' => 'multiple@example.test',
+            'contacts' => [['name' => 'Main Contact']],
+        ])->assertSessionHasErrors([
+            'types' => 'Select exactly one customer type.',
+            'segments' => 'Select no more than one segment.',
+        ]);
+
+        $this->assertDatabaseMissing('customers', ['name' => 'Multiple Choice Customer']);
+    }
+
+    public function test_customer_creation_can_leave_segment_unset(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.create');
+
+        $this->actingAs($user)->post(route('customers.store'), [
+            'name' => 'No Segment Customer',
+            'customer_group_id' => $this->group->id,
+            'types' => ['corporate'],
+            'segments' => [''],
+            'priority' => 'normal',
+            'status' => 'active',
+            'branch_type' => 'single',
+            'address_line_1' => '12 Main Road',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'district' => 'Mumbai City',
+            'pin_code' => '400001',
+            'contact_no_1' => '9876543210',
+            'email_1' => 'no-segment@example.test',
+            'contacts' => [['name' => 'Main Contact']],
+        ])->assertRedirect(route('customers.index'));
+
+        $this->assertSame([], Customer::where('name', 'No Segment Customer')->firstOrFail()->segments);
     }
 
     public function test_multi_branch_customer_requires_a_branch(): void
@@ -156,7 +224,9 @@ class CustomerCreationTest extends TestCase
 
         $this->actingAs($user)->get(route('customers.edit', $customer))
             ->assertOk()
-            ->assertSee('Edit customer');
+            ->assertSee('Edit customer')
+            ->assertSee('type="radio" name="types[]"', false)
+            ->assertSee('type="radio" name="segments[]"', false);
 
         $this->actingAs($user)->put(route('customers.update', $customer), [
             'name' => 'Updated Customer Name',
@@ -181,10 +251,80 @@ class CustomerCreationTest extends TestCase
             'name' => 'Updated Customer Name',
             'email_1' => 'updated@example.test',
         ]);
+        $this->assertSame(['corporate'], $customer->fresh()->types);
+        $this->assertSame(['office'], $customer->fresh()->segments);
         $this->assertDatabaseHas('customer_credit_terms', [
             'customer_id' => $customer->id,
             'credit_days' => 45,
             'po_mandatory' => 1,
         ]);
+    }
+
+    public function test_edit_form_warns_about_legacy_multiple_choices(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.update');
+        $customer = Customer::factory()->create([
+            'customer_group_id' => $this->group->id,
+            'types' => ['corporate', 'dealer'],
+            'segments' => ['office', 'hospitality'],
+        ]);
+
+        $this->actingAs($user)->get(route('customers.edit', $customer))
+            ->assertOk()
+            ->assertSee('This customer has multiple saved types or segments from the old form.');
+    }
+
+    public function test_customer_update_rejects_multiple_types_and_segments(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.update');
+        $customer = Customer::factory()->create(['customer_group_id' => $this->group->id]);
+        $originalName = $customer->name;
+
+        $this->actingAs($user)->put(route('customers.update', $customer), [
+            'name' => 'Changed Name',
+            'customer_group_id' => $this->group->id,
+            'types' => ['corporate', 'dealer'],
+            'segments' => ['office', 'healthcare'],
+            'priority' => 'normal',
+            'status' => 'active',
+            'address_line_1' => '88 Business Park',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'district' => 'Mumbai City',
+            'pin_code' => '400001',
+            'contact_no_1' => '9876543210',
+            'email_1' => 'updated@example.test',
+        ])->assertSessionHasErrors([
+            'types' => 'Select exactly one customer type.',
+            'segments' => 'Select no more than one segment.',
+        ]);
+
+        $this->assertSame(['corporate'], $customer->fresh()->types);
+        $this->assertSame(['office'], $customer->fresh()->segments);
+        $this->assertSame($originalName, $customer->fresh()->name);
+    }
+
+    public function test_customer_update_can_clear_optional_segment(): void
+    {
+        $user = User::factory()->create()->givePermissionTo('customers.update');
+        $customer = Customer::factory()->create(['customer_group_id' => $this->group->id]);
+
+        $this->actingAs($user)->put(route('customers.update', $customer), [
+            'name' => $customer->name,
+            'customer_group_id' => $this->group->id,
+            'types' => ['corporate'],
+            'segments' => [''],
+            'priority' => 'normal',
+            'status' => 'active',
+            'address_line_1' => '88 Business Park',
+            'city' => 'Mumbai',
+            'state' => 'Maharashtra',
+            'district' => 'Mumbai City',
+            'pin_code' => '400001',
+            'contact_no_1' => '9876543210',
+            'email_1' => 'updated@example.test',
+        ])->assertRedirect(route('customers.show', $customer));
+
+        $this->assertSame([], $customer->fresh()->segments);
     }
 }

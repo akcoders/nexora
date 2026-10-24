@@ -85,7 +85,7 @@ class CustomerController extends Controller
     public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse
     {
         $data = $request->safe()->except('credit');
-        $data['segments'] = $request->validated('segments', []);
+        $data['segments'] = array_values(array_filter($request->validated('segments') ?? []));
 
         DB::transaction(function () use ($request, $customer, $data): void {
             $customer->update($data);
@@ -212,10 +212,10 @@ class CustomerController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'customer_group_id' => ['required', Rule::exists('customer_groups', 'id')->where('status', 'active')],
             'mother_tongue' => ['nullable', 'string', 'max:50'],
-            'types' => ['required', 'array', 'min:1'],
+            'types' => ['required', 'array', 'size:1'],
             'types.*' => [Rule::in(['individual', 'corporate', 'architect', 'consultant', 'agent', 'dealer', 'government'])],
-            'segments' => ['nullable', 'array'],
-            'segments.*' => [Rule::in(['healthcare', 'education', 'industrials', 'builder', 'hospitality', 'office'])],
+            'segments' => ['nullable', 'array', 'max:1'],
+            'segments.*' => ['nullable', Rule::in(['healthcare', 'education', 'industrials', 'builder', 'hospitality', 'office'])],
             'priority' => ['required', Rule::in(['normal', 'high', 'very_high'])],
             'status' => ['required', Rule::in(['active', 'inactive', 'blacklisted'])],
             'branch_type' => ['required', Rule::in(['single', 'multi'])],
@@ -308,6 +308,9 @@ class CustomerController extends Controller
             'branches.*.contacts.*.is_billing' => ['nullable', 'boolean'],
             'branches.*.contacts.*.is_escalation' => ['nullable', 'boolean'],
             'documents.*' => ['nullable', 'file', 'max:10240'],
+        ], [
+            'types.size' => 'Select exactly one customer type.',
+            'segments.max' => 'Select no more than one segment.',
         ]);
 
         $primaryCount = collect($request->input('contacts', []))->filter(fn ($contact) => ! empty($contact['is_primary']))->count();
@@ -337,6 +340,8 @@ class CustomerController extends Controller
         if ($duplicate && ! $request->boolean('confirm_duplicate')) {
             return back()->withInput()->withErrors(['name' => 'A customer with the same name and city already exists. Confirm duplicate to continue.']);
         }
+
+        $validated['segments'] = array_values(array_filter($validated['segments'] ?? []));
 
         $customer = DB::transaction(function () use ($request, $validated) {
             $nextId = (Customer::withTrashed()->max('id') ?? 0) + 1;
