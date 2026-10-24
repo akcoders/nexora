@@ -245,6 +245,34 @@ a { text-decoration: none; }
 .nx-workflow-progress > div { position: relative; z-index: 1; display: grid; justify-items: center; gap: 7px; color: #94a3b8; }
 .nx-workflow-progress span { width: 35px; height: 35px; display: grid; place-items: center; color: #64748b; background: #fff; border: 2px solid #cbd5e1; border-radius: 50%; }
 .nx-workflow-progress svg { width: 15px; }
+.nx-activity-section { background: linear-gradient(180deg, #fff 0, #fbfdff 100%); }
+.nx-activity-count { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; color: #1d4ed8; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.nx-activity-count svg { width: 15px; height: 15px; }
+.nx-activity-timeline { position: relative; display: grid; gap: 18px; }
+.nx-activity-timeline::before { content: ''; position: absolute; top: 22px; bottom: 22px; left: 20px; width: 2px; background: linear-gradient(#bfdbfe, #cbd5e1); }
+.nx-activity-entry { --activity: #2563eb; --activity-soft: #eff6ff; position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: start; gap: 15px; }
+.nx-activity-entry--success { --activity: #16a34a; --activity-soft: #f0fdf4; }
+.nx-activity-entry--warning { --activity: #d97706; --activity-soft: #fffbeb; }
+.nx-activity-entry--slate { --activity: #64748b; --activity-soft: #f1f5f9; }
+.nx-activity-marker { z-index: 1; width: 42px; height: 42px; display: grid; place-items: center; color: var(--activity); background: var(--activity-soft); border: 4px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #dbeafe, 0 4px 12px rgba(15,23,42,.08); }
+.nx-activity-marker svg { width: 18px; height: 18px; }
+.nx-activity-card { min-width: 0; padding: 17px 18px; background: #fff; border: 1px solid #e2e8f0; border-left: 3px solid var(--activity); border-radius: 14px; box-shadow: 0 7px 22px rgba(15,23,42,.045); }
+.nx-activity-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 7px 14px; }
+.nx-activity-title { color: #0f172a; font-size: 15px; font-weight: 700; }
+.nx-activity-latest { padding: 3px 8px; color: var(--activity); background: var(--activity-soft); border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.nx-activity-time { display: inline-flex; align-items: center; gap: 5px; color: #64748b; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.nx-activity-time svg { width: 13px; height: 13px; }
+.nx-activity-people { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.nx-activity-person { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #f8fafc; border: 1px solid #edf2f7; border-radius: 10px; }
+.nx-activity-person > span:last-child { min-width: 0; }
+.nx-activity-person small, .nx-activity-person strong { display: block; line-height: 1.25; }
+.nx-activity-person small { color: #64748b; font-size: 10px; }
+.nx-activity-person strong { margin-top: 2px; color: #334155; font-size: 12px; overflow-wrap: anywhere; }
+.nx-activity-avatar, .nx-activity-person-icon { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center; color: var(--activity); background: var(--activity-soft); border-radius: 8px; font-size: 11px; font-weight: 800; }
+.nx-activity-person-icon svg { width: 14px; height: 14px; }
+.nx-activity-remark { display: flex; align-items: flex-start; gap: 9px; margin-top: 13px; padding: 10px 12px; color: #334155; background: var(--activity-soft); border-radius: 9px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.nx-activity-remark svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 2px; color: var(--activity); }
+.nx-activity-empty { padding: 22px; color: #64748b; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; font-size: 13px; text-align: center; }
 .nx-workflow-progress small { font-size: 10px; font-weight: 700; }
 .nx-workflow-progress .done { color: #15803d; }
 .nx-workflow-progress .done span { color: #fff; background: #16a34a; border-color: #16a34a; }
@@ -905,6 +933,12 @@ body.nx-kanban-grabbing, body.nx-kanban-grabbing * { cursor: grabbing !important
 @keyframes nx-skel { to { background-position: -200% 0; } }
 
 @media (max-width: 767.98px) {
+    .nx-activity-entry { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+    .nx-activity-timeline::before { left: 16px; }
+    .nx-activity-marker { width: 34px; height: 34px; border-width: 3px; }
+    .nx-activity-marker svg { width: 15px; height: 15px; }
+    .nx-activity-card { padding: 13px; }
+    .nx-activity-person { flex: 1 1 135px; }
     .nx-kanban { margin: 0 -15px; padding: 2px 15px 18px; scroll-padding: 0 15px; }
     .nx-kanban-col { flex-basis: min(86vw, 320px); max-height: none; }
     .nx-kanban-search { width: 100%; }

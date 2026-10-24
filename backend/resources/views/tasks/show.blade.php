@@ -34,16 +34,46 @@
                     <div class="col-md-4"><span class="text-secondary d-block">Due date</span><strong>{{ $task->due_at?->format('d M Y, h:i A') ?? 'No due date' }}</strong></div>
                 </div>
             </section>
-            <section class="nx-card p-4">
-                <h3 class="h6 fw-bold mb-4">Activity timeline</h3>
-                <div class="d-grid gap-4">
-                    @foreach($task->actions as $action)
-                        <div class="d-flex gap-3">
-                            <span class="nx-metric-icon flex-shrink-0" style="width:38px;height:38px"><i data-lucide="{{ match ($action->action) { 'close' => 'circle-check-big', 'assign' => 'forward', 'priority' => 'flag', default => 'plus' } }}" style="width:18px"></i></span>
-                            <div class="flex-grow-1"><div class="d-flex justify-content-between"><strong>{{ $action->action === 'priority' ? 'Priority changed' : str($action->action)->headline() }}</strong><small class="text-secondary">{{ $action->created_at->format('d M, h:i A') }}</small></div><div class="small text-secondary mb-1">by {{ $action->user?->name }} @if($action->assignee) · assigned to {{ $action->assignee->name }} @endif</div><div class="small">{{ $action->remark }}</div></div>
-                        </div>
-                    @endforeach
+            <section class="nx-card nx-activity-section p-3 p-md-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                    <div>
+                        <div class="nx-overline">WORK ITEM HISTORY</div>
+                        <h3 class="h5 fw-bold mb-1">Activity timeline</h3>
+                        <p class="small text-secondary mb-0">Every update, handover and decision in one place. Latest first.</p>
+                    </div>
+                    <span class="nx-activity-count"><i data-lucide="history" aria-hidden="true"></i>{{ $task->actions->count() }} {{ $task->actions->count() === 1 ? 'update' : 'updates' }}</span>
                 </div>
+                <ol class="nx-activity-timeline list-unstyled mb-0">
+                    @forelse($task->actions as $action)
+                        @php
+                            $activityTone = match ($action->action) { 'close' => 'success', 'assign' => 'primary', 'priority' => 'warning', 'created' => 'slate', default => 'primary' };
+                            $activityIcon = match ($action->action) { 'close' => 'circle-check-big', 'assign' => 'user-round-check', 'priority' => 'flag', 'created' => 'plus', default => 'activity' };
+                        @endphp
+                        <li class="nx-activity-entry nx-activity-entry--{{ $activityTone }}">
+                            <span class="nx-activity-marker" aria-hidden="true"><i data-lucide="{{ $activityIcon }}"></i></span>
+                            <article class="nx-activity-card">
+                                <div class="nx-activity-card-head">
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <h4 class="nx-activity-title mb-0">{{ $action->action === 'priority' ? 'Priority changed' : str($action->action)->headline() }}</h4>
+                                        @if($loop->first)<span class="nx-activity-latest">Latest update</span>@endif
+                                    </div>
+                                    <time class="nx-activity-time" datetime="{{ $action->created_at->toIso8601String() }}"><i data-lucide="clock-3" aria-hidden="true"></i>{{ $action->created_at->format('d M Y') }} <span aria-hidden="true">·</span> {{ $action->created_at->format('h:i A') }}</time>
+                                </div>
+                                <div class="nx-activity-people">
+                                    <div class="nx-activity-person"><span class="nx-activity-avatar" aria-hidden="true">{{ strtoupper(substr($action->user?->name ?? 'System', 0, 1)) }}</span><span><small>Performed by</small><strong>{{ $action->user?->name ?? 'System' }}</strong></span></div>
+                                    @if($action->assignee)
+                                        <div class="nx-activity-person"><span class="nx-activity-person-icon" aria-hidden="true"><i data-lucide="arrow-right"></i></span><span><small>{{ $action->action === 'created' ? 'Initially assigned to' : 'Assigned to' }}</small><strong>{{ $action->assignee->name }}</strong></span></div>
+                                    @endif
+                                </div>
+                                @if($action->remark)
+                                    <div class="nx-activity-remark"><i data-lucide="message-square-text" aria-hidden="true"></i><p class="mb-0">{{ $action->remark }}</p></div>
+                                @endif
+                            </article>
+                        </li>
+                    @empty
+                        <li class="nx-activity-empty">No activity has been recorded yet.</li>
+                    @endforelse
+                </ol>
             </section>
         </div>
         <div class="col-xl-4">
