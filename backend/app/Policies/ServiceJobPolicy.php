@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\ServiceJob;
 use App\Models\User;
+use App\Support\RecordVisibility;
 
 class ServiceJobPolicy
 {
@@ -12,7 +13,7 @@ class ServiceJobPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('service_jobs.read') || $user->hasRole('Technician');
+        return $user->can('service_jobs.read') || $user->can('service_jobs.view_own');
     }
 
     /**
@@ -20,7 +21,7 @@ class ServiceJobPolicy
      */
     public function view(User $user, ServiceJob $serviceJob): bool
     {
-        return $serviceJob->assigned_to === $user->id
+        return RecordVisibility::allows($user, $serviceJob, 'service_jobs')
             || $user->can('service_jobs.assign')
             || $user->can('service_jobs.update');
     }

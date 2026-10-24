@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Rules\IndianDistrict;
 use App\Rules\IndianState;
 use App\Services\IndiaLocations;
+use App\Support\RecordVisibility;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,8 @@ class CustomerController extends Controller
 {
     public function index(Request $request): View
     {
-        $customers = Customer::with('group')->withCount(['contacts', 'branches', 'equipments'])
+        $customers = RecordVisibility::scope(Customer::query(), $request->user(), 'customers', false)
+            ->with('group')->withCount(['contacts', 'branches', 'equipments'])
             ->when($request->filled('search'), fn ($query) => $query->where(function ($query) use ($request) {
                 $query->where('name', 'like', '%'.$request->string('search').'%')
                     ->orWhere('code', 'like', '%'.$request->string('search').'%')
@@ -49,8 +51,10 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function show(Customer $customer): View
+    public function show(Request $request, Customer $customer): View
     {
+        abort_unless(RecordVisibility::allows($request->user(), $customer, 'customers', false), 403);
+
         $customer->load([
             'group',
             'contacts.branch',

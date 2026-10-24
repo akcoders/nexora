@@ -11,6 +11,7 @@ import './searchable-select.js';
 import './india-address.js';
 import './modal-flow.js';
 import './language-switcher.js';
+import './role-permissions.js';
 
 window.Alpine = Alpine;
 window.bootstrap = bootstrap;

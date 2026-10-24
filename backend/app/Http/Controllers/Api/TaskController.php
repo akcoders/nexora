@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\OneSignalService;
+use App\Support\RecordVisibility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,13 +25,10 @@ class TaskController extends Controller
             'type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
         ]);
 
-        $tasks = Task::with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee'])
+        $tasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')
+            ->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee'])
             ->withCount('actions')
             ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
-            ->where(function ($query) use ($request) {
-                $query->where('assigned_to', $request->user()->id)
-                    ->orWhereHas('members', fn ($query) => $query->where('user_id', $request->user()->id));
-            })
             ->when(($filters['scope'] ?? null) === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
             ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
             ->when(isset($filters['type']), fn ($query) => $query->where('task_type', $filters['type']))
@@ -44,7 +42,7 @@ class TaskController extends Controller
 
     public function show(Request $request, Task $task): JsonResponse
     {
-        abort_unless($task->assigned_to === $request->user()->id || $task->members()->where('user_id', $request->user()->id)->exists(), 403);
+        abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
 
         return response()->json([
             'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee']),
@@ -54,6 +52,7 @@ class TaskController extends Controller
 
     public function action(Request $request, Task $task, OneSignalService $oneSignal): JsonResponse
     {
+        abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
         abort_unless($task->assigned_to === $request->user()->id, 403, 'Only the current assignee can act on this task.');
         abort_if($task->status === 'closed', 422, 'This task is already closed.');
         if ((bool) Setting::valueFor('require_attendance_for_tasks', config('nexora.require_attendance_for_task_actions'))) {

@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Services\OneSignalService;
+use App\Support\RecordVisibility;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,8 @@ class TaskController extends Controller
 
     public function index(Request $request): View
     {
-        $tasks = Task::with(['customer', 'assignee', 'creator', 'latestAction.user', 'latestAction.assignee'])
+        $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks');
+        $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'latestAction.assignee'])
             ->withCount('actions')
             ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
@@ -43,11 +45,11 @@ class TaskController extends Controller
             'tasks' => $tasks,
             'users' => User::where('status', 'active')->orderBy('name')->get(),
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
-            'openCount' => Task::where('status', '!=', 'closed')->count(),
-            'workflowOpenCount' => Task::where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
-            'ticketOpenCount' => Task::where('task_type', Task::TYPE_TICKET)->where('status', '!=', 'closed')->count(),
-            'closedCount' => Task::where('status', 'closed')->count(),
-            'overdueCount' => Task::where('status', '!=', 'closed')->where('due_at', '<', now())->count(),
+            'openCount' => (clone $visibleTasks)->where('status', '!=', 'closed')->count(),
+            'workflowOpenCount' => (clone $visibleTasks)->where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
+            'ticketOpenCount' => (clone $visibleTasks)->where('task_type', Task::TYPE_TICKET)->where('status', '!=', 'closed')->count(),
+            'closedCount' => (clone $visibleTasks)->where('status', 'closed')->count(),
+            'overdueCount' => (clone $visibleTasks)->where('status', '!=', 'closed')->where('due_at', '<', now())->count(),
         ]);
     }
 
@@ -102,6 +104,7 @@ class TaskController extends Controller
 
     public function board(Request $request): View|JsonResponse
     {
+        $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks');
         if (! $request->expectsJson()) {
             return view('tasks.board', [
                 'users' => User::active()->orderBy('name')->get(),
@@ -110,8 +113,8 @@ class TaskController extends Controller
         }
 
         $user = $request->user();
-        $open = Task::workItems()->open()->withBoardData($user)->byUrgency()->get();
-        $closed = Task::workItems()->closed()->withBoardData($user)->latest('closed_at')->limit(self::BOARD_CLOSED_LIMIT)->get();
+        $open = (clone $visibleTasks)->workItems()->open()->withBoardData($user)->byUrgency()->get();
+        $closed = (clone $visibleTasks)->workItems()->closed()->withBoardData($user)->latest('closed_at')->limit(self::BOARD_CLOSED_LIMIT)->get();
 
         return response()->json([
             'tasks' => TaskBoardCardResource::collection($open->concat($closed))->resolve($request),
@@ -135,8 +138,10 @@ class TaskController extends Controller
         return back()->with('success', 'Priority updated.');
     }
 
-    public function show(Task $task): View
+    public function show(Request $request, Task $task): View
     {
+        abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
+
         return view('tasks.show', [
             'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'members.user']),
             'users' => User::where('status', 'active')->orderBy('name')->get(),

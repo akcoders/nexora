@@ -15,9 +15,37 @@ class RolePermissionController extends Controller
     {
         abort_unless($request->user()->can('roles.read'), 403);
 
+        $roles = Role::query()->withCount('users')->with('permissions')->orderBy('name')->get();
+        $selectedRole = $roles->firstWhere('id', $request->integer('role')) ?? $roles->first();
+        $permissions = Permission::query()->orderBy('name')->get()->groupBy(fn (Permission $permission): string => str($permission->name)->before('.')->toString());
+
+        $sections = [
+            ['name' => 'Operations', 'description' => 'Customer work, field service and daily workflows', 'icon' => 'briefcase-business', 'modules' => [
+                'customers' => 'Customers', 'products' => 'Products', 'checklists' => 'Service checklists', 'service_jobs' => 'Service jobs',
+                'attendance' => 'Attendance', 'tasks' => 'Workflow & tickets',
+            ]],
+            ['name' => 'People & finance', 'description' => 'Employee records, requests and payroll', 'icon' => 'users-round', 'modules' => [
+                'employees' => 'Employees', 'hr' => 'HR', 'leaves' => 'Leave requests', 'vouchers' => 'Expense vouchers', 'payroll' => 'Payroll',
+            ]],
+            ['name' => 'Administration', 'description' => 'Company setup and access management', 'icon' => 'settings-2', 'modules' => [
+                'companies' => 'Company master', 'users' => 'User accounts', 'roles' => 'Roles & permissions', 'settings' => 'Settings',
+            ]],
+            ['name' => 'Insights', 'description' => 'Reports and exports', 'icon' => 'chart-no-axes-combined', 'modules' => [
+                'reports' => 'Reports',
+            ]],
+        ];
+
+        $listedModules = collect($sections)->flatMap(fn (array $section) => array_keys($section['modules']));
+        $otherModules = $permissions->keys()->diff($listedModules)->mapWithKeys(fn (string $module): array => [$module => str($module)->headline()->toString()])->all();
+        if ($otherModules !== []) {
+            $sections[] = ['name' => 'Other modules', 'description' => 'Additional permission groups', 'icon' => 'blocks', 'modules' => $otherModules];
+        }
+
         return view('roles.index', [
-            'roles' => Role::query()->withCount('users')->with('permissions')->orderBy('name')->get(),
-            'permissions' => Permission::query()->orderBy('name')->get()->groupBy(fn (Permission $permission): string => str($permission->name)->before('.')->toString()),
+            'roles' => $roles,
+            'selectedRole' => $selectedRole,
+            'sections' => $sections,
+            'permissions' => $permissions,
         ]);
     }
 
@@ -32,7 +60,7 @@ class RolePermissionController extends Controller
         $role = Role::create(['name' => $validated['name'], 'guard_name' => 'web']);
         $role->syncPermissions($validated['permissions'] ?? []);
 
-        return back()->with('success', 'Role and permission set created.');
+        return redirect()->route('roles.index', ['role' => $role->id])->with('success', 'Role created. Set its permissions below.');
     }
 
     public function update(Request $request, Role $role): RedirectResponse
@@ -50,6 +78,6 @@ class RolePermissionController extends Controller
         $role->update(['name' => $validated['name']]);
         $role->syncPermissions($validated['permissions'] ?? []);
 
-        return back()->with('success', 'Role permissions updated.');
+        return redirect()->route('roles.index', ['role' => $role->id])->with('success', 'Role permissions updated.');
     }
 }

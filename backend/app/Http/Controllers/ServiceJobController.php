@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\ServiceJobAssignedNotification;
 use App\Services\OneSignalService;
 use App\Services\ServiceJobWorkflow;
+use App\Support\RecordVisibility;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,8 @@ class ServiceJobController extends Controller
     {
         Gate::authorize('viewAny', ServiceJob::class);
 
-        $jobs = ServiceJob::query()
+        $visibleJobs = RecordVisibility::scope(ServiceJob::query(), $request->user(), 'service_jobs');
+        $jobs = (clone $visibleJobs)
             ->with(['customer:id,name,code', 'serviceType:id,name', 'technician:id,name'])
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
@@ -49,11 +51,11 @@ class ServiceJobController extends Controller
             'statusLabels' => ServiceJobWorkflow::LABELS,
             'workflow' => $workflow,
             'metrics' => [
-                'today' => ServiceJob::query()->whereDate('scheduled_at', today())->count(),
-                'pending' => ServiceJob::query()->whereNotIn('status', ['completed', 'cancelled', 'customer_declined'])->count(),
-                'in_progress' => ServiceJob::query()->whereIn('status', ['on_the_way', 'arrived', 'inspection_in_progress', 'service_in_progress'])->count(),
-                'completed' => ServiceJob::query()->where('status', 'completed')->count(),
-                'payment_pending' => ServiceJob::query()->whereIn('payment_status', ['pending', 'partial'])->where('status', '!=', 'cancelled')->count(),
+                'today' => (clone $visibleJobs)->whereDate('scheduled_at', today())->count(),
+                'pending' => (clone $visibleJobs)->whereNotIn('status', ['completed', 'cancelled', 'customer_declined'])->count(),
+                'in_progress' => (clone $visibleJobs)->whereIn('status', ['on_the_way', 'arrived', 'inspection_in_progress', 'service_in_progress'])->count(),
+                'completed' => (clone $visibleJobs)->where('status', 'completed')->count(),
+                'payment_pending' => (clone $visibleJobs)->whereIn('payment_status', ['pending', 'partial'])->where('status', '!=', 'cancelled')->count(),
             ],
         ]);
     }

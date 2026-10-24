@@ -46,6 +46,8 @@ class DatabaseSeeder extends Seeder
                 ->map(fn (string $action) => "service_jobs.$action")
         );
 
+        $permissions = $permissions->merge(['customers.view_own', 'service_jobs.view_own', 'tasks.view_own']);
+
         $permissions->each(fn (string $permission) => Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']));
 
         $superAdmin = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
@@ -56,7 +58,7 @@ class DatabaseSeeder extends Seeder
         $superAdmin->syncPermissions(Permission::all());
         $adminRole->syncPermissions(Permission::where('name', 'not like', 'settings.%')->get());
         $managerRole->syncPermissions(Permission::whereIn('name', ['attendance.read', 'attendance.approve', 'attendance.export', 'tasks.read', 'tasks.assign', 'reports.read', 'reports.export', 'service_jobs.read', 'service_jobs.assign', 'service_jobs.approve', 'service_jobs.view_financials', 'employees.read', 'hr.read', 'leaves.read', 'leaves.approve', 'vouchers.read', 'vouchers.approve'])->get());
-        $technicianRole->syncPermissions(Permission::whereIn('name', ['service_jobs.read', 'service_jobs.inspect', 'service_jobs.create_estimate', 'service_jobs.perform', 'service_jobs.payment', 'service_jobs.complete'])->get());
+        $technicianRole->syncPermissions(Permission::whereIn('name', ['service_jobs.view_own', 'tasks.view_own', 'service_jobs.inspect', 'service_jobs.create_estimate', 'service_jobs.perform', 'service_jobs.payment', 'service_jobs.complete'])->get());
 
         $admin = User::firstOrNew(['email' => 'admin@nexora.test']);
         $admin->fill([

@@ -15,6 +15,7 @@ use App\Models\ServiceJob;
 use App\Models\ServiceMasterOption;
 use App\Services\ServiceEstimateCalculator;
 use App\Services\ServiceJobWorkflow;
+use App\Support\RecordVisibility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,12 +28,10 @@ class ServiceJobController extends Controller
     public function index(Request $request, ServiceJobWorkflow $workflow): JsonResponse
     {
         Gate::authorize('viewAny', ServiceJob::class);
-        $canViewAll = $request->user()->can('service_jobs.assign');
-        $jobs = ServiceJob::query()
+        $jobs = RecordVisibility::scope(ServiceJob::query(), $request->user(), 'service_jobs')
             ->with(['customer:id,name,code', 'equipment:id,equipment_type,brand,model,capacity,location', 'serviceType:id,name', 'technician:id,name,phone'])
             ->withCount('payments')
             ->withSum('payments', 'amount')
-            ->when(! $canViewAll, fn ($query) => $query->where('assigned_to', $request->user()->id))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('scope') && $request->string('scope')->toString() === 'today', fn ($query) => $query->whereDate('scheduled_at', today()))
             ->when($request->filled('scope') && $request->string('scope')->toString() === 'upcoming', fn ($query) => $query->where('scheduled_at', '>', now()))
@@ -467,7 +466,9 @@ class ServiceJobController extends Controller
     {
         Gate::authorize('view', $serviceJob);
         abort_unless($serviceJob->assigned_to === $request->user()->id || $request->user()->can('service_jobs.update'), 403, 'Only the assigned technician can update this service job.');
-        abort_unless($request->user()->can($permission) || $request->user()->can('service_jobs.update'), 403, 'You are not allowed to perform this service action.');
+        abort_unless($request->user()->can($permission)
+            || ($permission === 'service_jobs.read' && $request->user()->can('service_jobs.view_own'))
+            || $request->user()->can('service_jobs.update'), 403, 'You are not allowed to perform this service action.');
     }
 
     private function createInspection(ServiceJob $serviceJob, Request $request, string $phase): ServiceInspection
