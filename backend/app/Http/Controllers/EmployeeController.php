@@ -14,6 +14,7 @@ use App\Services\IndiaLocations;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -48,7 +49,7 @@ class EmployeeController extends Controller
             'metrics' => [
                 'total' => User::whereHas('employeeProfile')->count(),
                 'active' => User::whereHas('employeeProfile')->where('status', 'active')->count(),
-                'probation' => User::whereHas('employeeProfile', fn ($query) => $query->where('employment_type', 'probation'))->count(),
+                'probation' => User::whereHas('employeeProfile', fn ($query) => $query->where('employment_type', 'probation')->whereNull('probation_confirmed_at'))->count(),
                 'payroll' => EmployeeProfile::where('gross_monthly_salary', '>', 0)->count(),
             ],
         ]);
@@ -70,7 +71,7 @@ class EmployeeController extends Controller
         $user = DB::transaction(function () use ($request, $validated, $temporaryPassword): User {
             $user = User::create([
                 'name' => $this->fullName($validated),
-                'email' => $validated['work_email'],
+                'email' => $this->loginEmail($validated),
                 'password' => Hash::make($temporaryPassword),
                 'phone' => $validated['phone'] ?? null,
                 'employee_code' => ($validated['employee_code'] ?? null) ?: $this->nextEmployeeCode(),
@@ -101,7 +102,8 @@ class EmployeeController extends Controller
         abort_unless($employee->employeeProfile()->exists(), 404);
 
         return view('employees.show', [
-            'employee' => $employee->load(['employeeProfile.reportingManager', 'roles', 'premises', 'leaveBalances.leaveType']),
+            'employee' => $employee->load(['employeeProfile.reportingManager', 'employeeProfile.probationConfirmedBy', 'roles', 'premises', 'leaveBalances.leaveType']),
+            'referredBy' => ($id = data_get($employee->employeeProfile->verification, 'referred_by_id')) ? User::find($id) : null,
             'recentLeaves' => $employee->leaveRequests()->with('leaveType')->latest()->limit(5)->get(),
             'recentVouchers' => $employee->expenseVouchers()->latest()->limit(5)->get(),
             'recentPayroll' => $employee->payrollEntries()->with('payrollRun')->latest()->limit(6)->get(),
@@ -125,7 +127,7 @@ class EmployeeController extends Controller
         DB::transaction(function () use ($request, $employee, $validated): void {
             $employee->update([
                 'name' => $this->fullName($validated),
-                'email' => $validated['work_email'],
+                'email' => $this->loginEmail($validated),
                 'phone' => $validated['phone'] ?? null,
                 'employee_code' => ($validated['employee_code'] ?? null) ?: ($employee->employee_code ?: $this->nextEmployeeCode()),
                 'department' => $validated['department'] ?? null,
@@ -142,6 +144,30 @@ class EmployeeController extends Controller
         });
 
         return redirect()->route('employees.show', $employee)->with('success', 'Employee master updated successfully.');
+    }
+
+    /**
+     * HR review at the end of probation: the employee becomes permanent.
+     */
+    public function confirmProbation(Request $request, User $employee): RedirectResponse
+    {
+        abort_unless($request->user()->can('employees.update'), 403);
+        $profile = $employee->employeeProfile;
+        abort_unless($profile?->exists(), 404);
+        abort_unless($profile->isOnProbation(), 422, 'This employee is not on probation.');
+        $validated = $request->validate(['remarks' => ['nullable', 'string', 'max:2000']]);
+
+        $profile->update([
+            'employment_type' => 'permanent',
+            'probation_confirmed_at' => now(),
+            'probation_confirmed_by' => $request->user()->id,
+            'updated_by' => $request->user()->id,
+            'performance_career' => array_filter(($profile->performance_career ?? []) + [
+                'probation_review' => $validated['remarks'] ?? null,
+            ], fn ($value) => $value !== null),
+        ]);
+
+        return redirect()->route('employees.show', $employee)->with('success', $employee->name.' is now a permanent employee.');
     }
 
     /** @return array<string, mixed> */
@@ -174,8 +200,8 @@ class EmployeeController extends Controller
             'languages.*' => ['string', Rule::in(EmployeeMasterOptions::languageNames())],
             'preferred_language' => ['nullable', 'string', Rule::in(EmployeeMasterOptions::languageNames())],
             'profile_picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
-            'work_email' => ['required', 'email', 'max:254', Rule::unique('users', 'email')->ignore($employee)],
-            'personal_email' => ['nullable', 'email', 'max:254', 'different:work_email'],
+            'work_email' => ['nullable', 'email', 'max:254', Rule::unique('users', 'email')->ignore($employee)],
+            'personal_email' => ['required', 'email', 'max:254', 'different:work_email', Rule::when(blank($request->input('work_email')), [Rule::unique('users', 'email')->ignore($employee)])],
             'phone' => ['required', 'string', 'max:20', $mobile],
             'employee_code' => ['nullable', 'string', 'max:30', 'alpha_dash', Rule::unique('users', 'employee_code')->ignore($employee)],
             'department' => ['required', 'string', 'max:100', Rule::in(EmployeeMasterOptions::allowed(array_keys(EmployeeMasterOptions::departments()), $employee?->department))],
@@ -184,8 +210,9 @@ class EmployeeController extends Controller
             'user_status' => ['required', $in('user_statuses')],
             'premises' => ['required', 'array', 'min:1'],
             'premises.*' => ['integer', 'distinct', 'exists:premises,id'],
-            'date_of_joining' => ['nullable', 'date', 'after:date_of_birth', 'before_or_equal:'.now()->addYear()->toDateString()],
+            'date_of_joining' => ['nullable', 'required_if:employment_type,probation', 'date', 'after:date_of_birth', 'before_or_equal:'.now()->addYear()->toDateString()],
             'employment_type' => ['nullable', $in('employment_types', 'employment_type')],
+            'probation_months' => ['nullable', 'required_if:employment_type,probation', 'integer', 'between:1,36'],
             'employee_category' => ['nullable', 'string', 'max:80', $in('employee_categories', 'employee_category')],
             'job_grade' => ['nullable', 'string', 'max:30', $in('job_grades', 'job_grade')],
             'reporting_manager_id' => ['nullable', 'integer', 'exists:users,id', ...$notSelf],
@@ -213,12 +240,24 @@ class EmployeeController extends Controller
             'current_address' => ['nullable', $addressKeys],
             'permanent_address' => ['nullable', $addressKeys],
             'company_accommodation_address' => ['nullable', $addressKeys],
-            'emergency_family' => ['nullable', 'array:emergency_name,relation,mobile'],
-            'emergency_family.emergency_name' => ['nullable', 'string', 'max:120', $personName, 'required_with:emergency_family.mobile'],
-            'emergency_family.relation' => ['nullable', 'string', $in('relations', 'emergency_family.relation'), 'required_with:emergency_family.emergency_name'],
-            'emergency_family.mobile' => ['nullable', 'string', 'max:20', $mobile, 'different:phone', 'required_with:emergency_family.emergency_name'],
-            'employment_details' => ['nullable', 'array'],
-            'verification' => ['nullable', 'array:police_verification,police_verification_date,police_verification_reference,police_verification_remarks,background_check,background_check_date,background_check_agency,background_check_remarks,uan,esic'],
+            'emergency_family' => ['required', 'array:emergency_name,relation,mobile,secondary_name,secondary_relation,secondary_mobile,dependents_count,dependents'],
+            'emergency_family.emergency_name' => ['required', 'string', 'max:120', $personName],
+            'emergency_family.relation' => ['required', 'string', $in('relations', 'emergency_family.relation')],
+            'emergency_family.mobile' => ['required', 'string', 'max:20', $mobile, 'different:phone'],
+            'emergency_family.secondary_name' => ['nullable', 'string', 'max:120', $personName, 'required_with:emergency_family.secondary_mobile,emergency_family.secondary_relation'],
+            'emergency_family.secondary_relation' => ['nullable', 'string', $in('relations', 'emergency_family.secondary_relation'), 'required_with:emergency_family.secondary_name'],
+            'emergency_family.secondary_mobile' => ['nullable', 'string', 'max:20', $mobile, 'different:phone', 'different:emergency_family.mobile', 'required_with:emergency_family.secondary_name'],
+            'emergency_family.dependents_count' => ['required', 'integer', 'between:0,20'],
+            'emergency_family.dependents' => ['nullable', 'array', 'max:20'],
+            'emergency_family.dependents.*' => ['array:name,gender,age'],
+            'emergency_family.dependents.*.name' => ['nullable', 'string', 'max:120', $personName, 'required_with:emergency_family.dependents.*.gender,emergency_family.dependents.*.age'],
+            'emergency_family.dependents.*.gender' => ['nullable', $in('genders')],
+            'emergency_family.dependents.*.age' => ['nullable', 'integer', 'between:0,120'],
+            'employment_details' => ['nullable', 'array:notice_period_days'],
+            'employment_details.notice_period_days' => ['nullable', 'integer', 'between:0,180'],
+            'verification' => ['nullable', 'array:police_verification,police_verification_date,police_verification_reference,police_verification_remarks,background_check,background_check_date,background_check_agency,background_check_remarks,uan,esic,source_of_hiring,referred_by_id'],
+            'verification.source_of_hiring' => ['nullable', $in('hiring_sources', 'verification.source_of_hiring')],
+            'verification.referred_by_id' => ['exclude_unless:verification.source_of_hiring,internal_staff', 'required_if:verification.source_of_hiring,internal_staff', 'integer', 'exists:users,id', ...$notSelf],
             'verification.police_verification' => ['nullable', Rule::in(EmployeeMasterOptions::verificationStatusKeys())],
             'verification.police_verification_date' => ['nullable', 'date', 'before_or_equal:today', 'required_if:verification.police_verification,verified'],
             'verification.police_verification_reference' => ['nullable', 'string', 'max:120'],
@@ -250,7 +289,9 @@ class EmployeeController extends Controller
             'education_skills.certifications' => ['nullable', 'string', 'max:255'],
             'education_skills.trade_licence' => ['nullable', 'string', 'max:255'],
             'education_skills.experience_years' => ['nullable', 'numeric', 'min:0', 'max:60', 'multiple_of:0.5'],
-            'safety' => ['nullable', 'array:ppe_size,safety_training,medical_fitness,incident_history'],
+            'safety' => ['nullable', 'array:ppe_size,safety_training,medical_fitness,medical_fitness_date,medical_fitness_valid_till,incident_history'],
+            'safety.medical_fitness_date' => ['nullable', 'date', 'before_or_equal:today', 'required_with:safety.medical_fitness_valid_till'],
+            'safety.medical_fitness_valid_till' => ['nullable', 'date', 'after_or_equal:safety.medical_fitness_date'],
             'safety.ppe_size' => ['nullable', 'string', $in('ppe_sizes', 'safety.ppe_size')],
             'safety.safety_training' => ['nullable', 'string', $in('safety_training', 'safety.safety_training')],
             'safety.medical_fitness' => ['nullable', 'string', $in('medical_fitness', 'safety.medical_fitness')],
@@ -306,6 +347,15 @@ class EmployeeController extends Controller
             'bank_details.account_number.regex' => 'Account number must be 9 to 18 digits.',
             'bank_details.ifsc.regex' => 'IFSC must be 11 characters: 4 letters, a zero, then 6 letters or digits (e.g. HDFC0001234).',
             'emergency_family.mobile.different' => 'Emergency mobile must be a different number from the employee mobile.',
+            'emergency_family.secondary_mobile.different' => 'The second emergency mobile must differ from the employee and first emergency numbers.',
+            'emergency_family.dependents.*.name.required_with' => 'Enter the dependent\'s name.',
+            'emergency_family.dependents.*.name.regex' => 'Dependent names can only contain letters, spaces, dots, hyphens and apostrophes.',
+            'date_of_joining.required_if' => 'Enter the joining date so the probation end date can be calculated.',
+            'probation_months.required_if' => 'Enter the probation period for an employee on probation.',
+            'verification.referred_by_id.required_if' => 'Select the staff member who referred this employee.',
+            'verification.referred_by_id.not_in' => 'An employee cannot refer themselves.',
+            'safety.medical_fitness_date.required_with' => 'Enter the date of the medical fitness check.',
+            'safety.medical_fitness_valid_till.after_or_equal' => 'Fitness validity cannot end before the check-up date.',
             'personal_email.different' => 'Personal email must be different from the work email.',
             'reporting_manager_id.not_in' => 'An employee cannot report to themselves.',
             'functional_manager_id.not_in' => 'An employee cannot be their own functional manager.',
@@ -320,6 +370,20 @@ class EmployeeController extends Controller
             'emergency_family.emergency_name' => 'emergency contact name',
             'emergency_family.relation' => 'emergency contact relation',
             'emergency_family.mobile' => 'emergency mobile',
+            'emergency_family.secondary_name' => 'second emergency contact name',
+            'emergency_family.secondary_relation' => 'second emergency contact relation',
+            'emergency_family.secondary_mobile' => 'second emergency mobile',
+            'emergency_family.dependents_count' => 'number of dependents',
+            'emergency_family.dependents.*.name' => 'dependent name',
+            'emergency_family.dependents.*.gender' => 'dependent gender',
+            'emergency_family.dependents.*.age' => 'dependent age',
+            'employment_details.notice_period_days' => 'notice period',
+            'probation_months' => 'probation period',
+            'verification.source_of_hiring' => 'source of hiring',
+            'verification.referred_by_id' => 'referring staff',
+            'safety.medical_fitness_date' => 'medical check-up date',
+            'safety.medical_fitness_valid_till' => 'fitness valid till',
+            'personal_email' => 'permanent email',
             'bank_details.bank_name' => 'bank name',
             'bank_details.account_number' => 'account number',
             'bank_details.ifsc' => 'IFSC',
@@ -393,9 +457,10 @@ class EmployeeController extends Controller
             'current_address' => IndiaLocations::withCountry($validated['current_address'] ?? null),
             'permanent_address' => IndiaLocations::withCountry($validated['permanent_address'] ?? null),
             'company_accommodation_address' => IndiaLocations::withCountry($validated['company_accommodation_address'] ?? null),
-            'emergency_family' => $validated['emergency_family'] ?? [],
+            'emergency_family' => $this->emergencyFamily($validated),
             'date_of_joining' => $validated['date_of_joining'] ?? null,
             'employment_type' => $validated['employment_type'] ?? null,
+            ...$this->probationPayload($validated, $profile),
             'employee_category' => $validated['employee_category'] ?? null,
             'job_grade' => $validated['job_grade'] ?? null,
             'reporting_manager_id' => $validated['reporting_manager_id'] ?? null,
@@ -420,7 +485,7 @@ class EmployeeController extends Controller
             'performance_career' => $validated['performance_career'] ?? [],
             'assets_access' => $validated['assets_access'] ?? [],
             'engagement_wellbeing' => $validated['engagement_wellbeing'] ?? [],
-            'exit_separation' => $validated['exit_separation'] ?? [],
+            'exit_separation' => $this->exitSeparation($validated),
             'documents' => $documents,
             'remarks' => $validated['remarks'] ?? null,
         ];
@@ -440,6 +505,77 @@ class EmployeeController extends Controller
             'departments' => EmployeeMasterOptions::departments(),
             'options' => fn (string $list): array => EmployeeMasterOptions::options($list),
         ];
+    }
+
+    /**
+     * Login email: the work email when the company has issued one, otherwise the permanent email.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function loginEmail(array $validated): string
+    {
+        return ($validated['work_email'] ?? null) ?: $validated['personal_email'];
+    }
+
+    /**
+     * Emergency contacts and dependents, with blank dependent rows dropped.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function emergencyFamily(array $validated): array
+    {
+        $family = $validated['emergency_family'] ?? [];
+        $family['dependents_count'] = (int) ($family['dependents_count'] ?? 0);
+        $family['dependents'] = collect($family['dependents'] ?? [])
+            ->map(fn (array $dependent): array => array_filter($dependent, fn ($value) => filled($value)))
+            ->map(fn (array $dependent): array => isset($dependent['age']) ? ['age' => (int) $dependent['age']] + $dependent : $dependent)
+            ->filter()
+            ->values()
+            ->all();
+
+        return $family;
+    }
+
+    /**
+     * Probation period and the end date derived from the joining date. A changed end date
+     * re-arms the HR reminder; a fresh probation clears any earlier confirmation.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function probationPayload(array $validated, ?EmployeeProfile $profile): array
+    {
+        $months = isset($validated['probation_months']) && $validated['probation_months'] !== null ? (int) $validated['probation_months'] : null;
+        $endDate = EmployeeProfile::probationEndDate($validated['date_of_joining'] ?? null, $months);
+        $onProbation = ($validated['employment_type'] ?? null) === 'probation';
+        $endChanged = $endDate?->toDateString() !== $profile?->probation_end_date?->toDateString();
+
+        return [
+            'probation_months' => $months,
+            'probation_end_date' => $endDate?->toDateString(),
+            'probation_notified_at' => $endChanged ? null : $profile?->probation_notified_at,
+            'probation_confirmed_at' => $onProbation ? null : $profile?->probation_confirmed_at,
+            'probation_confirmed_by' => $onProbation ? null : $profile?->probation_confirmed_by,
+        ];
+    }
+
+    /**
+     * Separation details; the last working day defaults to the resignation date plus the notice period.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function exitSeparation(array $validated): array
+    {
+        $exit = $validated['exit_separation'] ?? [];
+        $notice = data_get($validated, 'employment_details.notice_period_days');
+
+        if (filled($exit['resignation_date'] ?? null) && blank($exit['last_working_date'] ?? null) && is_numeric($notice)) {
+            $exit['last_working_date'] = Carbon::parse($exit['resignation_date'])->addDays((int) $notice)->toDateString();
+        }
+
+        return $exit;
     }
 
     private function fullName(array $validated): string

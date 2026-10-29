@@ -88,6 +88,7 @@ class EmployeeMasterOptions
         'ppe_sizes' => ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
         'safety_training' => ['Completed', 'Scheduled', 'Refresher due', 'Not completed', 'Not required'],
         'medical_fitness' => ['Fit', 'Fit with restrictions', 'Temporarily unfit', 'Check-up pending'],
+        'hiring_sources' => ['social_media' => 'Social media', 'website' => 'Company website', 'agent' => 'Agent / consultancy', 'job_portal' => 'Job portal', 'direct' => 'Direct / walk-in', 'internal_staff' => 'Reference from internal staff'],
         'issue_statuses' => ['Issued', 'Not issued', 'Returned'],
         'access_statuses' => ['Granted', 'Requested', 'Revoked', 'Not required'],
     ];

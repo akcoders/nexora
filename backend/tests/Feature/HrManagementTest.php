@@ -19,6 +19,8 @@ class HrManagementTest extends TestCase
 
         $this->actingAs($admin)->post(route('employees.store'), [
             'first_name' => 'Neha', 'last_name' => 'Patil', 'work_email' => 'neha.patil@classic.test', 'phone' => '9876500011',
+            'personal_email' => 'neha.home@example.test',
+            'emergency_family' => ['emergency_name' => 'Ravi Patil', 'relation' => 'Father', 'mobile' => '9876500022', 'dependents_count' => 0],
             'department' => 'HR', 'designation' => 'HR Executive', 'role' => 'Manager', 'user_status' => 'active', 'premises' => [$premises->id],
             'salary_currency' => 'INR', 'pay_frequency' => 'monthly', 'basic_salary' => 30000, 'hra' => 12000,
         ])->assertRedirect();

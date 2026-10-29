@@ -11,6 +11,13 @@
         $address = fn($block) => collect([data_get($block,'line1'), data_get($block,'city'), data_get($block,'district'), data_get($block,'state'), data_get($block,'pin')])->filter()->join(', ');
         $tenure = $profile->date_of_joining ? $profile->date_of_joining->diffForHumans(now(), ['parts' => 2, 'short' => true, 'syntax' => \Carbon\CarbonInterface::DIFF_ABSOLUTE]) : null;
         $statusTone = ['active'=>'success','inactive'=>'secondary','on_leave'=>'warning','suspended'=>'danger'][$employee->status] ?? 'secondary';
+        $employment = $profile->employmentStatus();
+        $family = $profile->emergency_family ?? [];
+        $dependents = collect(data_get($family, 'dependents', []))->filter(fn ($d) => is_array($d) && filled($d['name'] ?? null));
+        $safety = $profile->safety ?? [];
+        $exit = $profile->exit_separation ?? [];
+        $date = fn ($value) => filled($value) ? \Illuminate\Support\Carbon::parse($value)->format('d M Y') : null;
+        $hiringSources = $options::options('hiring_sources');
     @endphp
     @if(session('temporary_password'))<div class="alert alert-warning nx-flash border-0 shadow-sm d-flex align-items-start gap-2"><i data-lucide="key-round" style="width:18px;flex:0 0 auto;margin-top:2px"></i><div><strong>Temporary password:</strong> <code class="notranslate">{{ session('temporary_password') }}</code> — share it securely once. The employee can change it from their profile.</div></div>@endif
 
@@ -18,7 +25,7 @@
         <div class="p-4 d-flex flex-wrap align-items-center gap-4">
             @if($profile->profile_picture_path)<img class="nx-employee-photo" src="{{ asset('storage/'.$profile->profile_picture_path) }}" alt="{{ $employee->name }}">@else<span class="nx-employee-initial notranslate">{{ str($employee->name)->substr(0,1)->upper() }}</span>@endif
             <div class="flex-grow-1 min-w-0">
-                <div class="d-flex flex-wrap gap-2 mb-2"><span class="badge badge-soft-primary notranslate">{{ $employee->employee_code }}</span><span class="badge badge-soft-{{ $statusTone }}">{{ str($employee->status)->headline() }}</span>@if($profile->employment_type)<span class="badge bg-light text-dark border">{{ str($profile->employment_type)->headline() }}</span>@endif</div>
+                <div class="d-flex flex-wrap gap-2 mb-2"><span class="badge badge-soft-primary notranslate">{{ $employee->employee_code }}</span><span class="badge badge-soft-{{ $statusTone }}">{{ str($employee->status)->headline() }}</span><span class="badge badge-soft-{{ $employment['tone'] }}" title="{{ $employment['detail'] }}"><i data-lucide="{{ $employment['key']==='exited' ? 'door-open' : ($employment['key']==='notice' ? 'calendar-clock' : (str_starts_with($employment['key'],'probation') ? 'timer' : 'badge-check')) }}" style="width:13px;height:13px;vertical-align:-2px"></i> {{ $employment['label'] }}</span></div>
                 <h2 class="h4 fw-bold mb-1">{{ collect([$profile->salutation, $employee->name])->filter()->join(' ') }}</h2>
                 <div class="text-secondary">{{ $employee->designation ?: 'Designation not set' }} · {{ $employee->department ?: 'Department not set' }}@if($profile->local_script_name) · <span class="notranslate">{{ $profile->local_script_name }}</span>@endif</div>
                 <div class="d-flex flex-wrap gap-2 mt-3">
@@ -40,6 +47,36 @@
 
     <div class="row g-4">
         <div class="col-xl-8">
+            @if($profile->isOnProbation() || $employment['key']==='notice' || $employment['key']==='exited' || $profile->probation_confirmed_at)
+            <section class="nx-card p-4 mb-4 border-start border-4 border-{{ $employment['tone'] }}">
+                <div class="d-flex flex-wrap align-items-start gap-3">
+                    <span class="nx-field-group-icon" style="--group-a:{{ $employment['tone']==='danger' ? '#e11d48' : '#0284c7' }};--group-b:{{ $employment['tone']==='danger' ? '#f97316' : '#22d3ee' }}"><i data-lucide="{{ $profile->isOnProbation() ? 'timer' : 'calendar-clock' }}"></i></span>
+                    <div class="flex-grow-1 min-w-0">
+                        <h3 class="h6 fw-bold mb-1">Employment status: {{ $employment['label'] }}</h3>
+                        <p class="small text-secondary mb-2">{{ $employment['detail'] ?? 'Confirmed permanent employee.' }}</p>
+                        <div class="row g-3 small">
+                            @if($profile->isOnProbation() || $profile->probation_confirmed_at)
+                            <div class="col-6 col-md-3"><div class="text-secondary">Probation period</div><div class="fw-semibold">{{ $profile->probation_months ? $profile->probation_months.' months' : '—' }}</div></div>
+                            <div class="col-6 col-md-3"><div class="text-secondary">Probation ends</div><div class="fw-semibold">{{ $profile->probation_end_date?->format('d M Y') ?? '—' }}</div></div>
+                            @endif
+                            @if($profile->probation_confirmed_at)<div class="col-12 col-md-6"><div class="text-secondary">Confirmed permanent</div><div class="fw-semibold">{{ $profile->probation_confirmed_at->format('d M Y') }}@if($profile->probationConfirmedBy) by {{ $profile->probationConfirmedBy->name }}@endif</div></div>@endif
+                            @if($profile->noticePeriodDays() !== null)<div class="col-6 col-md-3"><div class="text-secondary">Notice period</div><div class="fw-semibold">{{ $profile->noticePeriodDays() }} days</div></div>@endif
+                            @if($profile->resignationDate())<div class="col-6 col-md-3"><div class="text-secondary">Resignation date</div><div class="fw-semibold">{{ $profile->resignationDate()->format('d M Y') }}</div></div>@endif
+                            @if($profile->lastWorkingDate())<div class="col-6 col-md-3"><div class="text-secondary">Last working day</div><div class="fw-semibold">{{ $profile->lastWorkingDate()->format('d M Y') }}</div></div>@endif
+                        </div>
+                    </div>
+                    @if($profile->isOnProbation())
+                    @can('employees.update')
+                    <form method="POST" action="{{ route('employees.confirm-probation',$employee) }}" class="d-flex flex-column gap-2" style="min-width:240px">@csrf
+                        <input class="form-control form-control-sm" name="remarks" maxlength="2000" placeholder="HR review remarks (optional)">
+                        <button class="btn btn-success btn-sm"><i data-lucide="badge-check" style="width:16px"></i> Confirm as permanent</button>
+                        <a class="small text-secondary text-center" href="{{ route('employees.edit',$employee) }}">Extend probation instead</a>
+                    </form>
+                    @endcan
+                    @endif
+                </div>
+            </section>
+            @endif
             <section class="nx-card p-4 mb-4">
                 <h3 class="h6 fw-bold mb-3 d-flex align-items-center gap-2"><span class="nx-field-group-icon" style="--group-a:#0284c7;--group-b:#22d3ee"><i data-lucide="shield-check"></i></span>Verification status</h3>
                 <div class="row g-3">
@@ -56,6 +93,11 @@
                     </div></div>
                     @endforeach
                 </div>
+                <div class="row g-3 small mt-1">
+                    <div class="col-6 col-md-4"><div class="text-secondary">Source of hiring</div><div class="fw-semibold">{{ $hiringSources[$verification['source_of_hiring'] ?? ''] ?? ($verification['source_of_hiring'] ?? '—') }}@if(($verification['source_of_hiring'] ?? null)==='internal_staff' && $referredBy) · referred by {{ $referredBy->name }}@endif</div></div>
+                    <div class="col-6 col-md-4"><div class="text-secondary">Medical fitness</div><div class="fw-semibold">{{ $safety['medical_fitness'] ?? '—' }}@if($date($safety['medical_fitness_date'] ?? null)) · checked {{ $date($safety['medical_fitness_date']) }}@endif</div></div>
+                    <div class="col-6 col-md-4"><div class="text-secondary">Fitness valid till</div><div class="fw-semibold {{ filled($safety['medical_fitness_valid_till'] ?? null) && \Illuminate\Support\Carbon::parse($safety['medical_fitness_valid_till'])->isPast() ? 'text-danger' : '' }}">{{ $date($safety['medical_fitness_valid_till'] ?? null) ?? '—' }}</div></div>
+                </div>
                 @if($identity->isNotEmpty() || !empty($verification['uan']) || !empty($verification['esic']))
                 <div class="row g-3 small mt-1">
                     @foreach(['aadhaar'=>'Aadhaar','pan'=>'PAN','passport'=>'Passport','driving_licence'=>'Driving licence','voter_id'=>'Voter ID'] as $key=>$label)@if($identity->get($key))<div class="col-6 col-md-4"><div class="text-secondary">{{ $label }}</div><div class="fw-semibold notranslate">{{ in_array($key,['aadhaar']) ? $mask($identity->get($key)) : $identity->get($key) }}</div></div>@endif @endforeach
@@ -69,12 +111,14 @@
             <section class="nx-card p-4 mb-4">
                 <h3 class="h6 fw-bold mb-3 d-flex align-items-center gap-2"><span class="nx-field-group-icon" style="--group-a:#7c3aed;--group-b:#a855f7"><i data-lucide="briefcase-business"></i></span>Employment & contact</h3>
                 <div class="row g-3 small">
-                    @foreach(['Work email'=>$employee->email,'Phone'=>$employee->phone,'Personal email'=>$profile->personal_email,'Role'=>$employee->getRoleNames()->join(', '),'Joining date'=>$profile->date_of_joining?->format('d M Y'),'Employment type'=>str($profile->employment_type)->headline(),'Category'=>$profile->employee_category,'Job grade'=>$profile->job_grade,'Reporting manager'=>$profile->reportingManager?->name,'Date of birth'=>$profile->date_of_birth?->format('d M Y'),'Gender'=>str($profile->gender)->headline(),'Blood group'=>$profile->blood_group] as $label=>$value)
+                    @foreach(['Login email'=>$employee->email,'Phone'=>$employee->phone,'Permanent email'=>$profile->personal_email,'Role'=>$employee->getRoleNames()->join(', '),'Joining date'=>$profile->date_of_joining?->format('d M Y'),'Employment status'=>$employment['label'].($employment['detail'] ? ' · '.$employment['detail'] : ''),'Category'=>$profile->employee_category,'Job grade'=>$profile->job_grade,'Reporting manager'=>$profile->reportingManager?->name,'Date of birth'=>$profile->date_of_birth?->format('d M Y'),'Gender'=>str($profile->gender)->headline(),'Blood group'=>$profile->blood_group] as $label=>$value)
                     <div class="col-6 col-md-4"><div class="text-secondary">{{ $label }}</div><div class="fw-semibold text-break">{{ $value ?: '—' }}</div></div>
                     @endforeach
                     <div class="col-md-6"><div class="text-secondary">Current address</div><div class="fw-semibold">{{ $address($profile->current_address) ?: '—' }}</div></div>
                     <div class="col-md-6"><div class="text-secondary">Permanent address</div><div class="fw-semibold">{{ $address($profile->permanent_address) ?: '—' }}</div></div>
-                    @if(data_get($profile->emergency_family,'emergency_name'))<div class="col-md-6"><div class="text-secondary">Emergency contact</div><div class="fw-semibold">{{ data_get($profile->emergency_family,'emergency_name') }}@if(data_get($profile->emergency_family,'relation')) ({{ data_get($profile->emergency_family,'relation') }})@endif · <span class="notranslate">{{ data_get($profile->emergency_family,'mobile') }}</span></div></div>@endif
+                    @if(data_get($family,'emergency_name'))<div class="col-md-6"><div class="text-secondary">Emergency contact 1</div><div class="fw-semibold">{{ data_get($family,'emergency_name') }}@if(data_get($family,'relation')) ({{ data_get($family,'relation') }})@endif · <span class="notranslate">{{ data_get($family,'mobile') }}</span></div></div>@endif
+                    @if(data_get($family,'secondary_name'))<div class="col-md-6"><div class="text-secondary">Emergency contact 2</div><div class="fw-semibold">{{ data_get($family,'secondary_name') }}@if(data_get($family,'secondary_relation')) ({{ data_get($family,'secondary_relation') }})@endif · <span class="notranslate">{{ data_get($family,'secondary_mobile') }}</span></div></div>@endif
+                    <div class="col-md-6"><div class="text-secondary">Dependents</div><div class="fw-semibold">{{ data_get($family,'dependents_count') ?? '—' }}@if($dependents->isNotEmpty()) · {{ $dependents->map(fn ($d) => trim($d['name'].' ('.collect([isset($d['gender']) ? str($d['gender'])->headline() : null, isset($d['age']) ? $d['age'].' yrs' : null])->filter()->join(', ').')', ' ()'))->join(', ') }}@endif</div></div>
                 </div>
             </section>
 
