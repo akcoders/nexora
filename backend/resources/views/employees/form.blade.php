@@ -38,6 +38,11 @@
             return $html;
         };
         $managerChoices = collect($managers)->mapWithKeys(fn ($x) => [$x->id => trim($x->name.' · '.$x->employee_code, ' ·')])->all();
+        $fam = fn($key,$default='') => old('emergency_family.'.$key, data_get($profile,'emergency_family.'.$key,$default));
+        $dependents = array_values(array_filter((array) old('emergency_family.dependents', data_get($profile,'emergency_family.dependents',[])), 'is_array'));
+        $dependentsCount = $fam('dependents_count', count($dependents) ?: '');
+        $workEmail = old('work_email', $employee && $employee->email !== $profile?->personal_email ? $employee->email : '');
+        $probationEnd = \App\Models\EmployeeProfile::probationEndDate($v('date_of_joining') ?: null, (int) $v('probation_months') ?: null);
         $department = $u('department');
         $designationChoices = collect($departments[$department] ?? array_merge(...array_values($departments)))->unique()->mapWithKeys(fn ($x) => [$x => $x])->all();
     @endphp
@@ -91,8 +96,8 @@
             <div class="nx-step-pane" data-pane="2">
                 <div class="nx-step-help"><div><h2 class="nx-section-title mb-1">Contact, address & family</h2><p class="small text-secondary mb-0">How to reach the employee and who to call in an emergency.</p></div><span class="nx-step-counter">Step 2 of 8</span></div>
                 <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label">Work email *</label><div class="nx-input-icon"><i data-lucide="mail"></i><input type="email" class="form-control" name="work_email" value="{{ old('work_email',$employee?->email) }}" required></div><div class="form-text">Used for login to the web app and the technician app.</div></div>
-                    <div class="col-md-4"><label class="form-label">Personal email</label><div class="nx-input-icon"><i data-lucide="at-sign"></i><input type="email" class="form-control" name="personal_email" value="{{ $v('personal_email') }}" data-v="different:work_email"></div></div>
+                    <div class="col-md-4"><label class="form-label">Permanent email *</label><div class="nx-input-icon"><i data-lucide="at-sign"></i><input type="email" class="form-control" name="personal_email" value="{{ $v('personal_email') }}" required data-v="email|different:work_email"></div><div class="form-text">Personal email that stays with the employee. Used for login when no work email is issued.</div></div>
+                    <div class="col-md-4"><label class="form-label">Work email</label><div class="nx-input-icon"><i data-lucide="mail"></i><input type="email" class="form-control" name="work_email" value="{{ $workEmail }}" data-v="email"></div><div class="form-text">Optional company email. When filled it becomes the login for the web and technician apps.</div></div>
                     <div class="col-md-4"><label class="form-label">Mobile *</label><div class="nx-input-icon"><i data-lucide="smartphone"></i><input class="form-control" name="phone" value="{{ $u('phone') }}" required data-v="mobile" inputmode="tel"></div></div>
                     @foreach(['current_address'=>['Current address','home','tone-sky'],'permanent_address'=>['Permanent address','map-pinned','tone-indigo'],'company_accommodation_address'=>['Company accommodation','building','tone-teal']] as $key=>[$label,$icon,$tone])
                     <div class="col-12"><div class="nx-field-group {{ $tone }}">
@@ -109,11 +114,29 @@
                     </div></div>
                     @endforeach
                     <div class="col-12"><div class="nx-field-group tone-rose">
-                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="phone-call"></i></span><div><strong>Emergency contact</strong><small>Family member or friend we can reach in an emergency.</small></div></div>
+                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="phone-call"></i></span><div><strong>Emergency contacts</strong><small>The first contact is required; add a second person as a backup.</small></div></div>
                         <div class="row g-3">
-                            <div class="col-md-4"><label class="form-label">Contact name</label><input class="form-control" name="emergency_family[emergency_name]" value="{{ old('emergency_family.emergency_name',data_get($profile,'emergency_family.emergency_name')) }}" data-v="person_name|required_with:mobile" maxlength="120"></div>
-                            <div class="col-md-4"><label class="form-label">Relation</label><select class="form-select" name="emergency_family[relation]" data-v="required_with:emergency_name">{!! $opt($options('relations'), old('emergency_family.relation',data_get($profile,'emergency_family.relation'))) !!}</select></div>
-                            <div class="col-md-4"><label class="form-label">Emergency mobile</label><input class="form-control" name="emergency_family[mobile]" value="{{ old('emergency_family.mobile',data_get($profile,'emergency_family.mobile')) }}" data-v="mobile|different:phone|required_with:emergency_name" data-msg-different="Emergency mobile must be a different number from the employee mobile." inputmode="tel"></div>
+                            <div class="col-md-4"><label class="form-label">Contact name *</label><input class="form-control" name="emergency_family[emergency_name]" value="{{ $fam('emergency_name') }}" required data-v="person_name" maxlength="120"></div>
+                            <div class="col-md-4"><label class="form-label">Relation *</label><select class="form-select" name="emergency_family[relation]" required>{!! $opt($options('relations'), $fam('relation')) !!}</select></div>
+                            <div class="col-md-4"><label class="form-label">Emergency mobile *</label><input class="form-control" name="emergency_family[mobile]" value="{{ $fam('mobile') }}" required data-v="mobile|different:phone" data-msg-different="Emergency mobile must be a different number from the employee mobile." inputmode="tel"></div>
+                            <div class="col-md-4"><label class="form-label">Second contact name</label><input class="form-control" name="emergency_family[secondary_name]" value="{{ $fam('secondary_name') }}" data-v="person_name|required_with:secondary_mobile,secondary_relation" maxlength="120"></div>
+                            <div class="col-md-4"><label class="form-label">Relation</label><select class="form-select" name="emergency_family[secondary_relation]" data-v="required_with:secondary_name">{!! $opt($options('relations'), $fam('secondary_relation')) !!}</select></div>
+                            <div class="col-md-4"><label class="form-label">Second emergency mobile</label><input class="form-control" name="emergency_family[secondary_mobile]" value="{{ $fam('secondary_mobile') }}" data-v="mobile|different:phone|different:mobile|required_with:secondary_name" data-msg-different="The second emergency mobile must differ from the employee and first emergency numbers." inputmode="tel"></div>
+                        </div>
+                    </div></div>
+                    <div class="col-12"><div class="nx-field-group tone-amber">
+                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="users"></i></span><div><strong>Dependents</strong><small>Family members who depend on the employee, for insurance and benefits.</small></div></div>
+                        <div class="row g-3">
+                            <div class="col-md-3"><label class="form-label">No. of dependents *</label><input type="number" class="form-control" name="emergency_family[dependents_count]" id="dependentsCount" value="{{ $dependentsCount }}" required min="0" max="20" data-v="integer|between:0,20" inputmode="numeric"><div class="form-text">Enter 0 if none. Details below are optional.</div></div>
+                            <div class="col-md-9"><div id="dependentRows" data-genders='@json($options('genders'))'>
+                                @foreach($dependents as $i=>$dependent)
+                                <div class="row g-2 align-items-end mb-2" data-dependent-row>
+                                    <div class="col-md-5"><label class="form-label small mb-1">Name</label><input class="form-control" name="emergency_family[dependents][{{ $i }}][name]" value="{{ $dependent['name'] ?? '' }}" data-v="person_name|required_with:gender,age" maxlength="120"></div>
+                                    <div class="col-md-4"><label class="form-label small mb-1">Gender</label><select class="form-select" name="emergency_family[dependents][{{ $i }}][gender]">{!! $opt($options('genders'), $dependent['gender'] ?? '') !!}</select></div>
+                                    <div class="col-md-3"><label class="form-label small mb-1">Age</label><input type="number" class="form-control" name="emergency_family[dependents][{{ $i }}][age]" value="{{ $dependent['age'] ?? '' }}" min="0" max="120" data-v="integer|between:0,120" inputmode="numeric"></div>
+                                </div>
+                                @endforeach
+                            </div><div class="form-text" id="dependentsHint">Set the number of dependents to add their name, gender and age.</div></div>
                         </div>
                     </div></div>
                 </div>
@@ -124,9 +147,12 @@
                 <div class="nx-step-help"><div><h2 class="nx-section-title mb-1">Employment & user access</h2><p class="small text-secondary mb-0">Where they sit in the organisation and what they can open in the apps.</p></div><span class="nx-step-counter">Step 3 of 8</span></div>
                 <div class="row g-3">
                     <div class="col-md-3"><label class="form-label">Employee code</label><input class="form-control" name="employee_code" value="{{ $u('employee_code') }}" placeholder="Auto generated" data-v="alpha_dash" maxlength="30" data-upper></div>
-                    <div class="col-md-3"><label class="form-label">Joining date</label><input type="date" class="form-control" name="date_of_joining" value="{{ $v('date_of_joining') }}" data-v="after:date_of_birth"></div>
-                    <div class="col-md-3"><label class="form-label">Employment type</label><select class="form-select" name="employment_type">{!! $opt($options('employment_types'), $v('employment_type','permanent'), null) !!}</select></div>
+                    <div class="col-md-3"><label class="form-label">Joining date</label><input type="date" class="form-control" name="date_of_joining" id="dateOfJoining" value="{{ $v('date_of_joining') }}" data-v="after:date_of_birth|required_if:employment_type,probation" data-msg-required-if="Enter the joining date so the probation end date can be calculated."></div>
+                    <div class="col-md-3"><label class="form-label">Employment type</label><select class="form-select" name="employment_type" id="employmentType">{!! $opt($options('employment_types'), $v('employment_type','permanent'), null) !!}</select></div>
+                    <div class="col-md-3"><label class="form-label">Probation period (months)</label><input type="number" class="form-control" name="probation_months" id="probationMonths" value="{{ $v('probation_months') }}" min="1" max="36" data-v="integer|between:1,36|required_if:employment_type,probation" data-msg-required-if="Enter the probation period for an employee on probation." inputmode="numeric" placeholder="e.g. 6"></div>
+                    <div class="col-md-3"><label class="form-label">Probation ends on</label><input class="form-control bg-light" id="probationEndDate" value="{{ $probationEnd?->format('d M Y') ?? '' }}" placeholder="Auto calculated" readonly tabindex="-1" data-v-skip><div class="form-text" id="probationEndHint">Joining date + probation period. HR is emailed when it ends.</div></div>
                     <div class="col-md-3"><label class="form-label">Category</label><select class="form-select" name="employee_category">{!! $opt($options('employee_categories'), $v('employee_category')) !!}</select></div>
+                    <div class="col-md-3"><label class="form-label">Notice period (days)</label><input type="number" class="form-control" name="employment_details[notice_period_days]" id="noticePeriodDays" value="{{ old('employment_details.notice_period_days', data_get($profile,'employment_details.notice_period_days')) }}" min="0" max="180" data-v="integer|between:0,180" inputmode="numeric" placeholder="e.g. 30"><div class="form-text">Used to work out the last working day on resignation.</div></div>
                     <div class="col-md-4"><label class="form-label">Department *</label><select class="form-select" name="department" id="employeeDepartment" required data-searchable data-placeholder="Select department">{!! $opt(array_combine(array_keys($departments), array_keys($departments)), $department, 'Select department') !!}</select></div>
                     <div class="col-md-4"><label class="form-label">Designation *</label><select class="form-select" name="designation" id="employeeDesignation" required data-searchable data-placeholder="Select designation" data-designations='@json($departments)'>{!! $opt($designationChoices, $u('designation'), 'Select designation') !!}</select><div class="form-text">Filtered by the selected department.</div></div>
                     <div class="col-md-2"><label class="form-label">Job grade</label><select class="form-select" name="job_grade">{!! $opt($options('job_grades'), $v('job_grade'), '-') !!}</select></div>
@@ -156,6 +182,13 @@
                             @endforeach
                             <div class="col-md-4"><label class="form-label">UAN (PF)</label><input class="form-control notranslate" name="verification[uan]" value="{{ $ver('uan') }}" data-v="uan" placeholder="12 digits" maxlength="30"></div>
                             <div class="col-md-4"><label class="form-label">ESIC number</label><input class="form-control notranslate" name="verification[esic]" value="{{ $ver('esic') }}" data-v="esic" placeholder="10 or 17 digits" maxlength="30"></div>
+                        </div>
+                    </div></div>
+                    <div class="col-12"><div class="nx-field-group tone-violet">
+                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="megaphone"></i></span><div><strong>Source of hiring</strong><small>How this person found the company. Pick the referring colleague for internal references.</small></div></div>
+                        <div class="row g-3">
+                            <div class="col-md-4"><label class="form-label">Source of hiring</label><select class="form-select" name="verification[source_of_hiring]" id="sourceOfHiring">{!! $opt($options('hiring_sources'), $ver('source_of_hiring')) !!}</select></div>
+                            <div class="col-md-5 d-none" id="referredByWrap"><label class="form-label">Referred by (internal staff) *</label><select class="form-select" name="verification[referred_by_id]" id="referredBy" data-searchable data-placeholder="Select staff member" data-v-optional data-v="required_if:source_of_hiring,internal_staff" data-msg-required-if="Select the staff member who referred this employee.">{!! $opt($managerChoices, $ver('referred_by_id'), 'Select staff member') !!}</select></div>
                         </div>
                     </div></div>
                     @foreach($verifications as $key=>[$label,$icon,$hint,$refKey,$refLabel])
@@ -250,10 +283,16 @@
                         <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="hard-hat"></i></span><div><strong>Safety</strong><small>PPE, training and fitness for field work.</small></div></div>
                         <div class="row g-3">
                             <div class="col-md-3"><label class="form-label">PPE size</label><select class="form-select" name="safety[ppe_size]">{!! $opt($options('ppe_sizes'), old('safety.ppe_size',data_get($profile,'safety.ppe_size'))) !!}</select></div>
-                            @foreach(['safety_training'=>'Safety training','medical_fitness'=>'Medical fitness'] as $key=>$label)
-                            <div class="col-md-3"><label class="form-label">{{ $label }}</label><select class="form-select" name="safety[{{ $key }}]">{!! $opt($options($key), old('safety.'.$key,data_get($profile,'safety.'.$key))) !!}</select></div>
-                            @endforeach
-                            <div class="col-md-3"><label class="form-label">Incident history</label><input class="form-control" name="safety[incident_history]" value="{{ old('safety.incident_history',data_get($profile,'safety.incident_history')) }}" maxlength="255" placeholder="None / brief note"></div>
+                            <div class="col-md-3"><label class="form-label">Safety training</label><select class="form-select" name="safety[safety_training]">{!! $opt($options('safety_training'), old('safety.safety_training',data_get($profile,'safety.safety_training'))) !!}</select></div>
+                            <div class="col-md-6"><label class="form-label">Incident history</label><input class="form-control" name="safety[incident_history]" value="{{ old('safety.incident_history',data_get($profile,'safety.incident_history')) }}" maxlength="255" placeholder="None / brief note"></div>
+                            <div class="col-12"><div class="nx-field-group tone-emerald mb-0">
+                                <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="stethoscope"></i></span><div><strong>Medical fitness details</strong><small>Fitness certificate status, check-up date and how long it stays valid.</small></div></div>
+                                <div class="row g-3">
+                                    <div class="col-md-4"><label class="form-label">Medical fitness status</label><select class="form-select" name="safety[medical_fitness]">{!! $opt($options('medical_fitness'), old('safety.medical_fitness',data_get($profile,'safety.medical_fitness'))) !!}</select></div>
+                                    <div class="col-md-4"><label class="form-label">Check-up date</label><input type="date" class="form-control" name="safety[medical_fitness_date]" value="{{ old('safety.medical_fitness_date',data_get($profile,'safety.medical_fitness_date')) }}" data-v="not_future|required_with:medical_fitness_valid_till"></div>
+                                    <div class="col-md-4"><label class="form-label">Fitness valid till</label><input type="date" class="form-control" name="safety[medical_fitness_valid_till]" value="{{ old('safety.medical_fitness_valid_till',data_get($profile,'safety.medical_fitness_valid_till')) }}" data-v="after_or_equal:medical_fitness_date"></div>
+                                </div>
+                            </div></div>
                         </div>
                     </div></div>
                     <div class="col-md-6"><label class="form-label">Goals / KPI</label><textarea class="form-control" name="performance_career[kpi]" rows="3" maxlength="2000">{{ old('performance_career.kpi',data_get($profile,'performance_career.kpi')) }}</textarea></div>
@@ -275,10 +314,10 @@
                         </div>
                     </div></div>
                     <div class="col-12"><div class="nx-field-group tone-slate">
-                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="door-open"></i></span><div><strong>Separation</strong><small>Fill only when the employee is leaving.</small></div></div>
+                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="door-open"></i></span><div><strong>Separation</strong><small>Fill only when the employee is leaving. The last working day is worked out from the notice period and can be adjusted.</small></div></div>
                         <div class="row g-3">
-                            <div class="col-md-3"><label class="form-label">Resignation date</label><input type="date" class="form-control" name="exit_separation[resignation_date]" value="{{ old('exit_separation.resignation_date',data_get($profile,'exit_separation.resignation_date')) }}" data-v="after_or_equal:date_of_joining"></div>
-                            <div class="col-md-3"><label class="form-label">Last working date</label><input type="date" class="form-control" name="exit_separation[last_working_date]" value="{{ old('exit_separation.last_working_date',data_get($profile,'exit_separation.last_working_date')) }}" data-v="after_or_equal:resignation_date"></div>
+                            <div class="col-md-3"><label class="form-label">Resignation date</label><input type="date" class="form-control" name="exit_separation[resignation_date]" id="resignationDate" value="{{ old('exit_separation.resignation_date',data_get($profile,'exit_separation.resignation_date')) }}" data-v="after_or_equal:date_of_joining"></div>
+                            <div class="col-md-3"><label class="form-label">Last working date</label><input type="date" class="form-control" name="exit_separation[last_working_date]" id="lastWorkingDate" value="{{ old('exit_separation.last_working_date',data_get($profile,'exit_separation.last_working_date')) }}" data-v="after_or_equal:resignation_date"><div class="form-text" id="lastWorkingHint">Resignation date + notice period.</div></div>
                             <div class="col-md-6"><label class="form-label">Exit reason / clearance</label><textarea class="form-control" name="exit_separation[notes]" rows="2" maxlength="2000">{{ old('exit_separation.notes',data_get($profile,'exit_separation.notes')) }}</textarea></div>
                         </div>
                     </div></div>
@@ -301,7 +340,7 @@
         const form=document.getElementById('employeeWizard'),steps=[...document.querySelectorAll('.nx-step')],panes=[...document.querySelectorAll('.nx-step-pane')],back=document.getElementById('employeeBack'),next=document.getElementById('employeeNext'),submit=document.getElementById('employeeSubmit'),progress=document.getElementById('employeeProgress');
         let current=0;
         const errorNames=@json(array_keys($errors->toArray()));
-        const map={first_name:0,middle_name:0,last_name:0,local_script_name:0,languages:0,preferred_language:0,salutation:0,gender:0,date_of_birth:0,marital_status:0,anniversary_date:0,blood_group:0,nationality:0,religion:0,profile_picture:0,work_email:1,personal_email:1,phone:1,current_address:1,permanent_address:1,company_accommodation_address:1,emergency_family:1,employee_code:2,department:2,designation:2,role:2,premises:2,user_status:2,date_of_joining:2,employment_type:2,employee_category:2,job_grade:2,reporting_manager_id:2,functional_manager_id:2,hr_manager_id:2,identity_documents:3,verification:3,documents:3,salary_currency:4,pay_frequency:4,pay_group:4,basic_salary:4,hra:4,transport_allowance:4,fuel_allowance:4,other_allowance:4,gross_monthly_salary:4,bank_details:4,benefits_allowances:5,engagement_wellbeing:5,remarks:5,education_skills:6,safety:6,performance_career:6,assets_access:7,exit_separation:7};
+        const map={first_name:0,middle_name:0,last_name:0,local_script_name:0,languages:0,preferred_language:0,salutation:0,gender:0,date_of_birth:0,marital_status:0,anniversary_date:0,blood_group:0,nationality:0,religion:0,profile_picture:0,work_email:1,personal_email:1,phone:1,current_address:1,permanent_address:1,company_accommodation_address:1,emergency_family:1,employee_code:2,department:2,designation:2,role:2,premises:2,user_status:2,date_of_joining:2,employment_type:2,probation_months:2,employment_details:2,employee_category:2,job_grade:2,reporting_manager_id:2,functional_manager_id:2,hr_manager_id:2,identity_documents:3,verification:3,documents:3,salary_currency:4,pay_frequency:4,pay_group:4,basic_salary:4,hra:4,transport_allowance:4,fuel_allowance:4,other_allowance:4,gross_monthly_salary:4,bank_details:4,benefits_allowances:5,engagement_wellbeing:5,remarks:5,education_skills:6,safety:6,performance_career:6,assets_access:7,exit_separation:7};
         if(errorNames.length){current=Math.min(...errorNames.map(x=>map[x.split('.')[0]]??0));errorNames.forEach(name=>{const el=form.querySelector(`[name="${name}"]`)||form.querySelector(`[name^="${name.split('.')[0]}["]`);el?.classList.add('is-invalid')});errorNames.forEach(name=>steps[map[name.split('.')[0]]??0]?.classList.add('error'))}
         function show(i){current=Math.max(0,Math.min(i,panes.length-1));panes.forEach((p,x)=>p.classList.toggle('active',x===current));steps.forEach((s,x)=>{s.classList.toggle('active',x===current);if(x<current&&!s.classList.contains('error'))s.classList.add('done');if(x>=current)s.classList.remove('done')});back.disabled=current===0;next.classList.toggle('d-none',current===panes.length-1);submit.classList.toggle('d-none',current!==panes.length-1);if(progress)progress.style.width=((current+1)/panes.length*100)+'%';window.scrollTo({top:0,behavior:'smooth'})}
         steps.forEach((s,i)=>s.onclick=()=>show(i));
@@ -332,6 +371,29 @@
 
         // Copy current address into permanent address
         document.getElementById('copyCurrentAddress')?.addEventListener('click',()=>{['line1','city','pin'].forEach(part=>{const from=form.querySelector(`[name="current_address[${part}]"]`),to=form.querySelector(`[name="permanent_address[${part}]"]`);if(from&&to)to.value=from.value});const state=form.querySelector('[name="current_address[state]"]'),district=form.querySelector('[name="current_address[district]"]'),toState=form.querySelector('[name="permanent_address[state]"]'),toDistrict=form.querySelector('[name="permanent_address[district]"]');if(state&&toState&&state.value){if(![...toState.options].some(o=>o.value===state.value))toState.add(new Option(state.value,state.value));toState.value=state.value;toState.dispatchEvent(new Event('change',{bubbles:true}));window.setTimeout(()=>{if(district?.value&&toDistrict){if(![...toDistrict.options].some(o=>o.value===district.value))toDistrict.add(new Option(district.value,district.value));toDistrict.value=district.value;toDistrict.dispatchEvent(new Event('change',{bubbles:true}))}},400)}});
+
+        // Dependents: one row per dependent
+        const dependentsCount=document.getElementById('dependentsCount'),dependentRows=document.getElementById('dependentRows'),dependentsHint=document.getElementById('dependentsHint'),genders=JSON.parse(dependentRows.dataset.genders||'{}');
+        function dependentRow(i){const row=document.createElement('div');row.className='row g-2 align-items-end mb-2';row.dataset.dependentRow='';row.innerHTML=`<div class="col-md-5"><label class="form-label small mb-1">Name</label><input class="form-control" name="emergency_family[dependents][${i}][name]" data-v="person_name|required_with:gender,age" maxlength="120"></div><div class="col-md-4"><label class="form-label small mb-1">Gender</label><select class="form-select" name="emergency_family[dependents][${i}][gender]"><option value="">Select</option>${Object.entries(genders).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div><div class="col-md-3"><label class="form-label small mb-1">Age</label><input type="number" class="form-control" name="emergency_family[dependents][${i}][age]" min="0" max="120" data-v="integer|between:0,120" inputmode="numeric"></div>`;return row}
+        function syncDependents(){const wanted=Math.max(0,Math.min(20,parseInt(dependentsCount.value,10)||0));const rows=[...dependentRows.querySelectorAll('[data-dependent-row]')];rows.slice(wanted).forEach(r=>r.remove());for(let i=rows.length;i<wanted;i++)dependentRows.appendChild(dependentRow(i));dependentsHint.classList.toggle('d-none',wanted>0)}
+        dependentsCount.addEventListener('input',syncDependents);syncDependents();
+
+        // Joining date + probation period -> probation end date
+        const joining=document.getElementById('dateOfJoining'),employmentType=document.getElementById('employmentType'),probationMonths=document.getElementById('probationMonths'),probationEnd=document.getElementById('probationEndDate'),probationHint=document.getElementById('probationEndHint');
+        function addMonths(date,months){const d=new Date(date.getTime());const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+months);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return d}
+        function syncProbation(){const months=parseInt(probationMonths.value,10);const onProbation=employmentType.value==='probation';probationMonths.closest('.col-md-3').querySelector('label').textContent=onProbation?'Probation period (months) *':'Probation period (months)';if(joining.value&&months>0){const end=addMonths(new Date(joining.value+'T00:00:00'),months);probationEnd.value=end.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});const days=Math.ceil((end-new Date(new Date().toDateString()))/86400000);probationHint.textContent=days<0?`Ended ${-days} day${-days===1?'':'s'} ago - HR review due.`:(days===0?'Ends today.':`${days} day${days===1?'':'s'} to go. HR is emailed when it ends.`)}else{probationEnd.value='';probationHint.textContent='Joining date + probation period. HR is emailed when it ends.'}}
+        [joining,employmentType,probationMonths].forEach(el=>el.addEventListener('input',syncProbation));employmentType.addEventListener('change',syncProbation);syncProbation();
+
+        // Source of hiring -> referring staff member
+        const source=document.getElementById('sourceOfHiring'),referredWrap=document.getElementById('referredByWrap'),referred=document.getElementById('referredBy');
+        function syncSource(){const internal=source.value==='internal_staff';referredWrap.classList.toggle('d-none',!internal);referred.disabled=!internal;if(!internal){referred.value='';referred.classList.remove('is-invalid')}}
+        source.addEventListener('change',syncSource);syncSource();
+
+        // Resignation date + notice period -> last working date
+        const resignation=document.getElementById('resignationDate'),lastWorking=document.getElementById('lastWorkingDate'),notice=document.getElementById('noticePeriodDays'),lastWorkingHint=document.getElementById('lastWorkingHint');
+        let autoLastWorking=lastWorking.value===''||lastWorking.dataset.auto==='1';
+        function syncLastWorking(){const days=parseInt(notice.value,10);if(!resignation.value){lastWorkingHint.textContent='Resignation date + notice period.';return}if(!(days>=0)){lastWorkingHint.textContent='Set the notice period in the Employment step to auto-fill this date.';return}const end=new Date(resignation.value+'T00:00:00');end.setDate(end.getDate()+days);const iso=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`;if(autoLastWorking){lastWorking.value=iso;lastWorking.dataset.auto='1'}lastWorkingHint.textContent=`${days}-day notice from ${new Date(resignation.value+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})} ends ${end.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}.`}
+        resignation.addEventListener('input',()=>{autoLastWorking=true;syncLastWorking()});notice.addEventListener('input',syncLastWorking);lastWorking.addEventListener('input',()=>{autoLastWorking=lastWorking.value==='';delete lastWorking.dataset.auto});syncLastWorking();
 
         // Salary component total helper
         const components=[...document.querySelectorAll('.salary-component')],total=document.getElementById('componentTotal'),gross=document.getElementById('grossMonthly');

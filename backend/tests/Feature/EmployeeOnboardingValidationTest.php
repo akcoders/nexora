@@ -25,6 +25,8 @@ class EmployeeOnboardingValidationTest extends TestCase
     {
         return array_replace_recursive([
             'first_name' => 'Neha', 'last_name' => 'Patil', 'work_email' => 'neha.patil@classic.test', 'phone' => '9876500011',
+            'personal_email' => 'neha.home@example.test',
+            'emergency_family' => ['emergency_name' => 'Ravi Patil', 'relation' => 'Father', 'mobile' => '9876500022', 'dependents_count' => 0],
             'department' => 'HR', 'designation' => 'HR Executive', 'role' => 'Manager', 'user_status' => 'active',
             'premises' => [Premises::firstOrFail()->id], 'salary_currency' => 'INR', 'pay_frequency' => 'monthly',
         ], $overrides);
@@ -38,7 +40,7 @@ class EmployeeOnboardingValidationTest extends TestCase
             'department' => 'Space Program',
             'identity_documents' => ['aadhaar' => '234567890123', 'pan' => 'ABCDE1234F', 'voter_id' => 'AB12'],
             'current_address' => ['pin' => '012345'],
-            'emergency_family' => ['emergency_name' => 'Ravi Patil', 'mobile' => '12345'],
+            'emergency_family' => ['emergency_name' => 'Ravi Patil', 'relation' => '', 'mobile' => '12345'],
             'bank_details' => ['account_number' => '123456789012'],
             'verification' => ['uan' => '1234', 'police_verification' => 'verified'],
             'basic_salary' => 30000,

@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
     Route::resource('employees', EmployeeController::class)->except(['destroy']);
+    Route::post('/employees/{employee}/confirm-probation', [EmployeeController::class, 'confirmProbation'])->name('employees.confirm-probation');
     Route::resource('companies', CompanyController::class)->except(['show', 'destroy']);
     Route::get('/roles-permissions', [RolePermissionController::class, 'index'])->name('roles.index');
     Route::post('/roles-permissions', [RolePermissionController::class, 'store'])->name('roles.store');
