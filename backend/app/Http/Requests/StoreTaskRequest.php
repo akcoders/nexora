@@ -28,6 +28,14 @@ class StoreTaskRequest extends FormRequest
         } elseif ($this->routeIs('workflows.store')) {
             $this->merge(['task_type' => Task::TYPE_WORKFLOW]);
         }
+        if ($this->input('task_type') === Task::TYPE_WORKFLOW) {
+            $this->merge(['category' => 'Internal']);
+        }
+    }
+
+    public function messages(): array
+    {
+        return ['due_at.after_or_equal' => 'Choose today or a later due date.'];
     }
 
     public function rules(): array
@@ -43,9 +51,9 @@ class StoreTaskRequest extends FormRequest
             ],
             'category' => ['nullable', 'string', 'max:60'],
             'priority' => ['required', Rule::in(Task::PRIORITIES)],
-            'due_at' => ['nullable', 'date'],
+            'due_at' => ['nullable', 'date', 'after_or_equal:today'],
             'assigned_to' => ['required', Rule::exists('users', 'id')->where('status', 'active')],
-            'observers' => ['nullable', 'array'],
+            'observers' => [Rule::excludeIf($this->route('task') instanceof Task), 'nullable', 'array'],
             'observers.*' => ['integer', 'distinct', Rule::exists('users', 'id')->where('status', 'active')],
             'attachment_required_on_completion' => ['sometimes', 'boolean'],
             'parent_task_id' => ['prohibited'],

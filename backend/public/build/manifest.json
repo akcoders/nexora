@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DER0JfCL.css",
+    "file": "assets/app-Bv-pzz24.css",
     "name": "app",
     "names": [
       "app.css"
@@ -9,7 +9,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-xLD67duw.js",
+    "file": "assets/app-DDi5MmmA.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -19,7 +19,7 @@
     ]
   },
   "resources/js/kanban-board.js": {
-    "file": "assets/kanban-board-DPA_BDTW.js",
+    "file": "assets/kanban-board-CqwiiHjV.js",
     "name": "kanban-board",
     "src": "resources/js/kanban-board.js",
     "isEntry": true

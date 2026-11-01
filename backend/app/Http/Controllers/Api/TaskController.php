@@ -25,7 +25,7 @@ class TaskController extends Controller
         ]);
 
         $tasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')
-            ->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee', 'parent:id,task_no,title'])
+            ->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee', 'parent:id,task_no,title', 'observers.user:id,name'])
             ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
             ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->when(($filters['scope'] ?? null) === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
@@ -44,7 +44,7 @@ class TaskController extends Controller
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
 
         return response()->json([
-            'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'parent', 'subtasks.assignee']),
+            'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'parent', 'subtasks.assignee', 'observers.user:id,name']),
             'assignees' => User::where('status', 'active')->orderBy('name')->get(['id', 'name', 'employee_code', 'designation']),
         ]);
     }

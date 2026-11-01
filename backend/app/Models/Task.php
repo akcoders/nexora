@@ -102,7 +102,7 @@ class Task extends Model
     /** Relations, counts and the viewer's watch flag needed to render a Kanban card. */
     public function scopeWithBoardData(Builder $query, User $viewer): void
     {
-        $query->with(['customer', 'assignee', 'latestAction.user', 'parent:id,task_no,title'])
+        $query->with(['customer', 'assignee', 'latestAction.user', 'parent:id,task_no,title', 'observers.user:id,name'])
             ->withCount(['actions', 'observers', 'subtasks', 'subtasks as completed_subtasks_count' => fn (Builder $query) => $query->closed()])
             ->withExists(['observers as watched_by_viewer' => fn (Builder $query) => $query->where('user_id', $viewer->id)]);
     }

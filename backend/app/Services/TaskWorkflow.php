@@ -26,8 +26,11 @@ class TaskWorkflow
                 abort_unless($parent->task_type === Task::TYPE_WORKFLOW, 422, 'Subtasks belong to internal workflows only.');
                 abort_if($parent->isClosed(), 422, 'Reopen the workflow before creating a subtask.');
             }
-            $observers = $data['observers'] ?? [];
+            $observers = $parent ? $parent->observers()->pluck('user_id')->all() : ($data['observers'] ?? []);
             unset($data['observers'], $data['return_to']);
+            if ($data['task_type'] === Task::TYPE_WORKFLOW) {
+                $data['category'] = 'Internal';
+            }
             $prefix = $data['task_type'] === Task::TYPE_TICKET ? 'TKT' : 'WFL';
             $task = Task::create(array_merge($data, [
                 'task_no' => $prefix.Str::ulid(),
@@ -42,22 +45,22 @@ class TaskWorkflow
             }
             if ($parent) {
                 foreach ($this->participantIds($parent) as $participant) {
-                    $task->members()->firstOrCreate(['user_id' => $participant, 'role' => 'observer']);
+                    if (! in_array($participant, $observers)) {
+                        $task->members()->firstOrCreate(['user_id' => $participant, 'role' => 'participant']);
+                    }
                 }
                 $ancestor = $parent;
                 while ($ancestor) {
                     $ancestor->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'assignee']);
                     $this->assign($ancestor, $task->assigned_to);
-                    $ancestor->actions()->create([
-                        'user_id' => $by->id, 'assigned_to' => $task->assigned_to, 'action' => 'assign',
-                        'related_task_id' => $task->id, 'remark' => 'Workflow assigned to the owner of subtask '.$task->task_no.'.',
-                    ]);
                     $ancestor = $ancestor->parent;
                 }
             }
             $task->recordAction([
                 'user_id' => $by->id, 'assigned_to' => $task->assigned_to, 'action' => 'created',
-                'remark' => $parent ? 'Subtask created and assigned under '.$parent->task_no.'.' : 'Task created and assigned.',
+                'remark' => $parent
+                    ? 'Parent: '.$parent->task_no.'. Responsible Person: '.$task->assignee->name.'. Priority: '.str($task->priority)->headline().'. Due: '.($task->due_at?->format('d M Y, h:i A') ?? 'Not set').'. Observers inherited: '.count($observers).'.'
+                    : 'Task created and assigned.',
             ]);
 
             return $task;
@@ -78,8 +81,9 @@ class TaskWorkflow
         $reassigning = $data['action'] === 'assign' || ($updating && ($data['reassign'] ?? false));
         $status = $updating ? $data['status'] : ($data['action'] === 'close' ? Task::STATUS_CLOSED : 'pending');
         $action = $status === Task::STATUS_CLOSED ? 'close' : ($reassigning ? 'assign' : 'update');
+        $returnedParents = [];
         try {
-            DB::transaction(function () use ($task, $data, $by, $allowReopen, $action, $status, &$stored): void {
+            DB::transaction(function () use ($task, $data, $by, $allowReopen, $action, $status, &$stored, &$returnedParents): void {
                 $task = Task::lockForUpdate()->findOrFail($task->id);
                 abort_if($task->isClosed() && (! $allowReopen || $action !== 'assign'), 422, 'This task is already closed.');
                 if ($action === 'assign' && $task->isClosed() && $task->parent?->isClosed()) {
@@ -117,6 +121,9 @@ class TaskWorkflow
                 }
                 if ($action === 'close') {
                     $task->update(['status' => Task::STATUS_CLOSED, 'closed_at' => now()]);
+                    if ($task->parent_task_id) {
+                        $returnedParents = $this->returnToCreator($task, $by);
+                    }
                 } else {
                     $task->update(['status' => $status, 'closed_at' => null]);
                     if ($status !== $previousStatus) {
@@ -147,7 +154,40 @@ class TaskWorkflow
                     'type' => $task->task_type.'_task', 'task_id' => $task->parent_task_id ?? $task->id,
                 ]);
             }
+            foreach (Task::whereIn('id', $returnedParents)->get() as $parent) {
+                $this->notifyAssigned($parent, 'Workflow returned to you');
+            }
         }
+    }
+
+    /** @return list<int> */
+    private function returnToCreator(Task $task, User $by): array
+    {
+        $task->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'previous_assignee']);
+        $task->members()->firstOrCreate(['user_id' => $task->created_by, 'role' => 'assignee']);
+        $task->update(['assigned_to' => $task->created_by]);
+        $returnedParents = [];
+        $parentId = $task->parent_task_id;
+        while ($parentId) {
+            $parent = Task::lockForUpdate()->find($parentId);
+            if (! $parent) {
+                break;
+            }
+            if (! $parent->isClosed()) {
+                $previousOwner = $parent->assigned_to;
+                $this->assign($parent, $task->created_by);
+                if ($previousOwner !== $task->created_by) {
+                    $returnedParents[] = $parent->id;
+                }
+            }
+            $parentId = $parent->parent_task_id;
+        }
+        $task->recordAction([
+            'user_id' => $by->id, 'action' => 'returned', 'assigned_to' => $task->created_by,
+            'remark' => 'Subtask completed. Ownership returned to '.$task->creator->name.', who created the subtask.',
+        ]);
+
+        return $returnedParents;
     }
 
     public function changeDueDate(Task $task, ?string $dueAt, string $reason, User $by): void
@@ -184,9 +224,9 @@ class TaskWorkflow
         return array_unique(array_merge([$task->created_by, $task->assigned_to], $task->members()->pluck('user_id')->all()));
     }
 
-    private function notifyAssigned(Task $task): void
+    private function notifyAssigned(Task $task, ?string $title = null): void
     {
-        $task->assignee->notify(new TaskAssignedNotification($task));
-        $this->oneSignal->sendToUser($task->assignee, 'New '.($task->task_type === Task::TYPE_TICKET ? 'complaint' : 'workflow').' assigned', $task->title, ['type' => $task->task_type.'_task', 'task_id' => $task->id]);
+        $task->assignee->notify(new TaskAssignedNotification($task, $title));
+        $this->oneSignal->sendToUser($task->assignee, $title ?? 'New '.($task->task_type === Task::TYPE_TICKET ? 'complaint' : 'workflow').' assigned', $task->title, ['type' => $task->task_type.'_task', 'task_id' => $task->id]);
     }
 }

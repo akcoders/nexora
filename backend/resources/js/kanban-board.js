@@ -126,7 +126,7 @@ function init(root) {
         const query = state.search.trim().toLowerCase();
         if (!query) return true;
 
-        return [task.task_no, task.title, task.customer, task.category, task.assignee?.name]
+        return [task.task_no, task.title, task.customer, task.assignee?.name]
             .some((value) => String(value ?? '').toLowerCase().includes(query));
     }
 
@@ -150,7 +150,7 @@ function init(root) {
         state.extraLanes.forEach((id) => ownerIds.add(id));
         const owners = [...ownerIds].map((id) => {
             const user = state.users.find((u) => u.id === id) ?? visible.find((task) => task.assignee?.id === id)?.assignee ?? { id, name: 'Unknown user' };
-            return { key: `owner:${id}`, userId: id, title: id === state.me ? `${user.name} (you)` : user.name, subtitle: user.designation || 'Current owner', avatar: user.name, tone: id === state.me ? '#7c3aed' : '#2563eb' };
+            return { key: `owner:${id}`, userId: id, title: id === state.me ? `${user.name} (you)` : user.name, subtitle: user.designation || 'Responsible Person', avatar: user.name, tone: id === state.me ? '#7c3aed' : '#2563eb' };
         }).sort((a, b) => (b.userId === state.me) - (a.userId === state.me) || a.title.localeCompare(b.title));
 
         return [...owners, closedLane];
@@ -209,6 +209,7 @@ function init(root) {
         const latest = task.latest && task.latest.action !== 'created'
             ? `<div class="nx-kc-latest" title="${esc(task.latest.remark)}"><i data-lucide="message-square-text"></i><span><strong>${esc(task.latest.by)}</strong> ${esc(task.latest.remark)}</span></div>`
             : '';
+        const observers = (task.observers || []).slice(0, 4).map(person => `<span class="nx-person-avatar" style="--person-size:24px;--person-hue:${(person.id * 47) % 360}" tabindex="0" role="img" title="${esc(person.name)} · Observer" aria-label="${esc(person.name)} · Observer"><span aria-hidden="true">${esc(initials(person.name))}</span><span class="nx-person-tooltip" role="tooltip">${esc(person.name)}</span></span>`).join('');
         const avatar = state.mode !== 'owner' || task.status === 'closed'
             ? `<span class="nx-kc-avatar" title="Owner: ${esc(task.assignee?.name ?? 'Unassigned')}">${esc(initials(task.assignee?.name))}</span>`
             : '';
@@ -224,11 +225,12 @@ function init(root) {
                 </div>
             </div>
             <a class="nx-kc-title" href="${esc(task.url)}">${esc(task.title)}</a>
-            <div class="nx-kc-meta"><i data-lucide="${isTicket ? 'building-2' : 'git-branch'}"></i><span>${esc(task.customer ?? 'Internal operation')} · ${esc(task.category || 'General')}</span></div>
+            <div class="nx-kc-meta"><i data-lucide="${isTicket ? 'building-2' : 'git-branch'}"></i><span>${esc(task.customer ?? 'Internal workflow')}</span></div>
             ${task.parent ? `<a class="nx-parent-link small" href="${esc(task.parent.url)}"><i data-lucide="corner-down-right" style="width:14px"></i> ${esc(task.parent.task_no)}</a>` : ''}
             ${task.subtasks_count ? `<div class="small text-secondary">${task.completed_subtasks_count}/${task.subtasks_count} subtasks completed</div>` : ''}
             ${task.attachment_required_on_completion ? '<div class="small text-secondary"><i data-lucide="paperclip" style="width:13px"></i> Completion attachment required</div>' : ''}
             ${latest}
+            ${observers ? `<div class="nx-kc-observers"><span>Observers</span><div class="nx-avatar-stack">${observers}${task.observers_count > 4 ? `<span class="nx-avatar-more" title="${esc((task.observers || []).slice(4).map(person => person.name).join(', '))}">+${task.observers_count - 4}</span>` : ''}</div></div>` : ''}
             <div class="nx-kc-foot">
                 ${due}
                 <span class="nx-kc-count" title="Timeline entries"><i data-lucide="history"></i>${task.actions_count}</span>
@@ -421,6 +423,7 @@ function init(root) {
         if (result.isConfirmed && result.value?.task) {
             if (intent.kind === 'assign' && state.mode === 'owner') state.extraLanes.delete(result.value.task.assignee?.id);
             upsert(result.value.task);
+            if (intent.kind === 'close' && task.parent) await load({ quiet: true });
             toast.fire({ icon: 'success', title: result.value.message });
         }
     }

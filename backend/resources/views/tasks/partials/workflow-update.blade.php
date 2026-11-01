@@ -1,6 +1,6 @@
-<aside class="nx-card p-4" id="workflowUpdateCard">
+<aside class="nx-card nx-update-card p-4" id="workflowUpdateCard">
     <h3 class="h6 fw-bold mb-3">Task update</h3>
-    <div class="d-flex align-items-center gap-3 mb-2"><span class="nx-avatar">{{ strtoupper(substr($task->assignee->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $task->assignee->name }}</div><small class="text-secondary">Current owner</small></div></div>
+    <div class="d-flex align-items-center gap-3 mb-2"><x-person-avatar :user="$task->assignee" :size="42" detail="Responsible Person" /><div><div class="fw-semibold">{{ $task->assignee->name }}</div><small class="text-secondary">Responsible Person</small></div></div>
     <p class="small text-secondary mb-4">Last updated {{ $task->updated_at->format('d M Y, h:i A') }}</p>
 
     @if(!$task->isClosed() && auth()->user()->can('act', $task))
@@ -13,11 +13,11 @@
             <div class="mb-3"><label class="form-label" for="workflowStatus">Status *</label><select class="form-select" name="status" id="workflowStatus" required><option value="pending" @selected(old('status', $task->status) === 'pending')>Active</option><option value="in_progress" @selected(old('status', $task->status) === 'in_progress')>In progress</option><option value="closed" @selected(old('status') === 'closed')>Completed</option></select></div>
 
             <div class="mb-3"><label class="form-label" for="workflowReassign">Assign to someone else?</label><select class="form-select" name="reassign" id="workflowReassign"><option value="0" @selected(!old('reassign'))>No — keep current owner</option><option value="1" @selected(old('reassign') == '1')>Yes</option></select></div>
-            <fieldset id="workflowAssigneeFields" class="mb-3" @disabled(!old('reassign')) @if(!old('reassign')) hidden @endif><label class="form-label" for="workflowNextAssignee">Next assignee *</label><select class="form-select" name="assigned_to" id="workflowNextAssignee" required><option value="">Select user</option>@foreach($users as $user)@if($user->id !== $task->assigned_to)<option value="{{ $user->id }}" @selected(old('assigned_to') == $user->id)>{{ $user->name }}</option>@endif @endforeach</select></fieldset>
+            <fieldset id="workflowAssigneeFields" class="mb-3" @disabled(!old('reassign')) @if(!old('reassign')) hidden @endif><label class="form-label" for="workflowNextAssignee">Responsible Person *</label><select class="form-select" name="assigned_to" id="workflowNextAssignee" required><option value="">Select user</option>@foreach($users as $user)@if($user->id !== $task->assigned_to)<option value="{{ $user->id }}" @selected(old('assigned_to') == $user->id)>{{ $user->name }}</option>@endif @endforeach</select></fieldset>
 
             <div class="mb-3"><label class="form-label" for="workflowChangeDueDate">Change due date?</label><select class="form-select" name="change_due_date" id="workflowChangeDueDate"><option value="0" @selected(!old('change_due_date'))>No — keep {{ $task->due_at?->format('d M Y, h:i A') ?? 'no due date' }}</option><option value="1" @selected(old('change_due_date') == '1')>Yes</option></select></div>
             <fieldset id="workflowDueDateFields" class="mb-3" @disabled(!old('change_due_date')) @if(!old('change_due_date')) hidden @endif>
-                <div class="mb-3"><label class="form-label" for="workflowDueDate">New due date & time</label><input class="form-control" type="datetime-local" id="workflowDueDate" name="due_at" value="{{ old('due_at', $task->due_at?->format('Y-m-d\TH:i')) }}"><div class="form-text">Leave blank to remove the due date.</div></div>
+                <div class="mb-3"><x-date-time-picker :value="old('due_at', $task->due_at)" id="workflowDueDate" label="New due date & time" /><div class="form-text">Clear the date to remove the deadline.</div></div>
                 <label class="form-label" for="workflowDueDateReason">Reason for changing the due date *</label><textarea class="form-control" id="workflowDueDateReason" name="reason" rows="2" required maxlength="3000">{{ old('reason') }}</textarea>
             </fieldset>
 
@@ -29,7 +29,7 @@
         <p class="small text-secondary">{{ $task->isClosed() ? 'This workflow is completed.' : 'Only the owner or an authorised user can update this workflow.' }}</p>
     @endif
 
-    @if($task->members->isNotEmpty())<div class="small text-secondary mt-4 mb-2">Observers & previous owners</div>@foreach($task->members as $member)<div class="small border-top py-2">{{ $member->user?->name }} · {{ str($member->role)->headline() }}</div>@endforeach @endif
+    @include('tasks.partials.participants')
 </aside>
 
 @push('scripts')

@@ -10,7 +10,7 @@ class TaskAssignedNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public Task $task) {}
+    public function __construct(public Task $task, public ?string $title = null) {}
 
     public function via(object $notifiable): array
     {
@@ -20,7 +20,7 @@ class TaskAssignedNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            'title' => 'New task assigned',
+            'title' => $this->title ?? 'New task assigned',
             'message' => $this->task->title,
             'task_id' => $this->task->id,
             'task_no' => $this->task->task_no,

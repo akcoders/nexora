@@ -352,7 +352,7 @@ class _ServiceJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.zero,
       onTap: () async {
         await Navigator.push<void>(
           context,
@@ -531,7 +531,7 @@ class _TaskCard extends StatelessWidget {
       color: task['parent_task_id'] != null ? const Color(0xFFFAF5FF) : null,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.zero,
         onTap: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
@@ -650,6 +650,27 @@ class _TaskCard extends StatelessWidget {
                   ),
                 ),
               ],
+              if (List<dynamic>.from(task['observers'] ?? []).isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Observers',
+                        style: TextStyle(color: AppColors.muted, fontSize: 12),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ObserverAvatars(
+                          people: List<dynamic>.from(task['observers'])
+                              .map((member) => member['user'])
+                              .whereType<Map>()
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const Divider(height: 28),
               Row(
                 children: [
@@ -797,12 +818,16 @@ class _TaskDetailsState extends State<_TaskDetails> {
   }
 
   Future<void> changeDueDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final previous = DateTime.tryParse(
+      task?['due_at']?.toString() ?? '',
+    )?.toLocal();
     final date = await showDatePicker(
       context: context,
-      initialDate:
-          DateTime.tryParse(task?['due_at']?.toString() ?? '')?.toLocal() ??
-          DateTime.now(),
-      firstDate: DateTime(2020),
+      initialDate: previous == null || previous.isBefore(today)
+          ? today
+          : previous,
+      firstDate: today,
       lastDate: DateTime(2100),
     );
     if (date == null || !mounted) return;
@@ -905,6 +930,9 @@ class _TaskDetailsState extends State<_TaskDetails> {
     String description = '';
     int? owner;
     bool evidenceRequired = false;
+    final inheritedObservers = List<dynamic>.from(
+      task?['observers'] ?? [],
+    ).map((member) => member['user']).whereType<Map>().toList();
     String? validation;
     bool saving = false;
     final created = await showDialog<bool>(
@@ -938,7 +966,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   decoration: const InputDecoration(
-                    labelText: 'Subtask owner *',
+                    labelText: 'Responsible Person *',
                   ),
                   isExpanded: true,
                   items: assignees
@@ -956,14 +984,30 @@ class _TaskDetailsState extends State<_TaskDetails> {
                       ? null
                       : (value) => update(() => owner = value),
                 ),
-                CheckboxListTile(
+                const SizedBox(height: 12),
+                const T(
+                  'Observers inherited from parent',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (inheritedObservers.isNotEmpty)
+                  _ObserverAvatars(people: inheritedObservers)
+                else
+                  const T(
+                    'No observers on the parent workflow.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const T('Attachment required when complete'),
                   value: evidenceRequired,
                   onChanged: saving
                       ? null
-                      : (value) =>
-                            update(() => evidenceRequired = value ?? false),
+                      : (value) => update(() => evidenceRequired = value),
                 ),
                 if (validation != null)
                   Text(
@@ -1035,10 +1079,13 @@ class _TaskDetailsState extends State<_TaskDetails> {
   }
 
   Future<void> pickUpdateDueDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
     final date = await showDatePicker(
       context: context,
-      initialDate: updateDueAt ?? DateTime.now(),
-      firstDate: DateTime(2020),
+      initialDate: updateDueAt == null || updateDueAt!.isBefore(today)
+          ? today
+          : updateDueAt!,
+      firstDate: today,
       lastDate: DateTime(2100),
     );
     if (date == null || !mounted) return;
@@ -1073,7 +1120,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
       return;
     }
     if (assigning && assignedTo == null) {
-      setState(() => error = 'Select the next assignee.');
+      setState(() => error = 'Select the Responsible Person.');
       return;
     }
 
@@ -1231,7 +1278,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
                   value: task?['customer']?['name']?.toString() ?? 'Internal',
                 ),
                 _DetailRow(
-                  label: 'Assignee',
+                  label: 'Responsible Person',
                   value: task?['assignee']?['name']?.toString() ?? '—',
                 ),
                 _DetailRow(
@@ -1257,6 +1304,29 @@ class _TaskDetailsState extends State<_TaskDetails> {
             ),
           ),
         ),
+        if (List<dynamic>.from(task?['observers'] ?? []).isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const T(
+                  'Observers',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _ObserverAvatars(
+                  people: List<dynamic>.from(
+                    task?['observers'],
+                  ).map((member) => member['user']).whereType<Map>().toList(),
+                ),
+              ],
+            ),
+          ),
         if (task?['parent'] != null)
           TextButton.icon(
             onPressed: () => openRelated(task!['parent']['id'] as int),
@@ -1401,7 +1471,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
                     DropdownButtonFormField<int>(
                       initialValue: assignedTo,
                       decoration: const InputDecoration(
-                        labelText: 'Next assignee *',
+                        labelText: 'Responsible Person *',
                       ),
                       items: assignees
                           .where((item) => item['id'] != task?['assigned_to'])
@@ -1538,7 +1608,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: T(
-                'You can view this workflow as an observer. Only the current assignee can take action.',
+                'You can view this workflow as an observer. Only the Responsible Person can take action.',
                 style: TextStyle(color: AppColors.muted),
               ),
             ),
@@ -1553,72 +1623,167 @@ class _TaskDetailsState extends State<_TaskDetails> {
         if (actions.isEmpty)
           const T('No activity yet.', style: TextStyle(color: AppColors.muted))
         else
-          ...actions.map((item) => _ActionTile(action: item)),
+          ...actions.map(
+            (item) => _ActionTile(
+              action: item,
+              isSubtask: task?['parent_task_id'] != null,
+            ),
+          ),
       ],
     );
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.action});
+class _ObserverAvatars extends StatelessWidget {
+  const _ObserverAvatars({required this.people});
+  final List<dynamic> people;
 
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 5,
+    runSpacing: 6,
+    children: [
+      for (final person in people)
+        Tooltip(
+          message: person['name']?.toString() ?? 'Observer',
+          child: CircleAvatar(
+            radius: 15,
+            backgroundColor: HSVColor.fromAHSV(
+              1,
+              ((person['id'] as num? ?? 0).toDouble() * 47) % 360,
+              .12,
+              .96,
+            ).toColor(),
+            foregroundColor: AppColors.primary,
+            child: Text(
+              (person['name']?.toString() ?? '?')
+                  .trim()
+                  .split(RegExp(r'\s+'))
+                  .where((part) => part.isNotEmpty)
+                  .take(2)
+                  .map((part) => part[0])
+                  .join()
+                  .toUpperCase(),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+class _ActionTile extends StatefulWidget {
+  const _ActionTile({required this.action, this.isSubtask = false});
   final dynamic action;
+  final bool isSubtask;
+
+  @override
+  State<_ActionTile> createState() => _ActionTileState();
+}
+
+class _ActionTileState extends State<_ActionTile> {
+  bool expanded = false;
 
   @override
   Widget build(BuildContext context) {
+    final action = widget.action;
     final created = DateTime.tryParse(action['created_at']?.toString() ?? '');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
+    final remark = action['remark']?.toString() ?? '';
+    final subtaskCreated =
+        action['action'] == 'created' &&
+        (widget.isSubtask || action['related_task_id'] != null);
+    final title = subtaskCreated
+        ? 'Subtask created and assigned'
+        : switch (action['action']) {
+            'created' => 'Created',
+            'assign' => 'Assigned',
+            'close' => 'Completed',
+            'returned' => 'Returned to creator',
+            'update' => 'Progress update',
+            'status' => 'Status changed',
+            'priority' => 'Priority changed',
+            'due_date' => 'Due date changed',
+            _ => 'Update',
+          };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          left: BorderSide(color: Color(0xFFCBD5E1), width: 2),
+          bottom: BorderSide(color: Color(0xFFEDF2F7)),
+        ),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDBEAFE),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: const Icon(
-              LucideIcons.activity,
-              size: 17,
-              color: AppColors.primary,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                created == null
+                    ? ''
+                    : DateFormat('d MMM, h:mm a').format(created.toLocal()),
+                style: const TextStyle(color: AppColors.muted, fontSize: 9),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${action['user']?['name'] ?? 'System'}${action['assignee'] == null ? '' : ' → ${action['assignee']['name']}'}',
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  action['action']?.toString().toUpperCase() ?? 'ACTION',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  action['remark']?.toString() ?? '',
-                  style: const TextStyle(color: AppColors.muted),
-                ),
-                for (final file in List<dynamic>.from(
-                  action['attachments'] ?? [],
-                ))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '📎 ${file['name']}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 12,
-                      ),
+          if (remark.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              remark,
+              maxLines: expanded ? null : 3,
+              overflow: expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 11,
+                height: 1.45,
+              ),
+            ),
+            if (remark.length > 90 || remark.split('\n').length > 2)
+              GestureDetector(
+                onTap: () => setState(() => expanded = !expanded),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(
+                    expanded ? 'Show less' : 'Read more',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                const SizedBox(height: 3),
-                Text(
-                  '${action['user']?['name'] ?? 'User'} · ${created == null ? '' : DateFormat('d MMM, hh:mm a').format(created.toLocal())}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
                 ),
-              ],
+              ),
+          ],
+          for (final file in List<dynamic>.from(action['attachments'] ?? []))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '📎 ${file['name']}',
+                style: const TextStyle(color: AppColors.primary, fontSize: 10),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -1648,7 +1813,7 @@ class _WorkflowProgress extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.zero,
       ),
       child: Row(
         children: List.generate(steps.length, (index) {

@@ -33,7 +33,6 @@
                 <div class="row g-3 small">
                     @if($isTicket)<div class="col-md-4"><span class="text-secondary d-block">Customer</span><strong>{{ $task->customer?->name }}</strong></div>@endif
                     <div class="col-md-4"><span class="text-secondary d-block">Completion attachment</span><strong>{{ $task->attachment_required_on_completion ? 'Required' : 'Optional' }}</strong></div>
-                    <div class="col-md-4"><span class="text-secondary d-block">Category</span><strong>{{ $task->category ?: 'General' }}</strong></div>
                     <div class="col-md-4"><span class="text-secondary d-block">Due date</span><strong>{{ $task->due_at?->format('d M Y, h:i A') ?? 'No due date' }}</strong></div>
                 </div>
             </section>
@@ -43,12 +42,12 @@
                         @if(!$task->isClosed() && auth()->user()->can('act', $task))<button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#taskModal"><i data-lucide="plus" style="width:16px"></i> Create subtask</button>@endif
                     </div>
                     <div class="d-grid gap-3">@forelse($task->subtasks as $subtask)
-                        <a class="nx-subtask-card d-block p-3 rounded text-decoration-none" href="{{ route('tasks.show', $subtask) }}"><div class="d-flex justify-content-between gap-2"><strong class="small">{{ $subtask->task_no }} · Subtask</strong><span class="badge {{ $subtask->isClosed() ? 'badge-soft-success' : 'badge-soft-warning' }}">{{ $subtask->isClosed() ? 'Completed' : 'Active' }}</span></div><div class="fw-semibold text-dark mt-2">{{ $subtask->title }}</div><div class="small text-secondary mt-1">{{ $subtask->assignee?->name }} · Due {{ $subtask->due_at?->format('d M Y, h:i A') ?? 'Not set' }}</div></a>
+                        <a class="nx-subtask-card d-block p-3 text-decoration-none" href="{{ route('tasks.show', $subtask) }}"><div class="d-flex justify-content-between gap-2"><strong class="small">{{ $subtask->task_no }} · Subtask</strong><span class="badge {{ $subtask->isClosed() ? 'badge-soft-success' : 'badge-soft-warning' }}">{{ $subtask->isClosed() ? 'Completed' : 'Active' }}</span></div><div class="fw-semibold text-dark mt-2">{{ $subtask->title }}</div><div class="small text-secondary mt-1">{{ $subtask->assignee?->name }} · Due {{ $subtask->due_at?->format('d M Y, h:i A') ?? 'Not set' }}</div></a>
                     @empty<div class="small text-secondary">No subtasks yet.</div>@endforelse</div>
                 </section>
             @endif
             <section class="nx-card nx-activity-section p-3 p-md-4">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
                     <div>
                         <div class="nx-overline">WORK ITEM HISTORY</div>
                         <h3 class="h5 fw-bold mb-1">Activity timeline</h3>
@@ -59,30 +58,34 @@
                 <ol class="nx-activity-timeline list-unstyled mb-0">
                     @forelse($task->actions as $action)
                         @php
-                            $activityTone = match ($action->action) { 'close' => 'success', 'assign' => 'primary', 'priority', 'due_date' => 'warning', 'created' => 'slate', default => 'primary' };
-                            $activityIcon = match ($action->action) { 'close' => 'circle-check-big', 'assign' => 'user-round-check', 'priority' => 'flag', 'due_date' => 'calendar-clock', 'created' => 'plus', default => 'activity' };
+                            $activityTone = match ($action->action) { 'close', 'returned' => 'success', 'assign' => 'primary', 'priority', 'due_date' => 'warning', 'created' => 'slate', default => 'primary' };
+                            $activityIcon = match ($action->action) { 'close' => 'circle-check-big', 'returned' => 'corner-up-left', 'assign' => 'user-round-check', 'priority' => 'flag', 'due_date' => 'calendar-clock', 'created' => 'plus', default => 'activity' };
                         @endphp
                         <li class="nx-activity-entry nx-activity-entry--{{ $activityTone }}">
                             <span class="nx-activity-marker" aria-hidden="true"><i data-lucide="{{ $activityIcon }}"></i></span>
+                            @php
+                                $isSubtaskCreation = $action->action === 'created' && ($action->related_task_id || $task->parent_task_id);
+                                $activityTitle = $isSubtaskCreation ? 'Subtask created and assigned' : (($action->related_task_id ? 'Subtask · ' : '').match($action->action) { 'priority' => 'Priority changed', 'due_date' => 'Due date changed', 'close' => 'Completed', 'update' => 'Progress update', 'status' => 'Status changed', 'returned' => 'Returned to creator', default => str($action->action)->headline() });
+                            @endphp
                             <article class="nx-activity-card">
                                 <div class="nx-activity-card-head">
-                                    <div class="d-flex flex-wrap align-items-center gap-2">
-                                        <h4 class="nx-activity-title mb-0">{{ ($action->related_task_id ? 'Subtask · ' : '').match($action->action) { 'priority' => 'Priority changed', 'due_date' => 'Due date changed', 'close' => 'Completed', 'update' => 'Progress update', 'status' => 'Status changed', default => str($action->action)->headline() } }}</h4>
-                                        @if($loop->first)<span class="nx-activity-latest">Latest update</span>@endif
-                                    </div>
-                                    <time class="nx-activity-time" datetime="{{ $action->created_at->toIso8601String() }}"><i data-lucide="clock-3" aria-hidden="true"></i>{{ $action->created_at->format('d M Y') }} <span aria-hidden="true">·</span> {{ $action->created_at->format('h:i A') }}</time>
+                                    <div class="d-flex flex-wrap align-items-center gap-2"><h4 class="nx-activity-title mb-0">{{ $activityTitle }}</h4>@if($loop->first)<span class="nx-activity-latest">Latest</span>@endif</div>
+                                    <time class="nx-activity-time" datetime="{{ $action->created_at->toIso8601String() }}" title="{{ $action->created_at->format('d M Y, h:i A') }}">{{ $action->created_at->format('d M, h:i A') }}</time>
                                 </div>
-                                <div class="nx-activity-people">
-                                    <div class="nx-activity-person"><span class="nx-activity-avatar" aria-hidden="true">{{ strtoupper(substr($action->user?->name ?? 'System', 0, 1)) }}</span><span><small>Performed by</small><strong>{{ $action->user?->name ?? 'System' }}</strong></span></div>
-                                    @if($action->assignee)
-                                        <div class="nx-activity-person"><span class="nx-activity-person-icon" aria-hidden="true"><i data-lucide="arrow-right"></i></span><span><small>{{ $action->action === 'created' ? 'Initially assigned to' : 'Assigned to' }}</small><strong>{{ $action->assignee->name }}</strong></span></div>
-                                    @endif
+                                <div class="nx-activity-meta">
+                                    <x-person-avatar :user="$action->user" :size="22" />
+                                    <strong>{{ $action->user?->name ?? 'System' }}</strong>
+                                    @if($action->assignee)<span class="nx-activity-arrow" aria-hidden="true">→</span><span class="text-secondary">Responsible Person:</span><strong>{{ $action->assignee->name }}</strong>@endif
+                                    @if($action->relatedTask)<a class="nx-activity-task-link" href="{{ route('tasks.show', $action->relatedTask) }}" title="{{ $action->relatedTask->title }}">{{ $action->relatedTask->task_no }}</a>@endif
                                 </div>
-                                @if($action->relatedTask)<a class="small d-inline-block mb-2" href="{{ route('tasks.show', $action->relatedTask) }}">{{ $action->relatedTask->task_no }} · {{ $action->relatedTask->title }}</a>@endif
                                 @if($action->remark)
-                                    <div class="nx-activity-remark"><i data-lucide="message-square-text" aria-hidden="true"></i><p class="mb-0">{{ $action->remark }}</p></div>
+                                    @if(mb_strlen($action->remark) > 240 || substr_count($action->remark, "\n") > 2)
+                                        <details class="nx-activity-details"><summary><span class="nx-remark-preview">{{ str($action->remark)->squish()->limit(180) }}</span><span class="nx-expand-label">Read more</span><span class="nx-expanded-label">Hide details</span></summary><p class="nx-activity-note">{{ $action->remark }}</p></details>
+                                    @else
+                                        <p class="nx-activity-note">{{ $action->remark }}</p>
+                                    @endif
                                 @endif
-                                @if($action->attachments)<div class="d-flex flex-wrap gap-2 mt-3">@foreach($action->attachments as $index => $attachment)<a class="btn btn-sm btn-light border" href="{{ route('tasks.attachments.show', [$task, $action, $index]) }}"><i data-lucide="paperclip" style="width:14px"></i> {{ $attachment['name'] }}</a>@endforeach</div>@endif
+                                @if($action->attachments)<div class="nx-activity-attachments">@foreach($action->attachments as $index => $attachment)<a href="{{ route('tasks.attachments.show', [$task, $action, $index]) }}"><i data-lucide="paperclip" aria-hidden="true"></i>{{ $attachment['name'] }}</a>@endforeach</div>@endif
                             </article>
                         </li>
                     @empty
@@ -97,9 +100,8 @@
             @else
             <aside class="nx-card p-4 mb-4">
                 <h3 class="h6 fw-bold mb-3">Assignment</h3>
-                <div class="d-flex align-items-center gap-3 mb-4"><span class="nx-avatar">{{ strtoupper(substr($task->assignee->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $task->assignee->name }}</div><small class="text-secondary">Current assignee</small></div></div>
-                <div class="small text-secondary mb-2">Observers & previous owners</div>
-                @forelse($task->members as $member)<div class="small border-top py-2">{{ $member->user?->name }} · {{ str($member->role)->headline() }}</div>@empty<div class="small">No observers</div>@endforelse
+                <div class="d-flex align-items-center gap-3 mb-4"><span class="nx-avatar">{{ strtoupper(substr($task->assignee->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $task->assignee->name }}</div><small class="text-secondary">Responsible Person</small></div></div>
+                @include('tasks.partials.participants')
             </aside>
             @if(!$task->isClosed() && auth()->user()->can('act', $task))
                 <aside class="nx-card p-4">
@@ -110,13 +112,13 @@
                         @csrf
                         <label class="form-label">Remark *</label><textarea class="form-control mb-3" name="remark" rows="4" placeholder="Work completed, outcome or next step" required maxlength="3000">{{ old('remark') }}</textarea>
                         <label class="form-label">Action *</label><select class="form-select mb-3" name="action" id="taskAction" required><option value="assign">Assign next</option><option value="close">Close {{ $isTicket ? 'ticket' : 'workflow' }}</option></select>
-                        <div id="nextAssignee" class="mb-3"><label class="form-label">Next assignee</label><select class="form-select" name="assigned_to" data-v="required_if:action,assign"><option value="">Select user</option>@foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
+                        <div id="nextAssignee" class="mb-3"><label class="form-label">Responsible Person</label><select class="form-select" name="assigned_to" data-v="required_if:action,assign"><option value="">Select user</option>@foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
                         <div class="mb-3"><label class="form-label" for="taskAttachments">Attachments{{ $task->attachment_required_on_completion ? ' (required to complete)' : ' (optional)' }}</label><input type="file" class="form-control" id="taskAttachments" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"><div class="form-text">Up to 5 files, 10 MB each. Images, PDF, Word, Excel or text.</div></div>
                         @if($task->subtasks->contains(fn ($subtask) => !$subtask->isClosed()))<p class="small text-warning">Complete the open subtasks before completing this workflow.</p>@endif
                         <button class="btn btn-primary w-100">Submit action</button>
                     </form>
                 </aside>
-                <aside class="nx-card p-4 mt-4"><h3 class="h6 fw-bold mb-3">Change due date</h3><form method="POST" action="{{ route('tasks.due-date', $task) }}">@csrf<input type="hidden" name="_form" value="due-date"><label class="form-label">New due date & time</label><input class="form-control mb-3" type="datetime-local" name="due_at" value="{{ old('_form') === 'due-date' ? old('due_at') : $task->due_at?->format('Y-m-d\TH:i') }}"><label class="form-label">Reason for changing the due date *</label><textarea class="form-control mb-3" name="reason" rows="3" required maxlength="3000">{{ old('reason') }}</textarea><button class="btn btn-outline-primary w-100">Update due date</button></form></aside>
+                <aside class="nx-card p-4 mt-4"><h3 class="h6 fw-bold mb-3">Change due date</h3><form method="POST" action="{{ route('tasks.due-date', $task) }}">@csrf<input type="hidden" name="_form" value="due-date"><div class="mb-3"><x-date-time-picker :value="old('_form') === 'due-date' ? old('due_at') : $task->due_at" id="complaintDueDate" label="New due date & time" /></div><label class="form-label">Reason for changing the due date *</label><textarea class="form-control mb-3" name="reason" rows="3" required maxlength="3000">{{ old('reason') }}</textarea><button class="btn btn-outline-primary w-100">Update due date</button></form></aside>
             @endif
             @endif
         </div>

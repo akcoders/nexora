@@ -5,7 +5,7 @@
 @endphp
 <div class="modal fade" id="taskModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <form method="POST" action="{{ $createUrl }}" class="modal-content" id="workItemForm">
+        <form method="POST" action="{{ $createUrl }}" class="modal-content nx-task-create" id="workItemForm">
             @csrf
             <input type="hidden" name="_form" value="create">
             <input type="hidden" name="task_type" value="{{ $creatingComplaint ? 'ticket' : 'workflow' }}">
@@ -19,12 +19,21 @@
                     @if($creatingComplaint)
                     <div class="col-md-6" id="ticketCustomerField"><label class="form-label">Customer *</label><select class="form-select" name="customer_id" id="ticketCustomer" required><option value="">Select customer</option>@foreach($customers as $customer)<option value="{{ $customer->id }}" @selected(old('customer_id') == $customer->id)>{{ $customer->name }} · {{ $customer->code }}</option>@endforeach</select><div class="form-text">Required for every complaint.</div></div>
                     @endif
-                    <div class="col-md-3"><label class="form-label">Category</label><input class="form-control" name="category" maxlength="60" value="{{ old('category', $creatingComplaint ? 'Complaint' : 'Internal') }}"></div>
-                    <div class="col-md-3"><label class="form-label">Priority *</label><select class="form-select" name="priority" required><option value="normal" @selected(old('priority') === 'normal')>Normal</option><option value="high" @selected(old('priority') === 'high')>High</option><option value="very_high" @selected(old('priority') === 'very_high')>Very high</option></select></div>
-                    <div class="col-md-4"><label class="form-label">Due date & time</label><input type="datetime-local" class="form-control" name="due_at" value="{{ old('due_at') }}"></div>
-                    <div class="col-md-4"><label class="form-label">Current assignee *</label><select class="form-select" name="assigned_to" required><option value="">Select owner</option>@foreach($users as $user)<option value="{{ $user->id }}" @selected(old('assigned_to') == $user->id)>{{ $user->name }} · {{ $user->designation }}</option>@endforeach</select></div>
-                    <div class="col-md-4"><label class="form-label">Observers</label><select class="form-select" name="observers[]" multiple size="4">@foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
-                    <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="attachment_required_on_completion" value="1" id="completionAttachment" @checked(old('attachment_required_on_completion'))><label class="form-check-label fw-semibold" for="completionAttachment">Attachment required when complete</label><div class="form-text">The owner must upload evidence before completing this item.</div></div></div>
+                    <input type="hidden" name="category" value="Internal">
+                    <div class="col-md-6"><label class="form-label">Priority *</label><select class="form-select" name="priority" required><option value="normal" @selected(old('priority') === 'normal')>Normal</option><option value="high" @selected(old('priority') === 'high')>High</option><option value="very_high" @selected(old('priority') === 'very_high')>Very high</option></select></div>
+                    <div class="col-md-6"><x-date-time-picker :value="old('due_at')" id="createDueDate" /></div>
+                    <div class="col-md-6"><label class="form-label">Responsible Person *</label><select class="form-select" name="assigned_to" required><option value="">Select responsible person</option>@foreach($users as $user)<option value="{{ $user->id }}" @selected(old('assigned_to') == $user->id)>{{ $user->name }} · {{ $user->designation }}</option>@endforeach</select></div>
+                    <div class="col-12">
+                        @if($creatingSubtask)
+                            @php $inheritedObservers = $parentWorkflow->members->where('role', 'observer')->filter(fn ($member) => $member->user)->unique('user_id'); @endphp
+                            <div class="nx-inherited-observers"><div class="d-flex justify-content-between align-items-center gap-2"><strong class="small">Observers</strong><span class="nx-inherited-label">Inherited from {{ $parentWorkflow->task_no }}</span></div>
+                                @if($inheritedObservers->isNotEmpty())<div class="nx-avatar-stack mt-2">@foreach($inheritedObservers as $member)<x-person-avatar :user="$member->user" :size="32" detail="Observer" />@endforeach</div>@else<div class="small text-secondary mt-1">No observers on the parent workflow.</div>@endif
+                            </div>
+                        @else
+                            <x-observer-picker :users="$users" :selected="old('observers', [])" />
+                        @endif
+                    </div>
+                    <div class="col-12"><div class="nx-option-row"><div><label class="form-label mb-1" for="completionAttachment">Attachment required when complete</label><div class="small text-secondary">Require evidence before this item can be completed.</div></div><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" role="switch" name="attachment_required_on_completion" value="1" id="completionAttachment" @checked(old('attachment_required_on_completion'))></div></div></div>
                 </div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i data-lucide="send" style="width:17px"></i> Create & notify</button></div>

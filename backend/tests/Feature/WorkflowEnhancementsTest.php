@@ -144,7 +144,7 @@ class WorkflowEnhancementsTest extends TestCase
         $this->assertDatabaseHas('task_actions', ['task_id' => $parent->id, 'related_task_id' => $child->id, 'action' => 'close']);
         Notification::assertSentTo([$admin, $owner, $observer, $nextOwner], TaskCompletedNotification::class);
         $this->get(route('tasks.show', $parent))->assertSee('1/1 completed')->assertSee('Materials confirmed.');
-        $this->postJson(route('tasks.action', $parent), ['action' => 'close', 'remark' => 'Workflow finished.'])->assertOk();
+        $this->actingAs($owner)->postJson(route('tasks.action', $parent), ['action' => 'close', 'remark' => 'Workflow finished.'])->assertOk();
     }
 
     public function test_complaints_and_internal_workflows_have_separate_lists_counts_boards_and_creation(): void

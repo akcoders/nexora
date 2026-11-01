@@ -28,7 +28,7 @@ class TaskController extends Controller
     {
         $workType = $this->workType($request);
         $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')->where('task_type', $workType);
-        $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'parent'])
+        $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'parent', 'observers.user:id,name'])
             ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
             ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->open())
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
@@ -109,7 +109,7 @@ class TaskController extends Controller
     public function dueDate(Request $request, Task $task, TaskWorkflow $workflow): RedirectResponse|JsonResponse
     {
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks') && $request->user()->can('act', $task), 403);
-        $data = $request->validate(['due_at' => ['present', 'nullable', 'date'], 'reason' => ['required', 'string', 'max:3000']]);
+        $data = $request->validate(['due_at' => ['present', 'nullable', 'date', 'after_or_equal:today'], 'reason' => ['required', 'string', 'max:3000']], ['due_at.after_or_equal' => 'Choose today or a later due date.']);
         $workflow->changeDueDate($task, $data['due_at'], $data['reason'], $request->user());
         if ($request->expectsJson() || $request->is('api/*')) {
             return response()->json(['message' => 'Due date updated.', 'task' => $task->fresh()]);

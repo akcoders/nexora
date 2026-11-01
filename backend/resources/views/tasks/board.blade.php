@@ -9,7 +9,7 @@
             <div class="nx-kanban-toolbar-row">
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <div class="nx-kanban-segment" role="group" aria-label="Group cards by">
-                        <button type="button" data-mode-btn="owner"><i data-lucide="users-round"></i>Owner</button>
+                        <button type="button" data-mode-btn="owner"><i data-lucide="users-round"></i>Responsible Person</button>
                         <button type="button" data-mode-btn="status"><i data-lucide="columns-3"></i>Status</button>
                         <button type="button" data-mode-btn="priority"><i data-lucide="flag"></i>Priority</button>
                     </div>

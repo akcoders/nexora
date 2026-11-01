@@ -44,6 +44,7 @@ class TaskBoardCardResource extends JsonResource
             'closed_at' => $this->closed_at?->toIso8601String(),
             'actions_count' => (int) $this->actions_count,
             'observers_count' => (int) $this->observers_count,
+            'observers' => $this->observers->filter(fn ($member) => $member->user)->map(fn ($member): array => ['id' => $member->user->id, 'name' => $member->user->name])->values()->all(),
             'latest' => $this->latestAction ? [
                 'action' => $this->latestAction->action,
                 'by' => $this->latestAction->user?->name,
