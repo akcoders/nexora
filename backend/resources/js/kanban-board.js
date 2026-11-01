@@ -44,7 +44,7 @@ function readState(root) {
     return {
         feedUrl: root.dataset.feedUrl,
         mode,
-        type: ['workflow', 'ticket'].includes(params.get('type')) ? params.get('type') : '',
+        type: root.dataset.type || 'workflow',
         search: params.get('search') ?? '',
         quick: new Set((params.get('quick') ?? '').split(',').filter((key) => QUICK.includes(key))),
         tasks: new Map(),
@@ -73,8 +73,8 @@ function init(root) {
         const response = await fetch(url, {
             method,
             credentials: 'same-origin',
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-            body: body ? JSON.stringify(body) : undefined,
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf, ...(body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) },
+            body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined),
         });
         const json = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -202,7 +202,7 @@ function init(root) {
     function cardHtml(task) {
         const isTicket = task.type === 'ticket';
         const locked = !canDrag(task);
-        const classes = ['nx-kanban-card', `type-${task.type}`, `prio-${task.priority}`, task.overdue ? 'is-overdue' : '', task.status === 'closed' ? 'is-closed' : '', locked ? 'is-locked' : ''].filter(Boolean).join(' ');
+        const classes = ['nx-kanban-card', `type-${task.type}`, `prio-${task.priority}`, task.parent ? 'is-subtask' : '', task.overdue ? 'is-overdue' : '', task.status === 'closed' ? 'is-closed' : '', locked ? 'is-locked' : ''].filter(Boolean).join(' ');
         const due = task.status === 'closed'
             ? `<span class="nx-kc-due done"><i data-lucide="circle-check"></i>Closed</span>`
             : `<span class="nx-kc-due ${task.overdue ? 'overdue' : (isToday(task.due_at) ? 'today' : '')}" title="Due date"><i data-lucide="${task.overdue ? 'alarm-clock' : 'calendar-clock'}"></i>${esc(task.due_label ?? 'No due date')}</span>`;
@@ -216,7 +216,7 @@ function init(root) {
         return `<article class="${classes}" data-id="${task.id}" aria-label="${esc(task.task_no)}: ${esc(task.title)}">
             <div class="nx-kc-top">
                 <span class="nx-kc-no">${esc(task.task_no)}</span>
-                <span class="badge rounded-pill ${isTicket ? 'badge-soft-info' : 'badge-soft-primary'}">${isTicket ? 'Ticket' : 'Workflow'}</span>
+                <span class="badge rounded-pill ${isTicket ? 'badge-soft-info' : 'badge-soft-primary'}">${isTicket ? 'Complaint' : (task.parent ? 'Subtask' : 'Workflow')}</span>
                 ${task.status !== 'closed' ? `<span class="nx-kc-prio prio-${task.priority}">${esc(PRIORITY_LABEL[task.priority] ?? task.priority)}</span>` : ''}
                 <div class="dropdown ms-auto">
                     <button class="nx-kc-menu" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Actions for ${esc(task.task_no)}"><i data-lucide="ellipsis"></i></button>
@@ -225,6 +225,9 @@ function init(root) {
             </div>
             <a class="nx-kc-title" href="${esc(task.url)}">${esc(task.title)}</a>
             <div class="nx-kc-meta"><i data-lucide="${isTicket ? 'building-2' : 'git-branch'}"></i><span>${esc(task.customer ?? 'Internal operation')} · ${esc(task.category || 'General')}</span></div>
+            ${task.parent ? `<a class="nx-parent-link small" href="${esc(task.parent.url)}"><i data-lucide="corner-down-right" style="width:14px"></i> ${esc(task.parent.task_no)}</a>` : ''}
+            ${task.subtasks_count ? `<div class="small text-secondary">${task.completed_subtasks_count}/${task.subtasks_count} subtasks completed</div>` : ''}
+            ${task.attachment_required_on_completion ? '<div class="small text-secondary"><i data-lucide="paperclip" style="width:13px"></i> Completion attachment required</div>' : ''}
             ${latest}
             <div class="nx-kc-foot">
                 ${due}
@@ -376,13 +379,14 @@ function init(root) {
             confirmText = intent.reopen ? 'Reopen & assign' : 'Hand over';
         }
 
+        const upload = intent.kind === 'close' ? `<label class="form-label small fw-semibold mt-3" for="nxKanbanAttachments">Attachments ${task.attachment_required_on_completion ? '*' : '(optional)'}</label><input class="form-control" type="file" id="nxKanbanAttachments" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"><div class="form-text">Up to 5 files, 10 MB each.</div>` : '';
         const picker = needsPicker
             ? `<label class="form-label text-start d-block small fw-semibold mt-1" for="nxKanbanUser">${intent.reopen ? 'Assign to *' : 'Next owner *'}</label><select class="form-select mb-3" id="nxKanbanUser"><option value="">Select user</option>${userOptions(intent.reopen ? task.assignee?.id : null, intent.reopen ? null : task.assignee?.id)}</select>`
             : '';
         const result = await window.Swal.fire({
             title,
             icon,
-            html: `<div class="text-start"><div class="nx-kanban-dialog-card"><span class="small fw-bold text-primary">${esc(task.task_no)}</span><div class="fw-semibold">${esc(task.title)}</div></div>${picker}<label class="form-label small fw-semibold" for="nxKanbanRemark">${remarkLabel}</label><textarea class="form-control" id="nxKanbanRemark" rows="3" maxlength="3000" placeholder="${intent.kind === 'close' ? 'Outcome, work completed or customer confirmation' : (intent.kind === 'priority' ? 'Why the priority changed' : 'Context and next step for the new owner')}"></textarea></div>`,
+            html: `<div class="text-start"><div class="nx-kanban-dialog-card"><span class="small fw-bold text-primary">${esc(task.task_no)}</span><div class="fw-semibold">${esc(task.title)}</div></div>${picker}<label class="form-label small fw-semibold" for="nxKanbanRemark">${remarkLabel}</label><textarea class="form-control" id="nxKanbanRemark" rows="3" maxlength="3000" placeholder="${intent.kind === 'close' ? 'Outcome, work completed or customer confirmation' : (intent.kind === 'priority' ? 'Why the priority changed' : 'Context and next step for the new owner')}"></textarea>${upload}</div>`,
             showCancelButton: true,
             confirmButtonText: confirmText,
             focusConfirm: false,
@@ -397,9 +401,17 @@ function init(root) {
                 if (needsPicker && !userId) return window.Swal.showValidationMessage('Select who should own this item.');
                 if (remarkRequired && remark.length < 3) return window.Swal.showValidationMessage('A remark of at least 3 characters is mandatory.');
                 try {
-                    return intent.kind === 'priority'
-                        ? await request(task.priority_url, { method: 'POST', body: { priority: intent.priority, remark } })
-                        : await request(task.action_url, { method: 'POST', body: { action: intent.kind === 'close' ? 'close' : 'assign', remark, assigned_to: intent.kind === 'assign' ? userId : null } });
+                    if (intent.kind === 'priority') {
+                        return await request(task.priority_url, { method: 'POST', body: { priority: intent.priority, remark } });
+                    }
+                    const files = popup.querySelector('#nxKanbanAttachments')?.files;
+                    if (intent.kind === 'close' && task.attachment_required_on_completion && !files?.length) return window.Swal.showValidationMessage('Attach at least one file before completing this workflow.');
+                    const body = new FormData();
+                    body.append('action', intent.kind === 'close' ? 'close' : 'assign');
+                    body.append('remark', remark);
+                    if (intent.kind === 'assign') body.append('assigned_to', userId);
+                    for (const file of files || []) body.append('attachments[]', file);
+                    return await request(task.action_url, { method: 'POST', body });
                 } catch (error) {
                     return window.Swal.showValidationMessage(error.message);
                 }

@@ -3,16 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TaskActionRequest;
 use App\Models\Attendance;
 use App\Models\Setting;
 use App\Models\Task;
 use App\Models\User;
-use App\Notifications\TaskAssignedNotification;
-use App\Services\OneSignalService;
+use App\Services\TaskWorkflow;
 use App\Support\RecordVisibility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class TaskController extends Controller
@@ -26,12 +25,12 @@ class TaskController extends Controller
         ]);
 
         $tasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')
-            ->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee'])
-            ->withCount('actions')
+            ->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee', 'parent:id,task_no,title'])
+            ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
             ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->when(($filters['scope'] ?? null) === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
             ->when(isset($filters['status']), fn ($query) => $query->where('status', $filters['status']))
-            ->when(isset($filters['type']), fn ($query) => $query->where('task_type', $filters['type']))
+            ->where('task_type', $filters['type'] ?? Task::TYPE_WORKFLOW)
             ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
             ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
             ->orderBy('due_at')
@@ -45,12 +44,12 @@ class TaskController extends Controller
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
 
         return response()->json([
-            'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee']),
+            'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'parent', 'subtasks.assignee']),
             'assignees' => User::where('status', 'active')->orderBy('name')->get(['id', 'name', 'employee_code', 'designation']),
         ]);
     }
 
-    public function action(Request $request, Task $task, OneSignalService $oneSignal): JsonResponse
+    public function action(TaskActionRequest $request, Task $task, TaskWorkflow $workflow): JsonResponse
     {
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
         abort_unless($task->assigned_to === $request->user()->id, 403, 'Only the current assignee can act on this task.');
@@ -59,29 +58,8 @@ class TaskController extends Controller
             abort_unless(Attendance::where('user_id', $request->user()->id)->whereDate('attendance_date', today())->exists(), 422, 'Mark attendance before taking task action.');
         }
 
-        $validated = $request->validate([
-            'action' => ['required', Rule::in(['close', 'assign'])],
-            'remark' => ['required', 'string', 'max:3000'],
-            'assigned_to' => ['required_if:action,assign', 'nullable', 'exists:users,id'],
-        ]);
+        $workflow->act($task, $request->validated(), $request->user());
 
-        DB::transaction(function () use ($request, $task, $validated) {
-            $task->actions()->create(['user_id' => $request->user()->id, 'action' => $validated['action'], 'remark' => $validated['remark'], 'assigned_to' => $validated['assigned_to'] ?? null]);
-            if ($validated['action'] === 'assign') {
-                $task->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'previous_assignee']);
-                $task->members()->firstOrCreate(['user_id' => $validated['assigned_to'], 'role' => 'assignee']);
-            }
-            $task->update($validated['action'] === 'close'
-                ? ['status' => 'closed', 'closed_at' => now()]
-                : ['status' => 'pending', 'assigned_to' => $validated['assigned_to'], 'closed_at' => null]);
-        });
-
-        if ($validated['action'] === 'assign') {
-            $task->fresh()->assignee->notify(new TaskAssignedNotification($task->fresh()));
-            $type = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
-            $oneSignal->sendToUser($task->fresh()->assignee, ucfirst($type).' assigned to you', $task->title, ['type' => $type.'_task', 'task_id' => $task->id]);
-        }
-
-        return response()->json(['message' => 'Task updated.', 'task' => $task->fresh()->load(['assignee', 'actions.user', 'actions.assignee'])]);
+        return response()->json(['message' => 'Task updated.', 'task' => $task->fresh()->load(['assignee', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'parent', 'subtasks.assignee'])]);
     }
 }

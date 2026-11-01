@@ -19,6 +19,11 @@ class TaskAction extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function relatedTask(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'related_task_id');
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');

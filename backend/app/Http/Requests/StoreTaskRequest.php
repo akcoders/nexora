@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Models\Task;
+use App\Support\RecordVisibility;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreTaskRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        $parent = $this->route('task');
+        if ($parent instanceof Task) {
+            return RecordVisibility::allows($this->user(), $parent, 'tasks') && $this->user()->can('act', $parent);
+        }
+
+        return $this->user()->can('tasks.create') || $this->user()->can('tasks.assign');
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->route('task') instanceof Task) {
+            $this->merge(['task_type' => Task::TYPE_WORKFLOW]);
+        } elseif ($this->routeIs('complaints.store')) {
+            $this->merge(['task_type' => Task::TYPE_TICKET]);
+        } elseif ($this->routeIs('workflows.store')) {
+            $this->merge(['task_type' => Task::TYPE_WORKFLOW]);
+        }
+    }
+
+    public function rules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'task_type' => ['required', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'customer_id' => [
+                Rule::requiredIf(fn (): bool => $this->input('task_type') === Task::TYPE_TICKET),
+                Rule::prohibitedIf(fn (): bool => $this->input('task_type') === Task::TYPE_WORKFLOW),
+                'nullable', 'exists:customers,id',
+            ],
+            'category' => ['nullable', 'string', 'max:60'],
+            'priority' => ['required', Rule::in(Task::PRIORITIES)],
+            'due_at' => ['nullable', 'date'],
+            'assigned_to' => ['required', Rule::exists('users', 'id')->where('status', 'active')],
+            'observers' => ['nullable', 'array'],
+            'observers.*' => ['integer', 'distinct', Rule::exists('users', 'id')->where('status', 'active')],
+            'attachment_required_on_completion' => ['sometimes', 'boolean'],
+            'parent_task_id' => ['prohibited'],
+            'return_to' => ['nullable', Rule::in(['board'])],
+        ];
+    }
+}

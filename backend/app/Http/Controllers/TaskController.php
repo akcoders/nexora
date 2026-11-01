@@ -2,140 +2,120 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTaskRequest;
+use App\Http\Requests\TaskActionRequest;
 use App\Http\Requests\UpdateTaskPriorityRequest;
 use App\Http\Resources\TaskBoardCardResource;
 use App\Models\Customer;
 use App\Models\Task;
+use App\Models\TaskAction;
 use App\Models\User;
-use App\Notifications\TaskAssignedNotification;
-use App\Services\OneSignalService;
+use App\Services\TaskWorkflow;
 use App\Support\RecordVisibility;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskController extends Controller
 {
-    /** Recently closed items shown in the board's Closed lane. */
     private const BOARD_CLOSED_LIMIT = 40;
 
     public function index(Request $request): View
     {
-        $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks');
-        $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'latestAction.assignee'])
-            ->withCount('actions')
-            ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
-            ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
+        $workType = $this->workType($request);
+        $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')->where('task_type', $workType);
+        $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'parent'])
+            ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
+            ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->open())
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
-            ->when($request->filled('type'), fn ($query) => $query->where('task_type', $request->string('type')))
             ->when($request->filled('assignee'), fn ($query) => $query->where('assigned_to', $request->integer('assignee')))
             ->when($request->filled('search'), fn ($query) => $query->where(fn ($query) => $query
                 ->where('title', 'like', '%'.$request->string('search').'%')
                 ->orWhere('task_no', 'like', '%'.$request->string('search').'%')
                 ->orWhereHas('customer', fn ($query) => $query->where('name', 'like', '%'.$request->string('search').'%'))))
             ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
-            ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
-            ->orderBy('due_at')->paginate(20)->withQueryString();
+            ->byUrgency()->orderByDesc('id')->paginate(20)->withQueryString();
 
         return view('tasks.index', [
-            'tasks' => $tasks,
-            'users' => User::where('status', 'active')->orderBy('name')->get(),
-            'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
-            'openCount' => (clone $visibleTasks)->where('status', '!=', 'closed')->count(),
-            'workflowOpenCount' => (clone $visibleTasks)->where('task_type', 'workflow')->where('status', '!=', 'closed')->count(),
-            'ticketOpenCount' => (clone $visibleTasks)->where('task_type', Task::TYPE_TICKET)->where('status', '!=', 'closed')->count(),
-            'closedCount' => (clone $visibleTasks)->where('status', 'closed')->count(),
-            'overdueCount' => (clone $visibleTasks)->where('status', '!=', 'closed')->where('due_at', '<', now())->count(),
+            'tasks' => $tasks, 'workType' => $workType,
+            'users' => User::active()->orderBy('name')->get(),
+            'customers' => $workType === Task::TYPE_TICKET ? Customer::where('status', 'active')->orderBy('name')->get() : collect(),
+            'openCount' => (clone $visibleTasks)->open()->count(),
+            'closedCount' => (clone $visibleTasks)->closed()->count(),
+            'overdueCount' => (clone $visibleTasks)->open()->where('due_at', '<', now())->count(),
         ]);
     }
 
-    public function store(Request $request, OneSignalService $oneSignal): RedirectResponse
+    public function store(StoreTaskRequest $request, TaskWorkflow $workflow): RedirectResponse
     {
-        abort_unless($request->user()->can('tasks.create') || $request->user()->can('tasks.assign'), 403);
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'task_type' => ['required', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'customer_id' => [
-                Rule::requiredIf(fn (): bool => $request->string('task_type')->toString() === Task::TYPE_TICKET),
-                Rule::prohibitedIf(fn (): bool => $request->string('task_type')->toString() === Task::TYPE_WORKFLOW),
-                'nullable',
-                'exists:customers,id',
-            ],
-            'category' => ['nullable', 'string', 'max:100'],
-            'priority' => ['required', Rule::in(['normal', 'high', 'very_high'])],
-            'due_at' => ['nullable', 'date'],
-            'assigned_to' => ['required', 'exists:users,id'],
-            'observers' => ['nullable', 'array'],
-            'observers.*' => ['exists:users,id'],
-            'return_to' => ['nullable', Rule::in(['board'])],
-        ]);
-        $returnTo = $data['return_to'] ?? null;
-        unset($data['return_to']);
-
-        $task = DB::transaction(function () use ($request, $data) {
-            $observers = $data['observers'] ?? [];
-            unset($data['observers']);
-            $nextId = (Task::withTrashed()->max('id') ?? 0) + 1;
-            $prefix = $data['task_type'] === Task::TYPE_TICKET ? 'TKT' : 'WFL';
-            $data['customer_id'] = $data['task_type'] === Task::TYPE_TICKET ? $data['customer_id'] : null;
-            $task = Task::create(array_merge($data, ['task_no' => $prefix.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT), 'created_by' => $request->user()->id, 'status' => 'pending']));
-            foreach ($observers as $observer) {
-                $task->members()->create(['user_id' => $observer, 'role' => 'observer']);
-            }
-            $task->actions()->create(['user_id' => $request->user()->id, 'assigned_to' => $task->assigned_to, 'action' => 'created', 'remark' => 'Task created and assigned.']);
-
-            return $task;
-        });
-        $task->assignee->notify(new TaskAssignedNotification($task));
-        $label = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
-        $oneSignal->sendToUser($task->assignee, 'New '.ucfirst($label).' assigned', $task->title, ['type' => $label.'_task', 'task_id' => $task->id]);
-
-        if ($returnTo === 'board') {
+        $task = $workflow->create($request->validated(), $request->user());
+        if ($request->validated('return_to') === 'board') {
             return redirect()->route('tasks.board', ['type' => $task->task_type])->with('success', $task->task_no.' created and added to the board.');
         }
 
-        return redirect()->route('tasks.show', $task)->with('success', 'Task created successfully.');
+        return redirect()->route('tasks.show', $task)->with('success', 'Created successfully.');
+    }
+
+    public function subtask(StoreTaskRequest $request, Task $task, TaskWorkflow $workflow): RedirectResponse|JsonResponse
+    {
+        $subtask = $workflow->create($request->validated(), $request->user(), $task);
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json(['message' => 'Subtask created and workflow assigned to its owner.', 'task' => $subtask], 201);
+        }
+
+        return redirect()->route('tasks.show', $task)->with('success', $subtask->task_no.' created. Workflow assigned to the subtask owner.');
     }
 
     public function board(Request $request): View|JsonResponse
     {
-        $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks');
+        $workType = $this->workType($request);
+        $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')->where('task_type', $workType);
         if (! $request->expectsJson()) {
             return view('tasks.board', [
+                'workType' => $workType,
                 'users' => User::active()->orderBy('name')->get(),
-                'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
+                'customers' => $workType === Task::TYPE_TICKET ? Customer::where('status', 'active')->orderBy('name')->get() : collect(),
             ]);
         }
-
         $user = $request->user();
-        $open = (clone $visibleTasks)->workItems()->open()->withBoardData($user)->byUrgency()->get();
-        $closed = (clone $visibleTasks)->workItems()->closed()->withBoardData($user)->latest('closed_at')->limit(self::BOARD_CLOSED_LIMIT)->get();
+        $open = (clone $visibleTasks)->open()->withBoardData($user)->byUrgency()->get();
+        $closed = (clone $visibleTasks)->closed()->withBoardData($user)->latest('closed_at')->limit(self::BOARD_CLOSED_LIMIT)->get();
 
         return response()->json([
             'tasks' => TaskBoardCardResource::collection($open->concat($closed))->resolve($request),
             'users' => User::active()->orderBy('name')->get(['id', 'name', 'designation']),
-            'me' => $user->id,
-            'closed_limit' => self::BOARD_CLOSED_LIMIT,
-            'can_reopen' => $user->can('tasks.update'),
-            'generated_at' => now()->toIso8601String(),
+            'me' => $user->id, 'closed_limit' => self::BOARD_CLOSED_LIMIT,
+            'can_reopen' => $user->can('tasks.update'), 'generated_at' => now()->toIso8601String(),
         ]);
     }
 
     public function priority(UpdateTaskPriorityRequest $request, Task $task): JsonResponse|RedirectResponse
     {
+        abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
         abort_if($task->isClosed(), 422, 'Closed items cannot be re-prioritised.');
         $task->changePriority($request->validated('priority'), $request->user(), $request->validated('remark'));
-
-        if ($request->expectsJson()) {
+        if ($request->expectsJson() || $request->is('api/*')) {
             return response()->json(['message' => $task->task_no.' priority updated.', 'task' => $this->boardCard($request, $task)]);
         }
 
         return back()->with('success', 'Priority updated.');
+    }
+
+    public function dueDate(Request $request, Task $task, TaskWorkflow $workflow): RedirectResponse|JsonResponse
+    {
+        abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks') && $request->user()->can('act', $task), 403);
+        $data = $request->validate(['due_at' => ['present', 'nullable', 'date'], 'reason' => ['required', 'string', 'max:3000']]);
+        $workflow->changeDueDate($task, $data['due_at'], $data['reason'], $request->user());
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json(['message' => 'Due date updated.', 'task' => $task->fresh()]);
+        }
+
+        return back()->with('success', 'Due date updated with reason.');
     }
 
     public function show(Request $request, Task $task): View
@@ -143,56 +123,50 @@ class TaskController extends Controller
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
 
         return view('tasks.show', [
-            'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'members.user']),
-            'users' => User::where('status', 'active')->orderBy('name')->get(),
+            'task' => $task->load(['customer', 'assignee', 'creator', 'parent', 'subtasks.assignee', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'members.user']),
+            'workType' => $task->task_type,
+            'users' => User::active()->orderBy('name')->get(),
+            'customers' => collect(),
         ]);
     }
 
-    public function action(Request $request, Task $task, OneSignalService $oneSignal): RedirectResponse|JsonResponse
+    public function action(TaskActionRequest $request, Task $task, TaskWorkflow $workflow): RedirectResponse|JsonResponse
     {
-        $user = $request->user();
-        abort_unless($user->can('tasks.update') || $user->can('tasks.assign') || $task->assigned_to === $user->id || $task->created_by === $user->id, 403);
-        if ($task->status === 'closed' && ! $user->can('tasks.update')) {
-            abort_if($request->expectsJson(), 422, 'This task is already closed.');
-
-            return back()->with('error', 'This task is already closed.');
-        }
-        $data = $request->validate([
-            'action' => ['required', Rule::in(['close', 'assign'])],
-            'remark' => ['required', 'string', 'max:3000'],
-            'assigned_to' => ['required_if:action,assign', 'nullable', 'exists:users,id'],
-        ]);
-
-        DB::transaction(function () use ($request, $task, $data) {
-            $task->actions()->create(['user_id' => $request->user()->id, 'assigned_to' => $data['assigned_to'] ?? null, 'action' => $data['action'], 'remark' => $data['remark']]);
-            if ($data['action'] === 'assign') {
-                $task->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'previous_assignee']);
-                $task->members()->firstOrCreate(['user_id' => $data['assigned_to'], 'role' => 'assignee']);
-            }
-            $task->update($data['action'] === 'close'
-                ? ['status' => 'closed', 'closed_at' => now()]
-                : ['status' => 'pending', 'assigned_to' => $data['assigned_to'], 'closed_at' => null]);
-        });
-        if ($data['action'] === 'assign') {
-            $task->fresh()->assignee->notify(new TaskAssignedNotification($task->fresh()));
-            $type = $task->task_type === Task::TYPE_TICKET ? 'ticket' : 'workflow';
-            $oneSignal->sendToUser($task->fresh()->assignee, ucfirst($type).' assigned to you', $task->title, ['type' => $type.'_task', 'task_id' => $task->id]);
-        }
-
-        if ($request->expectsJson()) {
-            $message = $data['action'] === 'close' ? $task->task_no.' closed.' : $task->task_no.' assigned to '.$task->fresh()->assignee->name.'.';
-
-            return response()->json(['message' => $message, 'task' => $this->boardCard($request, $task)]);
+        $workflow->act($task, $request->validated(), $request->user(), $request->user()->can('tasks.update'));
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json(['message' => $task->task_no.' updated.', 'task' => $this->boardCard($request, $task)]);
         }
 
         return back()->with('success', 'Task action recorded.');
     }
 
+    public function attachment(Request $request, Task $task, TaskAction $action, int $attachment): StreamedResponse
+    {
+        abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
+        abort_unless($action->task_id === $task->id, 404);
+        $file = $action->attachments[$attachment] ?? null;
+        abort_unless(is_array($file) && isset($file['path'], $file['name']), 404);
+        abort_unless(Storage::disk('local')->exists($file['path']), 404);
+
+        return Storage::disk('local')->download($file['path'], $file['name']);
+    }
+
+    private function workType(Request $request): string
+    {
+        if ($request->routeIs('complaints.*')) {
+            return Task::TYPE_TICKET;
+        }
+        if ($request->routeIs('workflows.*')) {
+            return Task::TYPE_WORKFLOW;
+        }
+        $request->validate(['type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])]]);
+
+        return $request->input('type', Task::TYPE_WORKFLOW) ?: Task::TYPE_WORKFLOW;
+    }
+
     /** @return array<string, mixed> */
     private function boardCard(Request $request, Task $task): array
     {
-        $task = Task::withBoardData($request->user())->findOrFail($task->id);
-
-        return (new TaskBoardCardResource($task))->resolve($request);
+        return (new TaskBoardCardResource(Task::withBoardData($request->user())->findOrFail($task->id)))->resolve($request);
     }
 }

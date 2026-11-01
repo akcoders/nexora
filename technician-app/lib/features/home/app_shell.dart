@@ -171,7 +171,7 @@ class _AppShellState extends State<AppShell> {
                     ),
                     _MenuItem(
                       icon: LucideIcons.ticketCheck,
-                      label: 'Customer Tickets',
+                      label: 'Customer Complaints',
                       selected: index == 1 && taskTab == 2,
                       onTap: () => navigate(1, workTab: 2, closeDrawer: true),
                     ),

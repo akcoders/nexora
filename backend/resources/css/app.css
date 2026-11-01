@@ -1010,3 +1010,10 @@ body.nx-kanban-grabbing, body.nx-kanban-grabbing * { cursor: grabbing !important
     .nx-kanban-card, .nx-kanban-col { transition: none; }
     .nx-kanban-card.is-flash, .nx-skel { animation: none; }
 }
+
+/* Linked internal workflow subtasks */
+.nx-subtask-card, .nx-kanban-card.is-subtask { border-left: 4px solid #8b5cf6; background: #faf7ff; }
+.nx-subtask-row > td { background-color: #faf7ff; }
+.nx-subtask-row > td:first-child { border-left: 4px solid #8b5cf6; }
+.nx-subtask-banner { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 12px; color: #6d28d9; background: #f3e8ff; }
+.nx-parent-link { color: #7c3aed; }

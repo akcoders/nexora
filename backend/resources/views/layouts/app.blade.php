@@ -41,11 +41,9 @@
                     @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan
                     <a class="nx-nav-link {{ request()->routeIs('service-jobs.*') ? 'active' : '' }}" href="{{ route('service-jobs.index') }}"><i data-lucide="wrench"></i>Service Jobs</a>
                     <a class="nx-nav-link {{ request()->routeIs('attendance.*') || request()->routeIs('premises.*') ? 'active' : '' }}" href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance @if($nxPendingAttendance)<span class="badge bg-warning text-dark ms-auto notranslate">{{ $nxPendingAttendance }}</span>@endif</a>
-                    @php $workType = request('type') ?: request()->route('task')?->task_type; @endphp
-                    @php $onBoard = request()->routeIs('tasks.board'); @endphp
-                    <a class="nx-nav-link {{ request()->routeIs('tasks.*') && ! $onBoard && $workType !== 'ticket' ? 'active' : '' }}" href="{{ route('tasks.index', ['scope' => 'open', 'type' => 'workflow']) }}"><i data-lucide="git-branch"></i>Internal Workflow</a>
-                    <a class="nx-nav-link {{ request()->routeIs('tasks.*') && ! $onBoard && $workType === 'ticket' ? 'active' : '' }}" href="{{ route('tasks.index', ['scope' => 'open', 'type' => 'ticket']) }}"><i data-lucide="ticket-check"></i>Customer Tickets</a>
-                    <a class="nx-nav-link {{ $onBoard ? 'active' : '' }}" href="{{ route('tasks.board') }}"><i data-lucide="square-kanban"></i>Kanban Board</a>
+                    @php $workType = request()->route('task')?->task_type ?? (request()->routeIs('complaints.*') ? 'ticket' : (request()->routeIs('workflows.*') ? 'workflow' : request('type', 'workflow'))); @endphp
+                    <a class="nx-nav-link {{ (request()->routeIs('workflows.*') || request()->routeIs('tasks.*')) && $workType !== 'ticket' ? 'active' : '' }}" href="{{ route('workflows.index', ['scope' => 'open']) }}"><i data-lucide="git-branch"></i>Internal Workflow</a>
+                    <a class="nx-nav-link {{ (request()->routeIs('complaints.*') || request()->routeIs('tasks.*')) && $workType === 'ticket' ? 'active' : '' }}" href="{{ route('complaints.index', ['scope' => 'open']) }}"><i data-lucide="ticket-check"></i>Customer Complaints</a>
                     <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>
                     <div class="nx-nav-label">HR & People</div>
                     @can('employees.read')<a class="nx-nav-link {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i data-lucide="contact-round"></i>Employees</a>@endcan
@@ -86,8 +84,8 @@
                                 <a class="dropdown-item" href="{{ route('service-jobs.create') }}"><i data-lucide="wrench"></i>Service job</a>
                                 @can('employees.create')<a class="dropdown-item" href="{{ route('employees.create') }}"><i data-lucide="contact-round"></i>Employee</a>@endcan
                                 @can('companies.create')<a class="dropdown-item" href="{{ route('companies.create') }}"><i data-lucide="landmark"></i>Company</a>@endcan
-                                <a class="dropdown-item" href="{{ route('tasks.index', ['scope' => 'open', 'type' => 'ticket']) }}"><i data-lucide="ticket-check"></i>Customer ticket</a>
-                                <a class="dropdown-item" href="{{ route('tasks.board') }}"><i data-lucide="square-kanban"></i>Kanban board</a>
+                                <a class="dropdown-item" href="{{ route('complaints.index', ['scope' => 'open']) }}"><i data-lucide="ticket-check"></i>Customer complaint</a>
+                                <a class="dropdown-item" href="{{ route('workflows.board') }}"><i data-lucide="square-kanban"></i>Internal workflow board</a>
                             </div>
                         </div>
                     </div>

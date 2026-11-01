@@ -31,6 +31,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/expense-vouchers', [HrSelfServiceController::class, 'storeVoucher']);
         Route::get('/tasks', [TaskController::class, 'index']);
         Route::get('/tasks/{task}', [TaskController::class, 'show']);
+        Route::post('/tasks/{task}/subtasks', [App\Http\Controllers\TaskController::class, 'subtask']);
+        Route::post('/tasks/{task}/due-date', [App\Http\Controllers\TaskController::class, 'dueDate']);
+        Route::get('/tasks/{task}/actions/{action}/attachments/{attachment}', [App\Http\Controllers\TaskController::class, 'attachment'])->whereNumber('attachment');
         Route::post('/tasks/{task}/action', [TaskController::class, 'action']);
         Route::get('/service-jobs', [ServiceJobController::class, 'index']);
         Route::get('/service-jobs/{service_job}', [ServiceJobController::class, 'show']);

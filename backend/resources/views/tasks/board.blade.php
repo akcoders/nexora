@@ -1,11 +1,10 @@
 <x-app-layout>
-    <x-slot name="title">Kanban Board</x-slot>
-    <x-slot name="pageTitle">Workflow & ticket board</x-slot>
-    <x-slot name="breadcrumb">Operations / Internal Workflow & Customer Tickets / Kanban</x-slot>
+    @php $isComplaint = $workType === 'ticket'; $moduleRoute = $isComplaint ? 'complaints' : 'workflows'; @endphp
+    <x-slot name="title">{{ $isComplaint ? 'Complaint board' : 'Workflow board' }}</x-slot>
+    <x-slot name="pageTitle">{{ $isComplaint ? 'Customer complaint board' : 'Internal workflow board' }}</x-slot>
+    <x-slot name="breadcrumb">Operations / {{ $isComplaint ? 'Customer Complaints' : 'Internal Workflow' }} / Kanban</x-slot>
 
-    @php $boardType = in_array(request('type'), ['workflow', 'ticket'], true) ? request('type') : null; @endphp
-
-    <section class="nx-kanban-app" data-kanban data-feed-url="{{ route('tasks.board') }}">
+    <section class="nx-kanban-app" data-kanban data-type="{{ $workType }}" data-feed-url="{{ route($moduleRoute.'.board') }}">
         <div class="nx-card nx-kanban-toolbar mb-3">
             <div class="nx-kanban-toolbar-row">
                 <div class="d-flex flex-wrap align-items-center gap-2">
@@ -14,16 +13,12 @@
                         <button type="button" data-mode-btn="status"><i data-lucide="columns-3"></i>Status</button>
                         <button type="button" data-mode-btn="priority"><i data-lucide="flag"></i>Priority</button>
                     </div>
-                    <nav class="nx-filter-pills" aria-label="Work type">
-                        <a href="#" data-type-btn="">All work</a>
-                        <a href="#" data-type-btn="workflow">Internal workflow</a>
-                        <a href="#" data-type-btn="ticket">Customer tickets</a>
-                    </nav>
+
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 ms-lg-auto">
                     <div class="input-group nx-kanban-search"><span class="input-group-text bg-white border-end-0"><i data-lucide="search" style="width:16px"></i></span><input class="form-control border-start-0 ps-0" type="search" data-search-input placeholder="Search number, title, customer, owner" value="{{ request('search') }}" aria-label="Search cards"></div>
-                    <a class="btn btn-light border" href="{{ route('tasks.index', array_filter(['scope' => 'open', 'type' => $boardType])) }}" title="List view"><i data-lucide="list" style="width:17px"></i><span class="d-none d-xl-inline ms-1">List</span></a>
-                    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#taskModal"><i data-lucide="plus" style="width:17px"></i> New item</button>
+                    <a class="btn btn-light border" href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}" title="List view"><i data-lucide="list" style="width:17px"></i><span class="d-none d-xl-inline ms-1">List</span></a>
+                    @if(auth()->user()->can('tasks.create') || auth()->user()->can('tasks.assign'))<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#taskModal"><i data-lucide="plus" style="width:17px"></i> {{ $isComplaint ? 'New complaint' : 'New workflow' }}</button>@endif
                 </div>
             </div>
             <div class="nx-kanban-toolbar-row border-top pt-3 mt-3">

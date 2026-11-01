@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
@@ -128,7 +129,10 @@ class _TasksScreenState extends State<TasksScreen>
               text: 'Jobs',
             ),
             Tab(icon: Icon(LucideIcons.gitBranch, size: 17), text: 'Workflow'),
-            Tab(icon: Icon(LucideIcons.ticketCheck, size: 17), text: 'Tickets'),
+            Tab(
+              icon: Icon(LucideIcons.ticketCheck, size: 17),
+              text: 'Complaints',
+            ),
             Tab(
               icon: Icon(LucideIcons.circleCheckBig, size: 17),
               text: 'Closed',
@@ -156,8 +160,8 @@ class _TasksScreenState extends State<TasksScreen>
           _TaskList(
             key: ValueKey('tickets$reload'),
             future: load(scope: 'open', type: 'ticket'),
-            title: 'Customer tickets',
-            subtitle: 'Customer-linked tickets assigned to you',
+            title: 'Customer complaints',
+            subtitle: 'Customer complaints assigned to you',
             onRefresh: refresh,
           ),
           _ClosedWorkList(
@@ -524,6 +528,7 @@ class _TaskCard extends StatelessWidget {
     final isClosed = task['status']?.toString() == 'closed';
     final actionsCount = (task['actions_count'] as num?)?.toInt() ?? 0;
     return Card(
+      color: task['parent_task_id'] != null ? const Color(0xFFFAF5FF) : null,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -553,7 +558,11 @@ class _TaskCard extends StatelessWidget {
                       runSpacing: 6,
                       children: [
                         _Pill(
-                          text: taskType == 'ticket' ? 'TICKET' : 'WORKFLOW',
+                          text: taskType == 'ticket'
+                              ? 'COMPLAINT'
+                              : (task['parent_task_id'] != null
+                                    ? 'SUBTASK'
+                                    : 'WORKFLOW'),
                           color: typeColor,
                         ),
                         _Pill(
@@ -580,6 +589,22 @@ class _TaskCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
+              if (task['parent'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '↳ ${task['parent']['task_no']}',
+                    style: const TextStyle(
+                      color: Color(0xFF7C3AED),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              if ((task['subtasks_count'] as num? ?? 0) > 0)
+                Text(
+                  '${task['completed_subtasks_count']}/${task['subtasks_count']} subtasks completed',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
               Text(
                 task['title']?.toString() ?? 'Untitled task',
                 style: const TextStyle(
@@ -685,6 +710,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
   Map<String, dynamic>? task;
   List<dynamic> assignees = [];
   String action = 'close';
+  final List<XFile> attachments = [];
   int? assignedTo;
   bool loading = true;
   bool submitting = false;
@@ -709,6 +735,8 @@ class _TaskDetailsState extends State<_TaskDetails> {
       );
       task = Map<String, dynamic>.from(response.data['task']);
       assignees = List<dynamic>.from(response.data['assignees'] ?? []);
+      if (assignedTo == task?['assigned_to']) assignedTo = null;
+      error = null;
       assignedTo ??= assignees
           .where((item) => item['id'] != task?['assigned_to'])
           .map<int?>((item) => item['id'] as int?)
@@ -721,6 +749,282 @@ class _TaskDetailsState extends State<_TaskDetails> {
     if (mounted) setState(() => loading = false);
   }
 
+  Future<void> pickAttachments(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final selected = source == ImageSource.camera
+          ? [
+              await picker.pickImage(source: source, imageQuality: 85),
+            ].whereType<XFile>().toList()
+          : await picker.pickMultiImage(imageQuality: 85);
+      if (!mounted) return;
+      if (attachments.length + selected.length > 5) {
+        setState(() => error = 'You can attach up to 5 photos.');
+        return;
+      }
+      setState(() {
+        attachments.addAll(selected);
+        error = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => error = 'Unable to select a photo. Please try again.');
+      }
+    }
+  }
+
+  Future<void> openRelated(int id) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .92,
+        child: _TaskDetails(taskId: id, onUpdated: widget.onUpdated),
+      ),
+    );
+    if (mounted) await load();
+  }
+
+  Future<void> changeDueDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate:
+          DateTime.tryParse(task?['due_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(
+        DateTime.tryParse(task?['due_at']?.toString() ?? '')?.toLocal() ??
+            DateTime.now(),
+      ),
+    );
+    if (time == null || !mounted) return;
+    String reason = '';
+    String? validation;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const T('Change due date'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat('d MMM yyyy, hh:mm a').format(
+                    DateTime(
+                      date.year,
+                      date.month,
+                      date.day,
+                      time.hour,
+                      time.minute,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (value) => reason = value,
+                  maxLength: 3000,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Reason for changing due date *',
+                    errorText: validation,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const T('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reason.trim().isEmpty) {
+                  update(() => validation = 'Please enter a reason.');
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: const T('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final reasonText = reason.trim();
+    if (saved != true || !mounted) return;
+    setState(() => submitting = true);
+    try {
+      await context.read<ApiClient>().dio.post(
+        'tasks/${widget.taskId}/due-date',
+        data: {
+          'due_at': DateTime(
+            date.year,
+            date.month,
+            date.day,
+            time.hour,
+            time.minute,
+          ).toIso8601String(),
+          'reason': reasonText,
+        },
+      );
+      widget.onUpdated();
+      if (mounted) await load();
+    } on DioException catch (exception) {
+      if (mounted) {
+        setState(
+          () => error =
+              exception.response?.data?['message']?.toString() ??
+              'Unable to change due date.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => submitting = false);
+    }
+  }
+
+  Future<void> createSubtask() async {
+    String title = '';
+    String description = '';
+    int? owner;
+    bool evidenceRequired = false;
+    String? validation;
+    bool saving = false;
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const T('Create subtask'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Linked to ${task?['task_no']}. This workflow will move to the subtask owner.',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (value) => title = value,
+                  maxLength: 255,
+                  decoration: const InputDecoration(labelText: 'Title *'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  onChanged: (value) => description = value,
+                  maxLines: 3,
+                  maxLength: 5000,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  decoration: const InputDecoration(
+                    labelText: 'Subtask owner *',
+                  ),
+                  isExpanded: true,
+                  items: assignees
+                      .map(
+                        (item) => DropdownMenuItem<int>(
+                          value: item['id'] as int,
+                          child: Text(
+                            item['name']?.toString() ?? '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: saving
+                      ? null
+                      : (value) => update(() => owner = value),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const T('Attachment required when complete'),
+                  value: evidenceRequired,
+                  onChanged: saving
+                      ? null
+                      : (value) =>
+                            update(() => evidenceRequired = value ?? false),
+                ),
+                if (validation != null)
+                  Text(
+                    validation!,
+                    style: const TextStyle(color: AppColors.danger),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving
+                  ? null
+                  : () => Navigator.pop(dialogContext, false),
+              child: const T('Cancel'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (title.trim().isEmpty || owner == null) {
+                        update(
+                          () =>
+                              validation = 'Enter a title and select an owner.',
+                        );
+                        return;
+                      }
+                      update(() {
+                        saving = true;
+                        validation = null;
+                      });
+                      try {
+                        await this.context.read<ApiClient>().dio.post(
+                          'tasks/${widget.taskId}/subtasks',
+                          data: {
+                            'title': title.trim(),
+                            'description': description.trim(),
+                            'assigned_to': owner,
+                            'priority': 'normal',
+                            'attachment_required_on_completion':
+                                evidenceRequired,
+                          },
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } on DioException catch (exception) {
+                        if (dialogContext.mounted) {
+                          update(() {
+                            saving = false;
+                            validation =
+                                exception.response?.data?['message']
+                                    ?.toString() ??
+                                'Unable to create subtask.';
+                          });
+                        }
+                      }
+                    },
+              child: Text(saving ? 'Creating…' : 'Create & assign'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (created == true) {
+      widget.onUpdated();
+      if (mounted) await load();
+    }
+  }
+
   Future<void> submit() async {
     if (remark.text.trim().isEmpty) {
       setState(() => error = 'Please enter a remark.');
@@ -731,8 +1035,17 @@ class _TaskDetailsState extends State<_TaskDetails> {
       return;
     }
 
+    if (action == 'close' &&
+        task?['attachment_required_on_completion'] == true &&
+        attachments.isEmpty) {
+      setState(
+        () => error =
+            'Attach at least one photo before completing this workflow.',
+      );
+      return;
+    }
     final isTicket = task?['task_type'] == 'ticket';
-    final workLabel = isTicket ? 'ticket' : 'workflow';
+    final workLabel = isTicket ? 'complaint' : 'workflow';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -769,11 +1082,16 @@ class _TaskDetailsState extends State<_TaskDetails> {
     try {
       await context.read<ApiClient>().dio.post(
         'tasks/${widget.taskId}/action',
-        data: {
+        data: FormData.fromMap({
           'action': action,
           'remark': remark.text.trim(),
           if (action == 'assign') 'assigned_to': assignedTo,
-        },
+          if (attachments.isNotEmpty)
+            'attachments[]': [
+              for (final file in attachments)
+                await MultipartFile.fromFile(file.path, filename: file.name),
+            ],
+        }),
       );
       widget.onUpdated();
       if (mounted) Navigator.pop(context);
@@ -816,7 +1134,9 @@ class _TaskDetailsState extends State<_TaskDetails> {
         Row(
           children: [
             _Pill(
-              text: type == 'ticket' ? 'TICKET' : 'WORKFLOW',
+              text: type == 'ticket'
+                  ? 'COMPLAINT'
+                  : (task?['parent_task_id'] != null ? 'SUBTASK' : 'WORKFLOW'),
               color: type == 'ticket' ? AppColors.secondary : AppColors.primary,
             ),
             const SizedBox(width: 8),
@@ -873,6 +1193,59 @@ class _TaskDetailsState extends State<_TaskDetails> {
             ),
           ),
         ),
+        if (task?['parent'] != null)
+          TextButton.icon(
+            onPressed: () => openRelated(task!['parent']['id'] as int),
+            icon: const Icon(LucideIcons.gitBranch),
+            label: Text('Parent: ${task!['parent']['task_no']}'),
+          ),
+        if (type != 'ticket') ...[
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              const Expanded(
+                child: T(
+                  'Subtasks',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (canAct)
+                TextButton.icon(
+                  onPressed: submitting ? null : createSubtask,
+                  icon: const Icon(LucideIcons.plus, size: 17),
+                  label: const T('Create subtask'),
+                ),
+            ],
+          ),
+          for (final child in List<dynamic>.from(task?['subtasks'] ?? []))
+            Card(
+              color: const Color(0xFFFAF5FF),
+              child: ListTile(
+                leading: Icon(
+                  child['status'] == 'closed'
+                      ? LucideIcons.circleCheckBig
+                      : LucideIcons.gitBranch,
+                  color: child['status'] == 'closed'
+                      ? AppColors.success
+                      : const Color(0xFF7C3AED),
+                ),
+                title: Text(child['title']?.toString() ?? ''),
+                subtitle: Text(
+                  '${child['task_no']} · ${child['assignee']?['name'] ?? ''} · ${child['status'] == 'closed' ? 'Completed' : 'Active'}',
+                ),
+                onTap: () => openRelated(child['id'] as int),
+              ),
+            ),
+        ],
+        if (canAct)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: submitting ? null : changeDueDate,
+              icon: const Icon(LucideIcons.calendarClock, size: 17),
+              label: const T('Change due date'),
+            ),
+          ),
         const SizedBox(height: 22),
         const T(
           'Activity',
@@ -935,6 +1308,44 @@ class _TaskDetailsState extends State<_TaskDetails> {
               onChanged: (value) => setState(() => assignedTo = value),
             ),
           ],
+          const SizedBox(height: 12),
+          Text(
+            task?['attachment_required_on_completion'] == true
+                ? 'Attachment required to complete'
+                : 'Attachments (optional)',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: submitting
+                    ? null
+                    : () => pickAttachments(ImageSource.camera),
+                icon: const Icon(LucideIcons.camera, size: 17),
+                label: const T('Take photo'),
+              ),
+              TextButton.icon(
+                onPressed: submitting
+                    ? null
+                    : () => pickAttachments(ImageSource.gallery),
+                icon: const Icon(LucideIcons.image, size: 17),
+                label: const T('Choose photos'),
+              ),
+            ],
+          ),
+          for (final file in attachments)
+            ListTile(
+              dense: true,
+              leading: const Icon(LucideIcons.paperclip, size: 17),
+              title: Text(file.name),
+              trailing: IconButton(
+                onPressed: submitting
+                    ? null
+                    : () => setState(() => attachments.remove(file)),
+                icon: const Icon(LucideIcons.x, size: 17),
+              ),
+            ),
           if (error != null) ...[
             const SizedBox(height: 10),
             Text(error!, style: const TextStyle(color: AppColors.danger)),
@@ -1008,6 +1419,19 @@ class _ActionTile extends StatelessWidget {
                   action['remark']?.toString() ?? '',
                   style: const TextStyle(color: AppColors.muted),
                 ),
+                for (final file in List<dynamic>.from(
+                  action['attachments'] ?? [],
+                ))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '📎 ${file['name']}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 3),
                 Text(
                   '${action['user']?['name'] ?? 'User'} · ${created == null ? '' : DateFormat('d MMM, hh:mm a').format(created.toLocal())}',

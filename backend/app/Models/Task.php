@@ -27,7 +27,17 @@ class Task extends Model
 
     protected function casts(): array
     {
-        return ['due_at' => 'datetime', 'closed_at' => 'datetime'];
+        return ['due_at' => 'datetime', 'closed_at' => 'datetime', 'attachment_required_on_completion' => 'boolean'];
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_task_id');
+    }
+
+    public function subtasks(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_task_id');
     }
 
     public function assignee(): BelongsTo
@@ -47,7 +57,7 @@ class Task extends Model
 
     public function actions(): HasMany
     {
-        return $this->hasMany(TaskAction::class)->latest();
+        return $this->hasMany(TaskAction::class)->latest()->orderByDesc('id');
     }
 
     public function latestAction(): HasOne
@@ -92,8 +102,8 @@ class Task extends Model
     /** Relations, counts and the viewer's watch flag needed to render a Kanban card. */
     public function scopeWithBoardData(Builder $query, User $viewer): void
     {
-        $query->with(['customer', 'assignee', 'latestAction.user'])
-            ->withCount(['actions', 'observers'])
+        $query->with(['customer', 'assignee', 'latestAction.user', 'parent:id,task_no,title'])
+            ->withCount(['actions', 'observers', 'subtasks', 'subtasks as completed_subtasks_count' => fn (Builder $query) => $query->closed()])
             ->withExists(['observers as watched_by_viewer' => fn (Builder $query) => $query->where('user_id', $viewer->id)]);
     }
 
@@ -116,8 +126,24 @@ class Task extends Model
 
         DB::transaction(function () use ($priority, $by, $note): void {
             $summary = 'Priority changed from '.str($this->priority)->headline().' to '.str($priority)->headline().'.';
-            $this->actions()->create(['user_id' => $by->id, 'action' => 'priority', 'remark' => trim($summary.' '.$note)]);
+            $this->recordAction(['user_id' => $by->id, 'action' => 'priority', 'remark' => trim($summary.' '.$note)]);
             $this->update(['priority' => $priority]);
         });
+    }
+
+    /** Records subtask activity on every parent timeline as well. @param array<string, mixed> $attributes */
+    public function recordAction(array $attributes): TaskAction
+    {
+        $action = $this->actions()->create($attributes);
+        $parent = $this->parent;
+        while ($parent) {
+            $parent->actions()->create(array_merge($attributes, [
+                'related_task_id' => $this->id,
+                'remark' => $this->task_no.' · '.$this->title.': '.$attributes['remark'],
+            ]));
+            $parent = $parent->parent;
+        }
+
+        return $action;
     }
 }
