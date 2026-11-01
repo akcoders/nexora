@@ -1123,11 +1123,13 @@ body.nx-kanban-grabbing, body.nx-kanban-grabbing * { cursor: grabbing !important
 .nx-activity-attachments svg { width: 12px; height: 12px; }
 
 /* Employee detail rows */
+.nx-employee-detail-list { min-width: 0; }
+.nx-employee-detail-list > [data-detail-rows] { display: grid; grid-template-columns: minmax(0, 1fr); }
 .nx-detail-list-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-bottom: 10px; }
 .nx-detail-list-head strong { font-size: 13px; }
 .nx-detail-list-head .btn, .nx-detail-remove { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .nx-detail-list-head svg, .nx-detail-remove svg { width: 15px; height: 15px; }
-.nx-detail-row { padding: 12px 0; border-top: 1px solid var(--nx-border); }
+.nx-detail-row { min-width: 0; padding: 12px 0; border-top: 1px solid var(--nx-border); }
 .nx-detail-row .form-label { margin-bottom: 5px; }
 .nx-detail-remove { min-height: 38px; min-width: 38px; }
 .nx-detail-remove:not(:disabled):hover { color: #b91c1c; border-color: #fecaca !important; background: #fff1f2; }
