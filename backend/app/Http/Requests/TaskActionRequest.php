@@ -18,6 +18,13 @@ class TaskActionRequest extends FormRequest
             && ($this->is('api/*') ? $task->assigned_to === $this->user()->id : $this->user()->can('act', $task));
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('status') === 'in_progress') {
+            $this->merge(['status' => 'pending']);
+        }
+    }
+
     public function rules(): array
     {
         $updating = $this->input('action') === 'update';
@@ -27,7 +34,7 @@ class TaskActionRequest extends FormRequest
         return [
             'action' => ['required', Rule::in(['update', 'close', 'assign'])],
             'remark' => ['required', 'string', 'max:3000'],
-            'status' => [Rule::excludeIf(! $updating), 'required', Rule::in(['pending', 'in_progress', Task::STATUS_CLOSED])],
+            'status' => [Rule::excludeIf(! $updating), 'required', Rule::in(['pending', Task::STATUS_CLOSED])],
             'reassign' => [Rule::excludeIf(! $updating), 'sometimes', 'boolean', Rule::prohibitedIf($completing && $this->boolean('reassign'))],
             'assigned_to' => [Rule::excludeIf(! $reassigning), 'required', Rule::exists('users', 'id')->where('status', 'active'), Rule::when($updating, [Rule::notIn([$this->route('task')->assigned_to])])],
             'change_due_date' => ['sometimes', 'boolean', 'declined'],

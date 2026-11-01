@@ -182,7 +182,7 @@ class _TasksScreenState extends State<TasksScreen>
             ),
             Tab(
               icon: Icon(LucideIcons.circleCheckBig, size: 17),
-              text: 'Closed',
+              text: 'Completed',
             ),
           ],
           labelColor: AppColors.primary,
@@ -611,7 +611,7 @@ class _TaskCard extends StatelessWidget {
                         ),
                         _Pill(
                           text: isClosed
-                              ? 'CLOSED'
+                              ? 'COMPLETED'
                               : (overdue ? 'OVERDUE' : 'PENDING'),
                           color: isClosed
                               ? AppColors.success
@@ -816,7 +816,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
       );
       task = Map<String, dynamic>.from(response.data['task']);
       assignees = List<dynamic>.from(response.data['assignees'] ?? []);
-      updateStatus = task?['status']?.toString() ?? 'pending';
+      updateStatus = task?['status'] == 'closed' ? 'closed' : 'pending';
       nextFollowUpAt = DateTime.tryParse(
         task?['next_follow_up_at']?.toString() ?? '',
       )?.toLocal();
@@ -1204,11 +1204,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
             _Pill(
               text: overdue
                   ? 'OVERDUE'
-                  : (task?['status']
-                            ?.toString()
-                            .replaceAll('_', ' ')
-                            .toUpperCase() ??
-                        'PENDING'),
+                  : (task?['status'] == 'closed' ? 'COMPLETED' : 'PENDING'),
               color: task?['status'] == 'closed'
                   ? AppColors.success
                   : (overdue ? AppColors.danger : AppColors.warning),
@@ -1385,10 +1381,6 @@ class _TaskDetailsState extends State<_TaskDetails> {
                       decoration: const InputDecoration(labelText: 'Status *'),
                       items: const [
                         DropdownMenuItem(value: 'pending', child: T('Pending')),
-                        DropdownMenuItem(
-                          value: 'in_progress',
-                          child: T('In progress'),
-                        ),
                         DropdownMenuItem(
                           value: 'closed',
                           child: T('Completed'),
@@ -1786,7 +1778,7 @@ class _WorkflowProgress extends StatelessWidget {
         icon: LucideIcons.activity,
         done: closed || actions > 1,
       ),
-      (label: 'Closed', icon: LucideIcons.circleCheckBig, done: closed),
+      (label: 'Completed', icon: LucideIcons.circleCheckBig, done: closed),
     ];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),

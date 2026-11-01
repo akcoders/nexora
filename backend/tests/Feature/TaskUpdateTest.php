@@ -64,7 +64,7 @@ class TaskUpdateTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_status_changes_keep_the_same_owner_and_record_the_change_in_the_parent_timeline(): void
+    public function test_legacy_in_progress_updates_remain_pending_and_record_the_remark_in_the_parent_timeline(): void
     {
         [$admin, $owner, $parent] = $this->workflow();
         $child = Task::create([
@@ -74,9 +74,10 @@ class TaskUpdateTest extends TestCase
 
         $this->actingAs($owner)->postJson(route('tasks.action', $child), ['action' => 'update', 'status' => 'in_progress', 'remark' => 'Checking the dispatch schedule.'])->assertOk();
 
-        $this->assertDatabaseHas('tasks', ['id' => $child->id, 'status' => 'in_progress', 'assigned_to' => $owner->id]);
+        $this->assertDatabaseHas('tasks', ['id' => $child->id, 'status' => 'pending', 'assigned_to' => $owner->id]);
         $this->assertDatabaseHas('task_actions', ['task_id' => $parent->id, 'related_task_id' => $child->id, 'action' => 'update']);
-        $this->assertDatabaseHas('task_actions', ['task_id' => $child->id, 'action' => 'status', 'remark' => 'Status changed from Pending to In progress.']);
+        $this->assertSame(1, $child->actions()->count());
+        $this->assertDatabaseMissing('task_actions', ['task_id' => $child->id, 'action' => 'status']);
     }
 
     public function test_reassigning_requires_another_owner_and_revised_dates_require_a_delay_reason_before_any_update_is_saved(): void
@@ -111,7 +112,7 @@ class TaskUpdateTest extends TestCase
 
         $task->refresh();
         $this->assertSame($admin->id, $task->assigned_to);
-        $this->assertSame('in_progress', $task->status);
+        $this->assertSame('pending', $task->status);
         $this->assertSame('2026-11-05 17:00:00', $task->due_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-11-07 17:00:00', $task->revised_due_at->format('Y-m-d H:i:s'));
         $this->assertDatabaseHas('task_actions', ['task_id' => $task->id, 'action' => 'assign', 'remark' => 'Please coordinate delivery.']);

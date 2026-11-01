@@ -24,6 +24,13 @@
         ];
         $ver = fn($key,$default='') => old('verification.'.$key, data_get($profile,'verification.'.$key,$default));
         $existingDocs = $profile?->documents ?? [];
+        $contactRows = old('emergency_family.contacts', $profile?->emergencyContacts() ?? []);
+        $educationRows = old('education_skills.education_records', $profile?->educationRecords() ?? []);
+        $certificationRows = old('education_skills.certification_records', $profile?->certificationRecords() ?? []);
+        $policyRows = old('benefits_allowances.insurance_policies', $profile?->insurancePolicies() ?? []);
+        $assetRows = old('assets_access.assigned_assets', $profile?->assignedAssets() ?? []);
+        $hasRows = fn($rows) => is_array($rows) && count($rows) > 0;
+
         // Renders <option>s; a saved value that is no longer offered stays selectable so older records still save.
         $opt = function (array $choices, mixed $selected, ?string $blank = 'Select'): string {
             $selected = $selected === null ? '' : (string) $selected;
@@ -114,15 +121,8 @@
                     </div></div>
                     @endforeach
                     <div class="col-12"><div class="nx-field-group tone-rose">
-                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="phone-call"></i></span><div><strong>Emergency contacts</strong><small>The first contact is required; add a second person as a backup.</small></div></div>
-                        <div class="row g-3">
-                            <div class="col-md-4"><label class="form-label">Contact name *</label><input class="form-control" name="emergency_family[emergency_name]" value="{{ $fam('emergency_name') }}" required data-v="person_name" maxlength="120"></div>
-                            <div class="col-md-4"><label class="form-label">Relation *</label><select class="form-select" name="emergency_family[relation]" required>{!! $opt($options('relations'), $fam('relation')) !!}</select></div>
-                            <div class="col-md-4"><label class="form-label">Emergency mobile *</label><input class="form-control" name="emergency_family[mobile]" value="{{ $fam('mobile') }}" required data-v="mobile|different:phone" data-msg-different="Emergency mobile must be a different number from the employee mobile." inputmode="tel"></div>
-                            <div class="col-md-4"><label class="form-label">Second contact name</label><input class="form-control" name="emergency_family[secondary_name]" value="{{ $fam('secondary_name') }}" data-v="person_name|required_with:secondary_mobile,secondary_relation" maxlength="120"></div>
-                            <div class="col-md-4"><label class="form-label">Relation</label><select class="form-select" name="emergency_family[secondary_relation]" data-v="required_with:secondary_name">{!! $opt($options('relations'), $fam('secondary_relation')) !!}</select></div>
-                            <div class="col-md-4"><label class="form-label">Second emergency mobile</label><input class="form-control" name="emergency_family[secondary_mobile]" value="{{ $fam('secondary_mobile') }}" data-v="mobile|different:phone|different:mobile|required_with:secondary_name" data-msg-different="The second emergency mobile must differ from the employee and first emergency numbers." inputmode="tel"></div>
-                        </div>
+                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="phone-call"></i></span><div><strong>Emergency contacts</strong><small>Add people we can contact in an emergency. At least one contact is required.</small></div></div>
+                        <x-employee-detail-list name="emergency_family[contacts]" :rows="$contactRows" :fields="[['key'=>'name','label'=>'Contact name','required'=>true,'max'=>120,'validation'=>'person_name','column'=>'col-md-4'],['key'=>'relation','label'=>'Relation','required'=>true,'options'=>$options('relations'),'column'=>'col-md-3'],['key'=>'mobile','label'=>'Mobile','type'=>'tel','required'=>true,'max'=>20,'validation'=>'mobile|different:phone','column'=>'col-md-3']]" title="People to contact" add-label="Add more contacts" :maximum="10" />
                     </div></div>
                     <div class="col-12"><div class="nx-field-group tone-amber">
                         <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="users"></i></span><div><strong>Dependents</strong><small>Family members who depend on the employee, for insurance and benefits.</small></div></div>
@@ -247,9 +247,12 @@
                             @foreach(['pf_eligible'=>'PF eligible','esic_eligible'=>'ESIC eligible'] as $key=>$label)@php $val = old('benefits_allowances.'.$key,data_get($profile,'benefits_allowances.'.$key)); @endphp
                             <div class="col-md-3"><label class="form-label">{{ $label }}</label><select class="form-select" name="benefits_allowances[{{ $key }}]"><option value="">Not set</option><option value="yes" @selected(in_array(strtolower((string)$val),['yes','1','true']))>Yes</option><option value="no" @selected(in_array(strtolower((string)$val),['no','0','false']))>No</option></select></div>
                             @endforeach
-                            <div class="col-md-3"><label class="form-label">Insurance policy</label><input class="form-control" name="benefits_allowances[insurance_policy]" value="{{ old('benefits_allowances.insurance_policy',data_get($profile,'benefits_allowances.insurance_policy')) }}" maxlength="120" placeholder="Policy no. / insurer"></div>
+
                             <div class="col-md-3"><label class="form-label">Gratuity eligible</label><select class="form-select" name="benefits_allowances[gratuity]">{!! $opt($options('yes_no'), old('benefits_allowances.gratuity',data_get($profile,'benefits_allowances.gratuity')), 'Not set') !!}</select></div>
                         </div>
+                        <x-employee-detail-section flag="benefits_allowances[has_policies]" label="Any policies?" :enabled="old('benefits_allowances.has_policies', $hasRows($policyRows))">
+                            <x-employee-detail-list name="benefits_allowances[insurance_policies]" :rows="$policyRows" :fields="[['key'=>'name','label'=>'Policy name','required'=>true,'max'=>120,'placeholder'=>'e.g. Health insurance'],['key'=>'number','label'=>'Policy number / provider (optional)']]" title="Policies" add-label="Add more policies" />
+                        </x-employee-detail-section>
                     </div></div>
                     <div class="col-12"><div class="nx-field-group tone-emerald">
                         <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="gift"></i></span><div><strong>Allowances & perks</strong><small>Loans, bonus and benefits in kind.</small></div></div>
@@ -271,9 +274,16 @@
                 <div class="row g-3">
                     <div class="col-12"><div class="nx-field-group tone-sky">
                         <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="graduation-cap"></i></span><div><strong>Education & skills</strong></div></div>
+                        <x-employee-detail-section flag="education_skills[has_education]" label="Education details available?" :enabled="old('education_skills.has_education', $hasRows($educationRows))">
+                            <x-employee-detail-list name="education_skills[education_records]" :rows="$educationRows" :fields="[['key'=>'name','label'=>'Education / qualification','required'=>true,'max'=>120,'placeholder'=>'e.g. ITI, Diploma or B.Com'],['key'=>'institution','label'=>'School / institution (optional)']]" title="Education" add-label="Add more education" />
+                        </x-employee-detail-section>
+                        <x-employee-detail-section flag="education_skills[has_certifications]" label="Any certifications?" :enabled="old('education_skills.has_certifications', $hasRows($certificationRows))">
+                            <x-employee-detail-list name="education_skills[certification_records]" :rows="$certificationRows" :fields="[['key'=>'name','label'=>'Certification name','required'=>true,'max'=>120,'placeholder'=>'e.g. HVAC safety certification'],['key'=>'issuer','label'=>'Issued by (optional)']]" title="Certifications" add-label="Add more certifications" />
+                        </x-employee-detail-section>
+                        <div class="small fw-semibold mt-4 mb-2">Skills & experience</div>
                         <div class="row g-3">
-                            <div class="col-md-4"><label class="form-label">Highest qualification</label><select class="form-select" name="education_skills[highest_qualification]">{!! $opt($options('qualifications'), old('education_skills.highest_qualification',data_get($profile,'education_skills.highest_qualification'))) !!}</select></div>
-                            @foreach(['specialization'=>'Specialization','technical_skills'=>'Technical skills','certifications'=>'Certifications','trade_licence'=>'Trade licence'] as $key=>$label)
+
+                            @foreach(['specialization'=>'Specialization','technical_skills'=>'Technical skills','trade_licence'=>'Trade licence'] as $key=>$label)
                             <div class="col-md-4"><label class="form-label">{{ $label }}</label><input class="form-control" name="education_skills[{{ $key }}]" value="{{ old('education_skills.'.$key,data_get($profile,'education_skills.'.$key)) }}" maxlength="255"></div>
                             @endforeach
                             <div class="col-md-4"><label class="form-label">Experience (years)</label><input type="number" min="0" max="60" step=".5" class="form-control" name="education_skills[experience_years]" value="{{ old('education_skills.experience_years',data_get($profile,'education_skills.experience_years')) }}" data-v="step:0.5"></div>
@@ -305,11 +315,13 @@
                 <div class="nx-step-help"><div><h2 class="nx-section-title mb-1">Assets, system access & separation</h2><p class="small text-secondary mb-0">Company property issued, and exit details when the time comes.</p></div><span class="nx-step-counter">Step 8 of 8</span></div>
                 <div class="row g-3">
                     <div class="col-12"><div class="nx-field-group tone-teal">
-                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="package-check"></i></span><div><strong>Assets issued</strong><small>Serial number, quantity or "Yes" is enough.</small></div></div>
-                        <div class="row g-3">
-                            @foreach(['laptop'=>'Laptop','mobile'=>'Company mobile','sim'=>'SIM','uniform'=>'Uniform','toolkit'=>'Toolkit','access_card'=>'Access card','email_access'=>'Email access','erp_access'=>'ERP access'] as $key=>$label)
-                            @php $assetList = match ($key) { 'uniform', 'toolkit' => 'issue_statuses', 'email_access', 'erp_access' => 'access_statuses', default => null }; $assetValue = old('assets_access.'.$key,data_get($profile,'assets_access.'.$key)); @endphp
-                            <div class="col-md-3"><label class="form-label">{{ $label }}</label>@if($assetList)<select class="form-select" name="assets_access[{{ $key }}]">{!! $opt($options($assetList), $assetValue) !!}</select>@else<input class="form-control" name="assets_access[{{ $key }}]" value="{{ $assetValue }}" maxlength="120" placeholder="Serial / number">@endif</div>
+                        <div class="nx-field-group-head"><span class="nx-field-group-icon"><i data-lucide="package-check"></i></span><div><strong>Assets issued</strong><small>Add each asset. A toolbox can have its own list of tool names; serial numbers are optional.</small></div></div>
+                        <x-employee-detail-section flag="assets_access[assets_assigned]" label="Any assets assigned?" :enabled="old('assets_access.assets_assigned', $hasRows($assetRows))">
+                            <x-employee-detail-list name="assets_access[assigned_assets]" :rows="$assetRows" :fields="[['key'=>'name','label'=>'Asset name','required'=>true,'max'=>120,'placeholder'=>'e.g. Laptop or toolbox'],['key'=>'identifier','label'=>'Serial / reference (optional)']]" title="Assigned assets" add-label="Add more assets" :maximum="50" :nested-assets="true" index-token="__ASSET_INDEX__" />
+                        </x-employee-detail-section>
+                        <div class="row g-3 mt-3">
+                            @foreach(['email_access'=>'Email access','erp_access'=>'ERP access'] as $key=>$label)
+                                <div class="col-md-4"><label class="form-label">{{ $label }}</label><select class="form-select" name="assets_access[{{ $key }}]">{!! $opt($options('access_statuses'), old('assets_access.'.$key, data_get($profile,'assets_access.'.$key))) !!}</select></div>
                             @endforeach
                         </div>
                     </div></div>

@@ -18,14 +18,17 @@ class TaskController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        if ($request->input('status') === 'in_progress') {
+            $request->merge(['status' => 'pending']);
+        }
         $filters = $request->validate([
             'scope' => ['nullable', Rule::in(['open'])],
-            'status' => ['nullable', Rule::in(['pending', 'in_progress', 'closed', 'overdue'])],
+            'status' => ['nullable', Rule::in(['pending', 'closed', 'overdue'])],
             'type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
         ]);
 
         $tasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')
-            ->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee', 'parent:id,task_no,title', 'observers.user:id,name'])
+            ->withVisibleParent($request->user())->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee', 'observers.user:id,name'])
             ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
             ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->when(($filters['scope'] ?? null) === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
@@ -45,7 +48,7 @@ class TaskController extends Controller
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
 
         return response()->json([
-            'task' => $task->load(['customer', 'assignee', 'creator', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'parent', 'subtasks.assignee', 'observers.user:id,name']),
+            'task' => $task->load(['customer', 'assignee', 'creator', 'observers.user:id,name'])->loadVisibleRelations($request->user()),
             'assignees' => User::where('status', 'active')->orderBy('name')->get(['id', 'name', 'employee_code', 'designation']),
         ]);
     }
@@ -61,6 +64,6 @@ class TaskController extends Controller
 
         $workflow->act($task, $request->validated(), $request->user());
 
-        return response()->json(['message' => 'Task updated.', 'task' => $task->fresh()->load(['assignee', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'parent', 'subtasks.assignee'])]);
+        return response()->json(['message' => 'Task updated.', 'task' => $task->fresh()->load('assignee')->loadVisibleRelations($request->user())]);
     }
 }

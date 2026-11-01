@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\Task;
+use App\Models\TaskMember;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Notifications\TaskCompletedNotification;
+use App\Support\RecordVisibility;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -23,11 +25,11 @@ class TaskWorkflow
         $task = DB::transaction(function () use ($data, $by, $parent): Task {
             if ($parent) {
                 $parent = Task::lockForUpdate()->findOrFail($parent->id);
-                abort_unless($by->can('act', $parent), 403);
+                abort_unless(RecordVisibility::allows($by, $parent, 'tasks') && $by->can('act', $parent), 403);
                 abort_unless($parent->task_type === Task::TYPE_WORKFLOW, 422, 'Subtasks belong to internal workflows only.');
                 abort_if($parent->isClosed(), 422, 'Reopen the workflow before creating a subtask.');
             }
-            $observers = $parent ? $parent->observers()->pluck('user_id')->all() : ($data['observers'] ?? []);
+            $observers = $parent ? $parent->observers()->whereNotIn('user_id', $parent->subtaskOnlyMembers()->pluck('user_id'))->pluck('user_id')->all() : ($data['observers'] ?? []);
             unset($data['observers'], $data['return_to']);
             if ($data['task_type'] === Task::TYPE_WORKFLOW) {
                 $data['category'] = 'Internal';
@@ -53,23 +55,21 @@ class TaskWorkflow
                 $ancestor = $parent;
                 while ($ancestor) {
                     $ancestor->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'assignee']);
-                    $this->assign($ancestor, $task->assigned_to);
+                    $this->assign($ancestor, $task->assigned_to, restrictParents: false, restoreAccess: false);
                     $ancestor = $ancestor->parent;
                 }
+                $this->restrictParentAccess($task, $task->assigned_to);
             }
             $task->recordAction([
                 'user_id' => $by->id, 'assigned_to' => $task->assigned_to, 'action' => 'created',
                 'remark' => $parent
-                    ? 'Parent: '.$parent->task_no.'. Responsible Person: '.$task->assignee->name.'. Priority: '.str($task->priority)->headline().'. Due: '.($task->due_at?->format('d M Y, h:i A') ?? 'Not set').'. Observers inherited: '.count($observers).'.'
+                    ? 'Responsible Person: '.$task->assignee->name.'. Priority: '.str($task->priority)->headline().'. Due: '.($task->due_at?->format('d M Y, h:i A') ?? 'Not set').'. Observers inherited: '.count($observers).'.'
                     : 'Task created and assigned.',
             ]);
 
             return $task;
         });
         $this->notifyAssigned($task);
-        if ($parent && $parent->assigned_to !== $task->assigned_to) {
-            $this->notifyAssigned($parent->fresh());
-        }
 
         return $task;
     }
@@ -80,12 +80,14 @@ class TaskWorkflow
         $stored = [];
         $updating = $data['action'] === 'update';
         $reassigning = $data['action'] === 'assign' || ($updating && ($data['reassign'] ?? false));
-        $status = $updating ? $data['status'] : ($data['action'] === 'close' ? Task::STATUS_CLOSED : 'pending');
+        $completing = $data['action'] === 'close' || ($updating && $data['status'] === Task::STATUS_CLOSED);
+        $status = $completing ? Task::STATUS_CLOSED : 'pending';
         $action = $status === Task::STATUS_CLOSED ? 'close' : ($reassigning ? 'assign' : 'update');
         $returnedParents = [];
         try {
             DB::transaction(function () use ($task, $data, $by, $allowReopen, $action, $status, &$stored, &$returnedParents): void {
                 $task = Task::lockForUpdate()->findOrFail($task->id);
+                abort_unless(RecordVisibility::allows($by, $task, 'tasks') && $by->can('act', $task), 403);
                 abort_if($task->isClosed() && (! $allowReopen || $action !== 'assign'), 422, 'This task is already closed.');
                 if ($action === 'assign' && $task->isClosed() && $task->parent?->isClosed()) {
                     throw ValidationException::withMessages(['action' => 'Reopen the parent workflow before reopening this subtask.']);
@@ -99,7 +101,6 @@ class TaskWorkflow
                     }
                 }
                 $followUp = $this->updateFollowUp($task, $data);
-                $previousStatus = $task->status;
                 $attachments = [];
                 foreach ($data['attachments'] ?? [] as $file) {
                     $path = $file->store('task-attachments/'.$task->id, 'local');
@@ -125,12 +126,6 @@ class TaskWorkflow
                     }
                 } else {
                     $task->update(['status' => $status, 'closed_at' => null]);
-                    if ($status !== $previousStatus) {
-                        $label = fn (string $value): string => match ($value) {
-                            'pending' => 'Pending', 'in_progress' => 'In progress', 'closed' => 'Completed', default => $value,
-                        };
-                        $task->recordAction(['user_id' => $by->id, 'action' => 'status', 'remark' => 'Status changed from '.$label($previousStatus).' to '.$label($status).'.']);
-                    }
                 }
             });
         } catch (Throwable $exception) {
@@ -148,9 +143,10 @@ class TaskWorkflow
                 $parent = $parent->parent;
             }
             foreach (User::whereIn('id', array_unique($ids))->get() as $participant) {
-                $participant->notify(new TaskCompletedNotification($task));
+                $completion = new TaskCompletedNotification($task);
+                $participant->notify($completion);
                 $this->oneSignal->sendToUser($participant, $task->parent_task_id ? 'Subtask completed' : 'Task completed', $task->task_no.' · '.$task->title, [
-                    'type' => $task->task_type.'_task', 'task_id' => $task->parent_task_id ?? $task->id,
+                    'type' => $task->task_type.'_task', 'task_id' => $completion->targetTaskId($participant),
                 ]);
             }
             foreach (Task::whereIn('id', $returnedParents)->get() as $parent) {
@@ -174,7 +170,7 @@ class TaskWorkflow
             }
             if (! $parent->isClosed()) {
                 $previousOwner = $parent->assigned_to;
-                $this->assign($parent, $task->created_by);
+                $this->assign($parent, $task->created_by, restrictParents: false);
                 if ($previousOwner !== $task->created_by) {
                     $returnedParents[] = $parent->id;
                 }
@@ -222,22 +218,37 @@ class TaskWorkflow
         ];
     }
 
-    private function assign(Task $task, int $owner): void
+    private function assign(Task $task, int $owner, bool $restrictParents = true, bool $restoreAccess = true): void
     {
         $task->members()->firstOrCreate(['user_id' => $task->assigned_to, 'role' => 'previous_assignee']);
         $task->members()->firstOrCreate(['user_id' => $owner, 'role' => 'assignee']);
-        $parent = $task->parent;
-        while ($parent) {
-            $parent->members()->firstOrCreate(['user_id' => $owner, 'role' => 'observer']);
-            $parent = $parent->parent;
+        if ($restoreAccess) {
+            $task->subtaskOnlyMembers()->where('user_id', $owner)->delete();
+        }
+        if ($restrictParents) {
+            $this->restrictParentAccess($task, $owner);
         }
         $task->update(['status' => 'pending', 'assigned_to' => $owner, 'closed_at' => null]);
+    }
+
+    private function restrictParentAccess(Task $task, int $owner): void
+    {
+        if ($owner === $task->created_by) {
+            return;
+        }
+        $parent = $task->parent;
+        while ($parent) {
+            if ($parent->created_by !== $owner) {
+                $parent->members()->firstOrCreate(['user_id' => $owner, 'role' => TaskMember::ROLE_SUBTASK_ONLY]);
+            }
+            $parent = $parent->parent;
+        }
     }
 
     /** @return list<int> */
     private function participantIds(Task $task): array
     {
-        return array_unique(array_merge([$task->created_by, $task->assigned_to], $task->members()->pluck('user_id')->all()));
+        return array_values(array_diff(array_unique(array_merge([$task->created_by, $task->assigned_to], $task->members()->pluck('user_id')->all())), $task->subtaskOnlyMembers()->pluck('user_id')->all()));
     }
 
     private function notifyAssigned(Task $task, ?string $title = null): void

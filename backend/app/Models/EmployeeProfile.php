@@ -122,6 +122,68 @@ class EmployeeProfile extends Model
         return ['key' => $type, 'label' => str($type)->headline()->toString(), 'tone' => $type === 'permanent' ? 'success' : 'primary', 'detail' => null];
     }
 
+    /** @return list<array<string, mixed>> */
+    public function emergencyContacts(): array
+    {
+        $family = $this->emergency_family ?? [];
+        if (is_array($family['contacts'] ?? null)) {
+            return array_values($family['contacts']);
+        }
+
+        return array_values(array_filter([
+            ['name' => $family['emergency_name'] ?? '', 'relation' => $family['relation'] ?? '', 'mobile' => $family['mobile'] ?? ''],
+            ['name' => $family['secondary_name'] ?? '', 'relation' => $family['secondary_relation'] ?? '', 'mobile' => $family['secondary_mobile'] ?? ''],
+        ], fn (array $contact): bool => filled($contact['name']) || filled($contact['mobile'])));
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function educationRecords(): array
+    {
+        $details = $this->education_skills ?? [];
+
+        return is_array($details['education_records'] ?? null)
+            ? array_values($details['education_records'])
+            : (filled($details['highest_qualification'] ?? null) ? [['name' => $details['highest_qualification'], 'institution' => '']] : []);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function certificationRecords(): array
+    {
+        $details = $this->education_skills ?? [];
+
+        return is_array($details['certification_records'] ?? null)
+            ? array_values($details['certification_records'])
+            : (filled($details['certifications'] ?? null) ? [['name' => $details['certifications'], 'issuer' => '']] : []);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function insurancePolicies(): array
+    {
+        $details = $this->benefits_allowances ?? [];
+
+        return is_array($details['insurance_policies'] ?? null)
+            ? array_values($details['insurance_policies'])
+            : (filled($details['insurance_policy'] ?? null) ? [['name' => $details['insurance_policy'], 'number' => '']] : []);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function assignedAssets(): array
+    {
+        $details = $this->assets_access ?? [];
+        if (is_array($details['assigned_assets'] ?? null)) {
+            return array_values($details['assigned_assets']);
+        }
+        $assets = [];
+        foreach (['laptop' => 'Laptop', 'mobile' => 'Company mobile', 'sim' => 'SIM', 'uniform' => 'Uniform', 'toolkit' => 'Toolkit', 'access_card' => 'Access card'] as $key => $name) {
+            $value = $details[$key] ?? null;
+            if (filled($value) && ! in_array(strtolower((string) $value), ['not issued', 'returned', 'no'])) {
+                $assets[] = ['name' => $name, 'identifier' => $value, 'items' => []];
+            }
+        }
+
+        return $assets;
+    }
+
     protected function casts(): array
     {
         return [

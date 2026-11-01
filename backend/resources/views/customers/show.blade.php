@@ -35,6 +35,7 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap align-items-start gap-2">
+                <a class="btn btn-light border" href="{{ route('customers.complaint-qr', $customer) }}" target="_blank" rel="noopener"><i data-lucide="qr-code" style="width:17px"></i>Complaint QR</a>
                 @can('customers.update')<a class="btn btn-light border" href="{{ route('customers.edit', $customer) }}"><i data-lucide="pencil" style="width:17px"></i>Edit customer</a>@endcan
                 <button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#floorPlanModal"><i data-lucide="building-2" style="width:17px"></i>Add building layout</button>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#unitModal"><i data-lucide="plus" style="width:17px"></i>Add AC unit</button>
@@ -54,9 +55,13 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerAssets" type="button"><i data-lucide="air-vent"></i>Units & floor plans <span class="badge bg-primary ms-1">{{ $customer->equipments->count() }}</span></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerPeople" type="button"><i data-lucide="users"></i>Branches & contacts</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerService" type="button"><i data-lucide="history"></i>Service history</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerComplaintQr" type="button"><i data-lucide="qr-code"></i>Complaint QR</button></li>
     </ul>
 
     <div class="tab-content">
+        <div class="tab-pane fade" id="customerComplaintQr">
+            <section class="nx-card p-4 text-center"><div class="fw-bold text-primary fs-4" style="letter-spacing:4px">NEXORA</div><h3 class="h5 fw-bold mt-3">Customer complaint QR</h3><p class="small text-secondary">Print this card and share it with your customer. Scanning opens the complaint page.</p><img class="d-block mx-auto" width="260" height="260" src="{{ asset('images/brand/nexora-complaint-qr.png') }}" alt="Nexora complaint QR code"><a class="btn btn-primary mt-3" href="{{ route('customers.complaint-qr', $customer) }}" target="_blank" rel="noopener"><i data-lucide="printer" style="width:17px"></i>Open print card</a><p class="small text-secondary mt-3 mb-0">The complaint form will be added to this page later. The printed QR will stay the same.</p></section>
+        </div>
         <div class="tab-pane fade show active" id="customerOverview">
             <div class="row g-4">
                 <div class="col-xl-8">

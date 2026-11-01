@@ -13,6 +13,7 @@ import './modal-flow.js';
 import './language-switcher.js';
 import './role-permissions.js';
 import './task-controls.js';
+import './employee-details.js';
 
 window.Alpine = Alpine;
 window.bootstrap = bootstrap;

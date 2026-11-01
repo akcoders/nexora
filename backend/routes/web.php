@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminAttendanceController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CustomerComplaintQrController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDraftController;
 use App\Http\Controllers\CustomerGroupController;
@@ -33,6 +34,8 @@ Route::get('/', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 });
 
+Route::get('/complaint', [CustomerComplaintQrController::class, 'start'])->name('public-complaints.create');
+
 Route::get('/service-feedback/{token}', [ServiceFeedbackController::class, 'show'])->name('service-feedback.show');
 Route::post('/service-feedback/{token}', [ServiceFeedbackController::class, 'store'])->middleware('throttle:10,1')->name('service-feedback.store');
 Route::get('/salary-slips/{payrollEntry}', SalarySlipController::class)->middleware('signed')->name('salary-slips.download');
@@ -41,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/locations/india', [LocationController::class, 'india'])->name('locations.india');
     Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+    Route::get('/customers/{customer}/complaint-qr', [CustomerComplaintQrController::class, 'show'])->name('customers.complaint-qr');
     Route::post('/customers/{customer}/floor-plans', [CustomerController::class, 'storeFloorPlan'])->name('customers.floor-plans.store');
     Route::post('/customers/{customer}/equipment', [CustomerController::class, 'storeEquipment'])->name('customers.equipment.store');
     Route::resource('customer-groups', CustomerGroupController::class)->only(['index', 'store', 'update', 'destroy']);

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Task;
+use App\Models\TaskMember;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -18,16 +19,22 @@ final class RecordVisibility
 
         abort_unless($user->can($module.'.view_own'), 403);
 
+        if ($query->getModel() instanceof Task) {
+            $query->whereDoesntHave('subtaskOnlyMembers', fn (Builder $members) => $members->where('user_id', $user->id));
+        }
+
         return $query->where(function (Builder $query) use ($user, $assignable): void {
             $query->where('created_by', $user->id);
             if ($assignable) {
                 $query->orWhere('assigned_to', $user->id);
             }
             if ($query->getModel() instanceof Task) {
-                $query->orWhereHas('members', fn (Builder $members) => $members->where('user_id', $user->id));
-                $query->orWhereHas('parent', fn (Builder $parent) => $parent->where('created_by', $user->id)
-                    ->orWhere('assigned_to', $user->id)
-                    ->orWhereHas('members', fn (Builder $members) => $members->where('user_id', $user->id)));
+                $query->orWhereHas('members', fn (Builder $members) => $members->where('user_id', $user->id)->where('role', '!=', TaskMember::ROLE_SUBTASK_ONLY));
+                $query->orWhereHas('parent', fn (Builder $parent) => $parent
+                    ->whereDoesntHave('subtaskOnlyMembers', fn (Builder $members) => $members->where('user_id', $user->id))
+                    ->where(fn (Builder $parent) => $parent->where('created_by', $user->id)
+                        ->orWhere('assigned_to', $user->id)
+                        ->orWhereHas('members', fn (Builder $members) => $members->where('user_id', $user->id)->where('role', '!=', TaskMember::ROLE_SUBTASK_ONLY))));
             }
         });
     }

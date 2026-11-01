@@ -68,7 +68,7 @@ class TechnicianTaskWorkflowTest extends TestCase
 
         $this->getJson('/api/v1/tasks?scope=open&type=workflow')
             ->assertOk()
-            ->assertJsonFragment(['id' => $activeWorkflow->id, 'status' => 'in_progress'])
+            ->assertJsonFragment(['id' => $activeWorkflow->id, 'status' => 'pending'])
             ->assertJsonMissing(['task_no' => $closedWorkflow->task_no]);
     }
 }

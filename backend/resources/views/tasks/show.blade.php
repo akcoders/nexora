@@ -16,7 +16,7 @@
                     <div>
                         <div class="d-flex gap-2 mb-3">
                             <span class="badge rounded-pill {{ $isTicket ? 'badge-soft-success' : 'badge-soft-primary' }}">{{ $isTicket ? 'Customer Complaint' : 'Internal Workflow' }}</span>
-                            <span class="badge rounded-pill {{ $task->status === 'closed' ? 'badge-soft-success' : ($task->isOverdue() ? 'badge-soft-danger' : 'badge-soft-warning') }}">{{ $task->status === 'closed' ? 'Closed' : ($task->isOverdue() ? 'Overdue' : 'Pending') }}</span>
+                            <span class="badge rounded-pill {{ $task->status === 'closed' ? 'badge-soft-success' : ($task->isOverdue() ? 'badge-soft-danger' : 'badge-soft-warning') }}">{{ $task->status === 'closed' ? 'Completed' : ($task->isOverdue() ? 'Overdue' : 'Pending') }}</span>
                             <span class="badge rounded-pill {{ $task->priority === 'very_high' ? 'badge-soft-danger' : 'badge-soft-primary' }}">{{ str($task->priority)->headline() }}</span>
                         </div>
                         <h2 class="h4 fw-bold">{{ $task->title }}</h2>
@@ -27,8 +27,8 @@
                 <div class="nx-workflow-progress my-4">
                     <div class="done"><span><i data-lucide="plus"></i></span><small>Created</small></div>
                     <div class="done"><span><i data-lucide="user-check"></i></span><small>Assigned</small></div>
-                    <div class="{{ $task->status !== 'closed' ? 'active' : 'done' }}"><span><i data-lucide="activity"></i></span><small>{{ $task->status !== 'closed' ? 'In progress' : 'Processed' }}</small></div>
-                    <div class="{{ $task->status === 'closed' ? 'done' : '' }}"><span><i data-lucide="circle-check-big"></i></span><small>Closed</small></div>
+                    <div class="{{ $task->status !== 'closed' ? 'active' : 'done' }}"><span><i data-lucide="activity"></i></span><small>{{ $task->status !== 'closed' ? 'Pending' : 'Completed' }}</small></div>
+                    <div class="{{ $task->status === 'closed' ? 'done' : '' }}"><span><i data-lucide="circle-check-big"></i></span><small>Completed</small></div>
                 </div>
                 <div class="row g-3 small">
                     @if($isTicket)<div class="col-md-4"><span class="text-secondary d-block">Customer</span><strong>{{ $task->customer?->name }}</strong></div>@endif

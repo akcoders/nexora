@@ -116,12 +116,27 @@
                     @endforeach
                     <div class="col-md-6"><div class="text-secondary">Current address</div><div class="fw-semibold">{{ $address($profile->current_address) ?: '—' }}</div></div>
                     <div class="col-md-6"><div class="text-secondary">Permanent address</div><div class="fw-semibold">{{ $address($profile->permanent_address) ?: '—' }}</div></div>
-                    @if(data_get($family,'emergency_name'))<div class="col-md-6"><div class="text-secondary">Emergency contact 1</div><div class="fw-semibold">{{ data_get($family,'emergency_name') }}@if(data_get($family,'relation')) ({{ data_get($family,'relation') }})@endif · <span class="notranslate">{{ data_get($family,'mobile') }}</span></div></div>@endif
-                    @if(data_get($family,'secondary_name'))<div class="col-md-6"><div class="text-secondary">Emergency contact 2</div><div class="fw-semibold">{{ data_get($family,'secondary_name') }}@if(data_get($family,'secondary_relation')) ({{ data_get($family,'secondary_relation') }})@endif · <span class="notranslate">{{ data_get($family,'secondary_mobile') }}</span></div></div>@endif
+                    @foreach($profile->emergencyContacts() as $index => $contact)<div class="col-md-6"><div class="text-secondary">Emergency contact {{ $index + 1 }}</div><div class="fw-semibold">{{ $contact['name'] ?? '' }}@if(!empty($contact['relation'])) ({{ $contact['relation'] }})@endif · <span class="notranslate">{{ $contact['mobile'] ?? '' }}</span></div></div>@endforeach
                     <div class="col-md-6"><div class="text-secondary">Dependents</div><div class="fw-semibold">{{ data_get($family,'dependents_count') ?? '—' }}@if($dependents->isNotEmpty()) · {{ $dependents->map(fn ($d) => trim($d['name'].' ('.collect([isset($d['gender']) ? str($d['gender'])->headline() : null, isset($d['age']) ? $d['age'].' yrs' : null])->filter()->join(', ').')', ' ()'))->join(', ') }}@endif</div></div>
                 </div>
             </section>
 
+            <section class="nx-card p-4 mb-4">
+                <h3 class="h6 fw-bold mb-3">Education, certifications & policies</h3>
+                <div class="row g-4">
+                    @foreach(['Education'=>[$profile->educationRecords(),'institution'], 'Certifications'=>[$profile->certificationRecords(),'issuer'], 'Policies'=>[$profile->insurancePolicies(),'number']] as $label=>[$records,$detail])
+                        <div class="col-md-4"><div class="small fw-bold text-secondary mb-2">{{ $label }}</div>@forelse($records as $record)<div class="small py-2 border-bottom"><strong class="d-block">{{ $record['name'] ?? '' }}</strong>@if(!empty($record[$detail]))<span class="text-secondary">{{ $record[$detail] }}</span>@endif</div>@empty<span class="small text-secondary">None added.</span>@endforelse</div>
+                    @endforeach
+                </div>
+            </section>
+            <section class="nx-card p-4 mb-4">
+                <h3 class="h6 fw-bold mb-3">Assigned assets & tools</h3>
+                @forelse($profile->assignedAssets() as $asset)
+                    <div class="py-3 border-bottom"><strong>{{ $asset['name'] ?? '' }}</strong>@if(!empty($asset['identifier']))<span class="small text-secondary ms-2">{{ $asset['identifier'] }}</span>@endif
+                        @if(!empty($asset['items']))<div class="d-flex flex-wrap gap-2 mt-2">@foreach($asset['items'] as $item)<span class="badge badge-soft-primary">{{ $item['name'] ?? '' }}</span>@endforeach</div>@endif
+                    </div>
+                @empty<p class="small text-secondary mb-0">No assets assigned.</p>@endforelse
+            </section>
             <section class="nx-card p-4">
                 <h3 class="h6 fw-bold mb-3 d-flex align-items-center gap-2"><span class="nx-field-group-icon" style="--group-a:#059669;--group-b:#84cc16"><i data-lucide="wallet-cards"></i></span>Recent payroll</h3>
                 <div class="table-responsive"><table class="table nx-table mb-0"><thead><tr><th>Month</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th></tr></thead><tbody>@forelse($recentPayroll as $entry)<tr><td class="notranslate">{{ $entry->payrollRun->payroll_month }}</td><td class="notranslate">₹{{ number_format($entry->gross_amount,2) }}</td><td class="notranslate">₹{{ number_format($entry->deduction_amount,2) }}</td><td class="fw-bold notranslate">₹{{ number_format($entry->net_amount,2) }}</td><td><span class="badge {{ $entry->status==='paid'?'badge-soft-success':'badge-soft-warning' }}">{{ str($entry->status)->headline() }}</span></td></tr>@empty<tr><td colspan="5" class="text-secondary">No payroll generated yet.</td></tr>@endforelse</tbody></table></div>

@@ -24,8 +24,8 @@ const PRIORITY_LABEL = Object.fromEntries(PRIORITIES.map((p) => [p.key, p.label]
 const MODES = ['owner', 'status', 'priority'];
 const QUICK = ['mine', 'watching', 'created', 'overdue'];
 const HINTS = {
-    owner: 'Drag a card to another owner to hand it over, or onto Closed to finish it. A remark is always required.',
-    status: 'Drag a card onto Closed to finish it. Users who can update tasks may drag closed cards back to reopen them.',
+    owner: 'Drag a card to another owner to hand it over, or onto Completed to finish it. A remark is always required.',
+    status: 'Drag a card onto Completed to finish it. Users who can update tasks may drag closed cards back to reopen them.',
     priority: 'Drag a pending card between lanes to change its priority. The change is recorded on the timeline.',
 };
 const REFRESH_MS = 60_000;
@@ -141,9 +141,9 @@ function init(root) {
         if (state.mode === 'priority') {
             return PRIORITIES.map((p) => ({ key: `priority:${p.key}`, title: `${p.label} priority`, subtitle: 'Pending items', icon: p.icon, tone: p.tone }));
         }
-        const closedLane = { key: 'closed', title: 'Closed', subtitle: `Latest ${state.closedLimit} closed`, icon: 'circle-check-big', tone: '#16a34a' };
+        const closedLane = { key: 'closed', title: 'Completed', subtitle: `Latest ${state.closedLimit} completed`, icon: 'circle-check-big', tone: '#16a34a' };
         if (state.mode === 'status') {
-            return [{ key: 'pending', title: 'Pending', subtitle: 'Pending until closed', icon: 'activity', tone: '#d97706' }, closedLane];
+            return [{ key: 'pending', title: 'Pending', subtitle: 'Pending until completed', icon: 'activity', tone: '#d97706' }, closedLane];
         }
 
         const ownerIds = new Set(visible.filter((task) => task.status !== 'closed' && task.assignee).map((task) => task.assignee.id));

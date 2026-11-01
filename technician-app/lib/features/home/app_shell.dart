@@ -150,60 +150,86 @@ class _AppShellState extends State<AppShell> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   children: [
-                    _MenuItem(
+                    _MenuGroup(
+                      id: 'workspace',
+                      label: 'Workspace',
                       icon: LucideIcons.layoutDashboard,
-                      label: 'Dashboard',
-                      selected: index == 0,
-                      onTap: () => navigate(0, closeDrawer: true),
+                      active: index == 0 || index == 3,
+                      children: [
+                        _MenuItem(
+                          icon: LucideIcons.layoutDashboard,
+                          label: 'Dashboard',
+                          selected: index == 0,
+                          onTap: () => navigate(0, closeDrawer: true),
+                        ),
+                        _MenuItem(
+                          icon: LucideIcons.bell,
+                          label: 'Notifications',
+                          selected: index == 3,
+                          onTap: () => navigate(3, closeDrawer: true),
+                        ),
+                      ],
                     ),
-                    const _MenuLabel('WORK'),
-                    _MenuItem(
+                    _MenuGroup(
+                      id: 'work',
+                      label: 'Work Management',
                       icon: LucideIcons.briefcaseBusiness,
-                      label: 'Service Jobs',
-                      selected: index == 1 && taskTab == 0,
-                      onTap: () => navigate(1, workTab: 0, closeDrawer: true),
+                      active: index == 1,
+                      children: [
+                        _MenuItem(
+                          icon: LucideIcons.briefcaseBusiness,
+                          label: 'Service Jobs',
+                          selected: index == 1 && taskTab == 0,
+                          onTap: () =>
+                              navigate(1, workTab: 0, closeDrawer: true),
+                        ),
+                        _MenuItem(
+                          icon: LucideIcons.gitBranch,
+                          label: 'Internal Workflow',
+                          selected: index == 1 && taskTab == 1,
+                          onTap: () =>
+                              navigate(1, workTab: 1, closeDrawer: true),
+                        ),
+                        _MenuItem(
+                          icon: LucideIcons.ticketCheck,
+                          label: 'Customer Complaints',
+                          selected: index == 1 && taskTab == 2,
+                          onTap: () =>
+                              navigate(1, workTab: 2, closeDrawer: true),
+                        ),
+                        _MenuItem(
+                          icon: LucideIcons.circleCheckBig,
+                          label: 'Completed Work',
+                          selected: index == 1 && taskTab == 3,
+                          onTap: () =>
+                              navigate(1, workTab: 3, closeDrawer: true),
+                        ),
+                      ],
                     ),
-                    _MenuItem(
-                      icon: LucideIcons.gitBranch,
-                      label: 'Internal Workflow',
-                      selected: index == 1 && taskTab == 1,
-                      onTap: () => navigate(1, workTab: 1, closeDrawer: true),
-                    ),
-                    _MenuItem(
-                      icon: LucideIcons.ticketCheck,
-                      label: 'Customer Complaints',
-                      selected: index == 1 && taskTab == 2,
-                      onTap: () => navigate(1, workTab: 2, closeDrawer: true),
-                    ),
-                    _MenuItem(
-                      icon: LucideIcons.circleCheckBig,
-                      label: 'Closed Work',
-                      selected: index == 1 && taskTab == 3,
-                      onTap: () => navigate(1, workTab: 3, closeDrawer: true),
-                    ),
-                    const _MenuLabel('SELF SERVICE'),
-                    _MenuItem(
-                      icon: LucideIcons.calendarCheck,
-                      label: 'Attendance',
-                      selected: index == 2,
-                      onTap: () => navigate(2, closeDrawer: true),
-                    ),
-                    _MenuItem(
-                      icon: LucideIcons.walletCards,
-                      label: 'My HR & Salary Slips',
-                      onTap: openHr,
-                    ),
-                    _MenuItem(
-                      icon: LucideIcons.bell,
-                      label: 'Notifications',
-                      selected: index == 3,
-                      onTap: () => navigate(3, closeDrawer: true),
-                    ),
-                    _MenuItem(
+                    _MenuGroup(
+                      id: 'people',
+                      label: 'HR & Account',
                       icon: LucideIcons.userRound,
-                      label: 'Profile',
-                      selected: index == 4,
-                      onTap: () => navigate(4, closeDrawer: true),
+                      active: index == 2 || index == 4,
+                      children: [
+                        _MenuItem(
+                          icon: LucideIcons.calendarCheck,
+                          label: 'Attendance',
+                          selected: index == 2,
+                          onTap: () => navigate(2, closeDrawer: true),
+                        ),
+                        _MenuItem(
+                          icon: LucideIcons.walletCards,
+                          label: 'My HR & Salary Slips',
+                          onTap: openHr,
+                        ),
+                        _MenuItem(
+                          icon: LucideIcons.userRound,
+                          label: 'Profile',
+                          selected: index == 4,
+                          onTap: () => navigate(4, closeDrawer: true),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -266,22 +292,50 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-class _MenuLabel extends StatelessWidget {
-  const _MenuLabel(this.value);
+class _MenuGroup extends StatelessWidget {
+  const _MenuGroup({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.children,
+  });
 
-  final String value;
+  final String id;
+  final String label;
+  final IconData icon;
+  final bool active;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 18, 20, 7),
-    child: T(
-      value,
-      style: const TextStyle(
-        color: AppColors.muted,
-        fontSize: 10,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+    child: ExpansionTile(
+      key: ValueKey('$id-$active'),
+      initiallyExpanded: active,
+      maintainState: true,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+      childrenPadding: const EdgeInsets.only(left: 14, bottom: 6),
+      shape: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      collapsedShape: const Border(
+        bottom: BorderSide(color: Color(0xFFE2E8F0)),
       ),
+      iconColor: AppColors.primary,
+      collapsedIconColor: AppColors.muted,
+      leading: Icon(
+        icon,
+        size: 20,
+        color: active ? AppColors.primary : AppColors.muted,
+      ),
+      title: T(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+          color: active ? AppColors.primary : AppColors.ink,
+        ),
+      ),
+      children: children,
     ),
   );
 }
@@ -305,14 +359,19 @@ class _MenuItem extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
     child: ListTile(
+      dense: true,
       selected: selected,
       selectedColor: AppColors.primary,
       selectedTileColor: const Color(0xFFEFF6FF),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      leading: Icon(icon, color: color),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      leading: Icon(icon, size: 19, color: color),
       title: T(
         label,
-        style: TextStyle(fontWeight: FontWeight.w700, color: color),
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
       trailing: selected
           ? const Icon(LucideIcons.chevronRight, size: 17)

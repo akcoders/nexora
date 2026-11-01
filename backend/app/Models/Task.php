@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\RecordVisibility;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +26,13 @@ class Task extends Model
     public const PRIORITIES = ['normal', 'high', 'very_high'];
 
     protected $guarded = [];
+
+    protected function status(): Attribute
+    {
+        $normalize = fn (?string $value): ?string => $value === 'in_progress' ? 'pending' : $value;
+
+        return Attribute::make(get: $normalize, set: $normalize);
+    }
 
     protected function casts(): array
     {
@@ -70,6 +79,27 @@ class Task extends Model
         return $this->hasMany(TaskMember::class);
     }
 
+    /** Subtask assignees who must not gain access to this ancestor workflow. */
+    public function subtaskOnlyMembers(): HasMany
+    {
+        return $this->members()->where('role', TaskMember::ROLE_SUBTASK_ONLY);
+    }
+
+    public function scopeWithVisibleParent(Builder $query, User $viewer): void
+    {
+        $query->with(['parent' => fn ($relation) => RecordVisibility::scope($relation->getQuery(), $viewer, 'tasks')]);
+    }
+
+    public function loadVisibleRelations(User $viewer): static
+    {
+        return $this->load([
+            'parent' => fn ($relation) => RecordVisibility::scope($relation->getQuery(), $viewer, 'tasks'),
+            'subtasks' => fn ($relation) => RecordVisibility::scope($relation->getQuery(), $viewer, 'tasks')->with('assignee'),
+            'actions.user', 'actions.assignee',
+            'actions.relatedTask' => fn ($relation) => RecordVisibility::scope($relation->getQuery(), $viewer, 'tasks'),
+        ]);
+    }
+
     public function observers(): HasMany
     {
         return $this->members()->where('role', 'observer');
@@ -107,7 +137,7 @@ class Task extends Model
     /** Relations, counts and the viewer's watch flag needed to render a Kanban card. */
     public function scopeWithBoardData(Builder $query, User $viewer): void
     {
-        $query->with(['customer', 'assignee', 'latestAction.user', 'parent:id,task_no,title', 'observers.user:id,name'])
+        $query->withVisibleParent($viewer)->with(['customer', 'assignee', 'latestAction.user', 'observers.user:id,name'])
             ->withCount(['actions', 'observers', 'subtasks', 'subtasks as completed_subtasks_count' => fn (Builder $query) => $query->closed()])
             ->withExists(['observers as watched_by_viewer' => fn (Builder $query) => $query->where('user_id', $viewer->id)]);
     }

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TaskMember extends Model
 {
+    public const ROLE_SUBTASK_ONLY = 'subtask_only';
+
     protected $guarded = [];
 
     public function user(): BelongsTo

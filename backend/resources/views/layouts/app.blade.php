@@ -30,31 +30,51 @@
             <div class="nx-sidebar-backdrop" id="nxSidebarBackdrop" onclick="document.getElementById('nxSidebar').classList.remove('open');this.classList.remove('show')"></div>
             <aside class="nx-sidebar" id="nxSidebar">
                 <a class="nx-brand notranslate" translate="no" href="{{ route('dashboard') }}"><span class="nx-brand-mark p-0 overflow-hidden bg-white"><img src="{{ asset('images/brand/classic-app-icon.png') }}" alt="Classic" class="w-100 h-100 object-fit-cover"></span><span>CLASSIC</span></a>
-                <nav class="nx-nav">
-                    <div class="nx-nav-label">Workspace</div>
-                    <a class="nx-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
-                    <div class="nx-nav-label">Operations</div>
-                    <a class="nx-nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" href="{{ route('customers.index') }}"><i data-lucide="building-2"></i>Customers</a>
-                    <a class="nx-nav-link {{ request()->routeIs('customer-groups.*') ? 'active' : '' }}" href="{{ route('customer-groups.index') }}"><i data-lucide="tags"></i>Customer Groups</a>
-                    <a class="nx-nav-link {{ request()->routeIs('products.*') || request()->routeIs('product-categories.*') ? 'active' : '' }}" href="{{ route('products.index') }}"><i data-lucide="package"></i>Products</a>
-                    <a class="nx-nav-link {{ request()->routeIs('checklists.*') ? 'active' : '' }}" href="{{ route('checklists.index') }}"><i data-lucide="clipboard-check"></i>Service Checklists</a>
-                    @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan
-                    <a class="nx-nav-link {{ request()->routeIs('service-jobs.*') ? 'active' : '' }}" href="{{ route('service-jobs.index') }}"><i data-lucide="wrench"></i>Service Jobs</a>
-                    <a class="nx-nav-link {{ request()->routeIs('attendance.*') || request()->routeIs('premises.*') ? 'active' : '' }}" href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance @if($nxPendingAttendance)<span class="badge bg-warning text-dark ms-auto notranslate">{{ $nxPendingAttendance }}</span>@endif</a>
-                    @php $workType = request()->route('task')?->task_type ?? (request()->routeIs('complaints.*') ? 'ticket' : (request()->routeIs('workflows.*') ? 'workflow' : request('type', 'workflow'))); @endphp
-                    <a class="nx-nav-link {{ (request()->routeIs('workflows.*') || request()->routeIs('tasks.*')) && $workType !== 'ticket' ? 'active' : '' }}" href="{{ route('workflows.index', ['scope' => 'open']) }}"><i data-lucide="git-branch"></i>Internal Workflow</a>
-                    <a class="nx-nav-link {{ (request()->routeIs('complaints.*') || request()->routeIs('tasks.*')) && $workType === 'ticket' ? 'active' : '' }}" href="{{ route('complaints.index', ['scope' => 'open']) }}"><i data-lucide="ticket-check"></i>Customer Complaints</a>
-                    <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>
-                    <div class="nx-nav-label">HR & People</div>
-                    @can('employees.read')<a class="nx-nav-link {{ request()->routeIs('employees.*') ? 'active' : '' }}" href="{{ route('employees.index') }}"><i data-lucide="contact-round"></i>Employees</a>@endcan
-                    @can('hr.read')<a class="nx-nav-link {{ request()->routeIs('hr.*') ? 'active' : '' }}" href="{{ route('hr.index') }}"><i data-lucide="calendar-heart"></i>Leave & Expenses</a>@endcan
-                    @can('payroll.read')<a class="nx-nav-link {{ request()->routeIs('payroll.*') ? 'active' : '' }}" href="{{ route('payroll.index') }}"><i data-lucide="wallet-cards"></i>Payroll</a>@endcan
-                    <div class="nx-nav-label">Administration</div>
-                    @can('companies.read')<a class="nx-nav-link {{ request()->routeIs('companies.*') ? 'active' : '' }}" href="{{ route('companies.index') }}"><i data-lucide="landmark"></i>Company Master</a>@endcan
-                    <a class="nx-nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}"><i data-lucide="users-round"></i>User Accounts</a>
-                    @can('roles.read')<a class="nx-nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}" href="{{ route('roles.index') }}"><i data-lucide="shield-check"></i>Roles & Permissions</a>@endcan
-                    <a class="nx-nav-link {{ request()->routeIs('notifications.*') ? 'active' : '' }}" href="{{ route('notifications.index') }}"><i data-lucide="bell"></i>Notifications @if($nxUnread)<span class="badge bg-danger ms-auto notranslate">{{ $nxUnread }}</span>@endif</a>
-                    <a class="nx-nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}"><i data-lucide="settings"></i>Settings</a>
+                @php
+                    $workType = request()->route('task')?->task_type ?? (request()->routeIs('complaints.*') ? 'ticket' : (request()->routeIs('workflows.*') ? 'workflow' : request('type', 'workflow')));
+                    $workflowActive = (request()->routeIs('workflows.*') || request()->routeIs('tasks.*')) && $workType !== 'ticket';
+                    $workflowBoardActive = $workflowActive && request()->routeIs('workflows.board', 'tasks.board');
+                    $complaintsActive = (request()->routeIs('complaints.*') || request()->routeIs('tasks.*')) && $workType === 'ticket';
+                @endphp
+                <nav class="nx-nav" aria-label="Main navigation">
+                    <x-sidebar-group id="nav-workspace" label="Workspace" icon="layout-grid" :active="request()->routeIs('dashboard', 'reports.*', 'notifications.*', 'profile.*')" :badge="$nxUnread">
+                        <a class="nx-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" @if(request()->routeIs('dashboard')) aria-current="page"@endif href="{{ route('dashboard') }}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
+                        <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" @if(request()->routeIs('reports.*')) aria-current="page"@endif href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>
+                        <a class="nx-nav-link {{ request()->routeIs('notifications.*') ? 'active' : '' }}" @if(request()->routeIs('notifications.*')) aria-current="page"@endif href="{{ route('notifications.index') }}"><i data-lucide="bell"></i>Notifications @if($nxUnread)<span class="badge bg-danger ms-auto notranslate">{{ $nxUnread }}</span>@endif</a>
+                        <a class="nx-nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" @if(request()->routeIs('profile.*')) aria-current="page"@endif href="{{ route('profile.edit') }}"><i data-lucide="user-round"></i>My Profile</a>
+                    </x-sidebar-group>
+
+                    <x-sidebar-group id="nav-customers" label="Customers" icon="building-2" :active="request()->routeIs('customers.*', 'customer-groups.*') || $complaintsActive">
+                        <a class="nx-nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" @if(request()->routeIs('customers.*')) aria-current="page"@endif href="{{ route('customers.index') }}"><i data-lucide="building-2"></i>Customers</a>
+                        <a class="nx-nav-link {{ request()->routeIs('customer-groups.*') ? 'active' : '' }}" @if(request()->routeIs('customer-groups.*')) aria-current="page"@endif href="{{ route('customer-groups.index') }}"><i data-lucide="tags"></i>Customer Groups</a>
+                        <a class="nx-nav-link {{ $complaintsActive ? 'active' : '' }}" @if($complaintsActive) aria-current="page"@endif href="{{ route('complaints.index', ['scope' => 'open']) }}"><i data-lucide="ticket-check"></i>Customer Complaints</a>
+                    </x-sidebar-group>
+
+                    <x-sidebar-group id="nav-service" label="Service & Catalog" icon="wrench" :active="request()->routeIs('service-jobs.*', 'products.*', 'product-categories.*', 'checklists.*', 'service-masters.*')">
+                        <a class="nx-nav-link {{ request()->routeIs('service-jobs.*') ? 'active' : '' }}" @if(request()->routeIs('service-jobs.*')) aria-current="page"@endif href="{{ route('service-jobs.index') }}"><i data-lucide="wrench"></i>Service Jobs</a>
+                        <a class="nx-nav-link {{ request()->routeIs('products.*', 'product-categories.*') ? 'active' : '' }}" @if(request()->routeIs('products.*', 'product-categories.*')) aria-current="page"@endif href="{{ route('products.index') }}"><i data-lucide="package"></i>Products</a>
+                        <a class="nx-nav-link {{ request()->routeIs('checklists.*') ? 'active' : '' }}" @if(request()->routeIs('checklists.*')) aria-current="page"@endif href="{{ route('checklists.index') }}"><i data-lucide="clipboard-check"></i>Service Checklists</a>
+                        @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" @if(request()->routeIs('service-masters.*')) aria-current="page"@endif href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan
+                    </x-sidebar-group>
+
+                    <x-sidebar-group id="nav-work" label="Work Management" icon="git-branch" :active="$workflowActive">
+                        <a class="nx-nav-link {{ $workflowActive && !$workflowBoardActive ? 'active' : '' }}" @if($workflowActive && !$workflowBoardActive) aria-current="page"@endif href="{{ route('workflows.index', ['scope' => 'open']) }}"><i data-lucide="git-branch"></i>Internal Workflow</a>
+                        <a class="nx-nav-link {{ $workflowBoardActive ? 'active' : '' }}" @if($workflowBoardActive) aria-current="page"@endif href="{{ route('workflows.board') }}"><i data-lucide="square-kanban"></i>Workflow Board</a>
+                    </x-sidebar-group>
+
+                    <x-sidebar-group id="nav-people" label="HR & People" icon="users-round" :active="request()->routeIs('employees.*', 'attendance.*', 'premises.*', 'hr.*', 'payroll.*')" :badge="$nxPendingAttendance" badge-tone="warning">
+                        @can('employees.read')<a class="nx-nav-link {{ request()->routeIs('employees.*') ? 'active' : '' }}" @if(request()->routeIs('employees.*')) aria-current="page"@endif href="{{ route('employees.index') }}"><i data-lucide="contact-round"></i>Employees</a>@endcan
+                        <a class="nx-nav-link {{ request()->routeIs('attendance.*', 'premises.*') ? 'active' : '' }}" @if(request()->routeIs('attendance.*', 'premises.*')) aria-current="page"@endif href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance @if($nxPendingAttendance)<span class="badge bg-warning text-dark ms-auto notranslate">{{ $nxPendingAttendance }}</span>@endif</a>
+                        @can('hr.read')<a class="nx-nav-link {{ request()->routeIs('hr.*') ? 'active' : '' }}" @if(request()->routeIs('hr.*')) aria-current="page"@endif href="{{ route('hr.index') }}"><i data-lucide="calendar-heart"></i>Leave & Expenses</a>@endcan
+                        @can('payroll.read')<a class="nx-nav-link {{ request()->routeIs('payroll.*') ? 'active' : '' }}" @if(request()->routeIs('payroll.*')) aria-current="page"@endif href="{{ route('payroll.index') }}"><i data-lucide="wallet-cards"></i>Payroll</a>@endcan
+                    </x-sidebar-group>
+
+                    <x-sidebar-group id="nav-admin" label="Administration" icon="settings-2" :active="request()->routeIs('companies.*', 'users.*', 'roles.*', 'settings.*')">
+                        @can('companies.read')<a class="nx-nav-link {{ request()->routeIs('companies.*') ? 'active' : '' }}" @if(request()->routeIs('companies.*')) aria-current="page"@endif href="{{ route('companies.index') }}"><i data-lucide="landmark"></i>Company Master</a>@endcan
+                        <a class="nx-nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" @if(request()->routeIs('users.*')) aria-current="page"@endif href="{{ route('users.index') }}"><i data-lucide="users-round"></i>User Accounts</a>
+                        @can('roles.read')<a class="nx-nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}" @if(request()->routeIs('roles.*')) aria-current="page"@endif href="{{ route('roles.index') }}"><i data-lucide="shield-check"></i>Roles & Permissions</a>@endcan
+                        <a class="nx-nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" @if(request()->routeIs('settings.*')) aria-current="page"@endif href="{{ route('settings.index') }}"><i data-lucide="settings"></i>Settings</a>
+                    </x-sidebar-group>
                 </nav>
                 <div class="nx-user-card">
                     <a class="nx-avatar notranslate" href="{{ route('profile.edit') }}" title="My profile">{{ strtoupper(substr($nxUser->name, 0, 1)) }}</a>

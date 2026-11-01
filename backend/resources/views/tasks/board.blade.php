@@ -33,7 +33,7 @@
             </div>
         </div>
 
-        <p class="small text-secondary mb-2 d-flex align-items-center gap-2" data-hint><i data-lucide="mouse-pointer-2" style="width:15px"></i><span data-hint-text>Drag a card to another owner to hand it over, or onto Closed to finish it. A remark is always required.</span></p>
+        <p class="small text-secondary mb-2 d-flex align-items-center gap-2" data-hint><i data-lucide="mouse-pointer-2" style="width:15px"></i><span data-hint-text>Drag a card to another owner to hand it over, or onto Completed to finish it. A remark is always required.</span></p>
 
         <div class="nx-kanban" data-board aria-busy="true">
             @foreach(range(1, 4) as $placeholder)

@@ -240,7 +240,7 @@ class EmployeeController extends Controller
             'current_address' => ['nullable', $addressKeys],
             'permanent_address' => ['nullable', $addressKeys],
             'company_accommodation_address' => ['nullable', $addressKeys],
-            'emergency_family' => ['required', 'array:emergency_name,relation,mobile,secondary_name,secondary_relation,secondary_mobile,dependents_count,dependents'],
+            'emergency_family' => ['required', 'array:emergency_name,relation,mobile,secondary_name,secondary_relation,secondary_mobile,dependents_count,dependents,contacts'],
             'emergency_family.emergency_name' => ['required', 'string', 'max:120', $personName],
             'emergency_family.relation' => ['required', 'string', $in('relations', 'emergency_family.relation')],
             'emergency_family.mobile' => ['required', 'string', 'max:20', $mobile, 'different:phone'],
@@ -273,7 +273,7 @@ class EmployeeController extends Controller
             'bank_details.bank_name' => ['nullable', 'string', 'max:120', 'required_with:bank_details.account_number,bank_details.ifsc'],
             'bank_details.account_number' => ['nullable', 'string', 'regex:/^[0-9]{9,18}$/', 'required_with:bank_details.bank_name,bank_details.ifsc'],
             'bank_details.ifsc' => ['nullable', 'string', 'regex:/^[A-Z]{4}0[A-Z0-9]{6}$/', 'required_with:bank_details.bank_name,bank_details.account_number'],
-            'benefits_allowances' => ['nullable', 'array:pf_eligible,esic_eligible,insurance_policy,gratuity,loan_balance,bonus_plan,medical_benefit,meal_benefit'],
+            'benefits_allowances' => ['nullable', 'array:pf_eligible,esic_eligible,insurance_policy,gratuity,loan_balance,bonus_plan,medical_benefit,meal_benefit,has_policies,insurance_policies'],
             'benefits_allowances.pf_eligible' => ['nullable', $in('yes_no')],
             'benefits_allowances.esic_eligible' => ['nullable', $in('yes_no')],
             'benefits_allowances.gratuity' => ['nullable', 'string', $in('yes_no', 'benefits_allowances.gratuity')],
@@ -282,7 +282,7 @@ class EmployeeController extends Controller
             'benefits_allowances.bonus_plan' => ['nullable', 'string', 'max:120'],
             'benefits_allowances.medical_benefit' => ['nullable', 'string', 'max:120'],
             'benefits_allowances.meal_benefit' => ['nullable', 'string', 'max:120'],
-            'education_skills' => ['nullable', 'array:highest_qualification,specialization,technical_skills,certifications,trade_licence,experience_years'],
+            'education_skills' => ['nullable', 'array:highest_qualification,specialization,technical_skills,certifications,trade_licence,experience_years,has_education,education_records,has_certifications,certification_records'],
             'education_skills.highest_qualification' => ['nullable', 'string', $in('qualifications', 'education_skills.highest_qualification')],
             'education_skills.specialization' => ['nullable', 'string', 'max:255'],
             'education_skills.technical_skills' => ['nullable', 'string', 'max:255'],
@@ -299,7 +299,7 @@ class EmployeeController extends Controller
             'performance_career' => ['nullable', 'array:kpi,career_plan'],
             'performance_career.kpi' => ['nullable', 'string', 'max:2000'],
             'performance_career.career_plan' => ['nullable', 'string', 'max:2000'],
-            'assets_access' => ['nullable', 'array:laptop,mobile,sim,uniform,toolkit,access_card,email_access,erp_access'],
+            'assets_access' => ['nullable', 'array:laptop,mobile,sim,uniform,toolkit,access_card,email_access,erp_access,assets_assigned,assigned_assets'],
             'assets_access.uniform' => ['nullable', 'string', $in('issue_statuses', 'assets_access.uniform')],
             'assets_access.toolkit' => ['nullable', 'string', $in('issue_statuses', 'assets_access.toolkit')],
             'assets_access.email_access' => ['nullable', 'string', $in('access_statuses', 'assets_access.email_access')],
@@ -317,6 +317,34 @@ class EmployeeController extends Controller
             ...IndiaLocations::optionalAddressRules('permanent_address.'),
             ...IndiaLocations::optionalAddressRules('company_accommodation_address.'),
         ];
+        $contactsSubmitted = $request->has('emergency_family.contacts');
+        foreach (['emergency_name', 'relation', 'mobile', 'secondary_name', 'secondary_relation', 'secondary_mobile'] as $key) {
+            array_unshift($rules['emergency_family.'.$key], Rule::excludeIf($contactsSubmitted));
+        }
+        $rules['emergency_family.contacts'] = [Rule::excludeIf(! $contactsSubmitted), 'required', 'array', 'min:1', 'max:10'];
+        $rules['emergency_family.contacts.*'] = ['array:name,relation,mobile'];
+        $rules['emergency_family.contacts.*.name'] = ['required', 'string', 'max:120', $personName];
+        $rules['emergency_family.contacts.*.relation'] = ['required', 'string', Rule::in(array_unique(array_merge(EmployeeMasterOptions::allowed('relations'), array_column($profile?->emergencyContacts() ?? [], 'relation'))))];
+        $rules['emergency_family.contacts.*.mobile'] = ['required', 'string', 'max:20', $mobile, 'different:phone', 'distinct:strict'];
+        foreach ([
+            ['education_skills', 'has_education', 'education_records', 'institution', 20],
+            ['education_skills', 'has_certifications', 'certification_records', 'issuer', 20],
+            ['benefits_allowances', 'has_policies', 'insurance_policies', 'number', 20],
+            ['assets_access', 'assets_assigned', 'assigned_assets', 'identifier', 50],
+        ] as [$section, $flag, $list, $detail, $limit]) {
+            $enabled = $request->boolean($section.'.'.$flag);
+            $path = $section.'.'.$list;
+            $rules[$section.'.'.$flag] = ['sometimes', 'boolean'];
+            $rules[$path] = [Rule::excludeIf(! $enabled), 'required', 'array', 'min:1', 'max:'.$limit];
+            $rules[$path.'.*'] = [Rule::excludeIf(! $enabled), 'array:name,'.$detail.($list === 'assigned_assets' ? ',items' : '')];
+            $rules[$path.'.*.name'] = [Rule::excludeIf(! $enabled), 'required', 'string', 'max:120'];
+            $rules[$path.'.*.'.$detail] = [Rule::excludeIf(! $enabled), 'nullable', 'string', 'max:160'];
+        }
+        $assetsEnabled = $request->boolean('assets_access.assets_assigned');
+        $rules['assets_access.assigned_assets.*.items'] = [Rule::excludeIf(! $assetsEnabled), 'nullable', 'array', 'max:50'];
+        $rules['assets_access.assigned_assets.*.items.*'] = [Rule::excludeIf(! $assetsEnabled), 'array:name'];
+        $rules['assets_access.assigned_assets.*.items.*.name'] = [Rule::excludeIf(! $assetsEnabled), 'required', 'string', 'max:120'];
+
         foreach (['current_address', 'permanent_address', 'company_accommodation_address'] as $address) {
             $rules["{$address}.line1"] = ['nullable', 'string', 'max:255'];
             $rules["{$address}.city"] = ['nullable', 'string', 'max:120'];
@@ -346,6 +374,8 @@ class EmployeeController extends Controller
             'verification.background_check_date.required_if' => 'Enter the date the background verification was cleared.',
             'bank_details.account_number.regex' => 'Account number must be 9 to 18 digits.',
             'bank_details.ifsc.regex' => 'IFSC must be 11 characters: 4 letters, a zero, then 6 letters or digits (e.g. HDFC0001234).',
+            'emergency_family.contacts.*.mobile.different' => 'Emergency mobile must be a different number from the employee mobile.',
+            'emergency_family.contacts.*.mobile.distinct' => 'Each emergency contact must have a different mobile number.',
             'emergency_family.mobile.different' => 'Emergency mobile must be a different number from the employee mobile.',
             'emergency_family.secondary_mobile.different' => 'The second emergency mobile must differ from the employee and first emergency numbers.',
             'emergency_family.dependents.*.name.required_with' => 'Enter the dependent\'s name.',
@@ -421,12 +451,67 @@ class EmployeeController extends Controller
                 $input[$email] = strtolower(trim($input[$email]));
             }
         }
+        $normaliseMobile = function (mixed $value): mixed {
+            if (! is_string($value) || ! IndianMobile::passes($value)) {
+                return $value;
+            }
+
+            return preg_replace('/^(?:91(?=\d{10}$)|0(?=\d{10}$))/', '', preg_replace('/\D/', '', $value));
+        };
+        foreach (['phone', 'emergency_family.mobile', 'emergency_family.secondary_mobile'] as $path) {
+            if (data_get($input, $path) !== null) {
+                data_set($input, $path, $normaliseMobile(data_get($input, $path)));
+            }
+        }
+        foreach (['emergency_family.contacts', 'education_skills.education_records', 'education_skills.certification_records', 'benefits_allowances.insurance_policies', 'assets_access.assigned_assets'] as $path) {
+            $rows = data_get($input, $path);
+            if (! is_array($rows)) {
+                continue;
+            }
+            array_walk_recursive($rows, function (&$value): void {
+                if (is_string($value)) {
+                    $value = trim($value);
+                }
+            });
+            if ($path === 'emergency_family.contacts') {
+                foreach ($rows as &$row) {
+                    if (is_array($row) && array_key_exists('mobile', $row)) {
+                        $row['mobile'] = $normaliseMobile($row['mobile']);
+                    }
+                }
+                unset($row);
+            }
+            if ($path === 'assets_access.assigned_assets') {
+                foreach ($rows as &$row) {
+                    if (is_array($row) && is_array($row['items'] ?? null)) {
+                        $row['items'] = array_values($row['items']);
+                    }
+                }
+                unset($row);
+            }
+            data_set($input, $path, array_values($rows));
+        }
         $request->replace($input);
     }
 
     /** @return array<string, mixed> */
     private function profilePayload(Request $request, array $validated, ?EmployeeProfile $profile = null): array
     {
+        foreach ([
+            ['education_skills', 'has_education', 'education_records', ['highest_qualification']],
+            ['education_skills', 'has_certifications', 'certification_records', ['certifications']],
+            ['benefits_allowances', 'has_policies', 'insurance_policies', ['insurance_policy']],
+            ['assets_access', 'assets_assigned', 'assigned_assets', ['laptop', 'mobile', 'sim', 'uniform', 'toolkit', 'access_card']],
+        ] as [$section, $flag, $list, $legacyKeys]) {
+            if (! array_key_exists($flag, $validated[$section] ?? [])) {
+                continue;
+            }
+            $validated[$section][$flag] = (bool) $validated[$section][$flag];
+            $validated[$section][$list] = $validated[$section][$flag] ? array_values($validated[$section][$list] ?? []) : [];
+            foreach ($legacyKeys as $key) {
+                unset($validated[$section][$key]);
+            }
+        }
         $documents = $profile?->documents ?? [];
         foreach ($request->file('documents', []) as $document) {
             $documents[] = ['name' => $document->getClientOriginalName(), 'path' => $document->store('employees/documents', 'public')];
@@ -526,6 +611,15 @@ class EmployeeController extends Controller
     private function emergencyFamily(array $validated): array
     {
         $family = $validated['emergency_family'] ?? [];
+        if (isset($family['contacts'])) {
+            $family['contacts'] = array_values($family['contacts']);
+            $first = $family['contacts'][0];
+            $second = $family['contacts'][1] ?? [];
+            $family = array_merge($family, [
+                'emergency_name' => $first['name'], 'relation' => $first['relation'], 'mobile' => $first['mobile'],
+                'secondary_name' => $second['name'] ?? null, 'secondary_relation' => $second['relation'] ?? null, 'secondary_mobile' => $second['mobile'] ?? null,
+            ]);
+        }
         $family['dependents_count'] = (int) ($family['dependents_count'] ?? 0);
         $family['dependents'] = collect($family['dependents'] ?? [])
             ->map(fn (array $dependent): array => array_filter($dependent, fn ($value) => filled($value)))

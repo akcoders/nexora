@@ -27,9 +27,12 @@ class TaskController extends Controller
 
     public function index(Request $request): View
     {
+        if ($request->input('status') === 'in_progress') {
+            $request->merge(['status' => 'pending']);
+        }
         $workType = $this->workType($request);
         $visibleTasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')->where('task_type', $workType);
-        $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'parent', 'observers.user:id,name'])
+        $tasks = (clone $visibleTasks)->withVisibleParent($request->user())->with(['customer', 'assignee', 'creator', 'latestAction.user', 'observers.user:id,name'])
             ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
             ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->open())
             ->when($request->input('status') === 'overdue', fn ($query) => $query->overdue())
@@ -67,7 +70,7 @@ class TaskController extends Controller
     {
         $subtask = $workflow->create($request->validated(), $request->user(), $task);
         if ($request->expectsJson() || $request->is('api/*')) {
-            return response()->json(['message' => 'Subtask created and workflow assigned to its owner.', 'task' => $subtask], 201);
+            return response()->json(['message' => 'Subtask created and workflow assigned to its owner.', 'task' => Task::withVisibleParent($request->user())->findOrFail($subtask->id)], 201);
         }
 
         return redirect()->route('tasks.show', $task)->with('success', $subtask->task_no.' created. Workflow assigned to the subtask owner.');
@@ -121,7 +124,7 @@ class TaskController extends Controller
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks'), 403);
 
         return view('tasks.show', [
-            'task' => $task->load(['customer', 'assignee', 'creator', 'parent', 'subtasks.assignee', 'actions.user', 'actions.assignee', 'actions.relatedTask', 'members.user']),
+            'task' => $task->load(['customer', 'assignee', 'creator', 'members.user'])->loadVisibleRelations($request->user()),
             'workType' => $task->task_type,
             'users' => User::active()->orderBy('name')->get(),
             'customers' => collect(),

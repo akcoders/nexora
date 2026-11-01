@@ -136,12 +136,13 @@ class WorkflowEnhancementsTest extends TestCase
         $this->actingAs($observer)->get(route('tasks.show', $child))->assertOk();
         $this->getJson(route('workflows.board'))->assertJsonFragment(['task_no' => $child->task_no]);
         $this->actingAs($nextOwner)->postJson(route('tasks.action', $parent), ['action' => 'close', 'remark' => 'Done.'])
-            ->assertUnprocessable()->assertJsonValidationErrors('action');
+            ->assertForbidden();
 
         $this->postJson(route('tasks.action', $child), ['action' => 'close', 'remark' => 'Materials confirmed.'])->assertOk();
         $this->assertDatabaseHas('task_actions', ['task_id' => $parent->id, 'related_task_id' => $child->id, 'action' => 'close']);
         Notification::assertSentTo([$admin, $owner, $observer, $nextOwner], TaskCompletedNotification::class);
-        $this->get(route('tasks.show', $parent))->assertSee('1/1 completed')->assertSee('Materials confirmed.');
+        $this->get(route('tasks.show', $parent))->assertForbidden();
+        $this->actingAs($owner)->get(route('tasks.show', $parent))->assertSee('1/1 completed')->assertSee('Materials confirmed.');
         $this->actingAs($owner)->postJson(route('tasks.action', $parent), ['action' => 'close', 'remark' => 'Workflow finished.'])->assertOk();
     }
 
