@@ -135,12 +135,14 @@ class Task extends Model
     public function recordAction(array $attributes): TaskAction
     {
         $action = $this->actions()->create($attributes);
+        $this->touch();
         $parent = $this->parent;
         while ($parent) {
             $parent->actions()->create(array_merge($attributes, [
                 'related_task_id' => $this->id,
                 'remark' => $this->task_no.' · '.$this->title.': '.$attributes['remark'],
             ]));
+            $parent->touch();
             $parent = $parent->parent;
         }
 

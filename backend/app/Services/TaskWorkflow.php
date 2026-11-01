@@ -74,14 +74,18 @@ class TaskWorkflow
     public function act(Task $task, array $data, User $by, bool $allowReopen = false): void
     {
         $stored = [];
+        $updating = $data['action'] === 'update';
+        $reassigning = $data['action'] === 'assign' || ($updating && ($data['reassign'] ?? false));
+        $status = $updating ? $data['status'] : ($data['action'] === 'close' ? Task::STATUS_CLOSED : 'pending');
+        $action = $status === Task::STATUS_CLOSED ? 'close' : ($reassigning ? 'assign' : 'update');
         try {
-            DB::transaction(function () use ($task, $data, $by, $allowReopen, &$stored): void {
+            DB::transaction(function () use ($task, $data, $by, $allowReopen, $action, $status, &$stored): void {
                 $task = Task::lockForUpdate()->findOrFail($task->id);
-                abort_if($task->isClosed() && (! $allowReopen || $data['action'] !== 'assign'), 422, 'This task is already closed.');
-                if ($data['action'] === 'assign' && $task->isClosed() && $task->parent?->isClosed()) {
+                abort_if($task->isClosed() && (! $allowReopen || $action !== 'assign'), 422, 'This task is already closed.');
+                if ($action === 'assign' && $task->isClosed() && $task->parent?->isClosed()) {
                     throw ValidationException::withMessages(['action' => 'Reopen the parent workflow before reopening this subtask.']);
                 }
-                if ($data['action'] === 'close') {
+                if ($action === 'close') {
                     if ($task->subtasks()->open()->exists()) {
                         throw ValidationException::withMessages(['action' => 'Complete all subtasks before completing this workflow.']);
                     }
@@ -89,6 +93,11 @@ class TaskWorkflow
                         throw ValidationException::withMessages(['attachments' => 'Attach at least one file before completing this workflow.']);
                     }
                 }
+                if ($data['change_due_date'] ?? false) {
+                    $this->changeDueDate($task, $data['due_at'], $data['reason'], $by);
+                    $task->refresh();
+                }
+                $previousStatus = $task->status;
                 $attachments = [];
                 foreach ($data['attachments'] ?? [] as $file) {
                     $path = $file->store('task-attachments/'.$task->id, 'local');
@@ -99,14 +108,23 @@ class TaskWorkflow
                     $attachments[] = ['path' => $path, 'name' => $file->getClientOriginalName()];
                 }
                 $task->recordAction([
-                    'user_id' => $by->id, 'action' => $data['action'], 'remark' => $data['remark'],
-                    'assigned_to' => $data['action'] === 'assign' ? $data['assigned_to'] : null,
+                    'user_id' => $by->id, 'action' => $action, 'remark' => $data['remark'],
+                    'assigned_to' => $action === 'assign' ? $data['assigned_to'] : null,
                     'attachments' => $attachments ?: null,
                 ]);
-                if ($data['action'] === 'assign') {
+                if ($action === 'assign') {
                     $this->assign($task, $data['assigned_to']);
-                } else {
+                }
+                if ($action === 'close') {
                     $task->update(['status' => Task::STATUS_CLOSED, 'closed_at' => now()]);
+                } else {
+                    $task->update(['status' => $status, 'closed_at' => null]);
+                    if ($status !== $previousStatus) {
+                        $label = fn (string $value): string => match ($value) {
+                            'pending' => 'Active', 'in_progress' => 'In progress', 'closed' => 'Completed', default => $value,
+                        };
+                        $task->recordAction(['user_id' => $by->id, 'action' => 'status', 'remark' => 'Status changed from '.$label($previousStatus).' to '.$label($status).'.']);
+                    }
                 }
             });
         } catch (Throwable $exception) {
@@ -114,9 +132,9 @@ class TaskWorkflow
             throw $exception;
         }
         $task->refresh();
-        if ($data['action'] === 'assign') {
+        if ($action === 'assign') {
             $this->notifyAssigned($task);
-        } else {
+        } elseif ($action === 'close') {
             $ids = $this->participantIds($task);
             $parent = $task->parent;
             while ($parent) {

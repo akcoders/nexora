@@ -710,6 +710,11 @@ class _TaskDetailsState extends State<_TaskDetails> {
   Map<String, dynamic>? task;
   List<dynamic> assignees = [];
   String action = 'close';
+  String updateStatus = 'pending';
+  bool reassign = false;
+  bool reschedule = false;
+  DateTime? updateDueAt;
+  final dueDateReason = TextEditingController();
   final List<XFile> attachments = [];
   int? assignedTo;
   bool loading = true;
@@ -725,6 +730,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
   @override
   void dispose() {
     remark.dispose();
+    dueDateReason.dispose();
     super.dispose();
   }
 
@@ -735,12 +741,15 @@ class _TaskDetailsState extends State<_TaskDetails> {
       );
       task = Map<String, dynamic>.from(response.data['task']);
       assignees = List<dynamic>.from(response.data['assignees'] ?? []);
-      if (assignedTo == task?['assigned_to']) assignedTo = null;
+      updateStatus = task?['status']?.toString() ?? 'pending';
+      updateDueAt = DateTime.tryParse(
+        task?['due_at']?.toString() ?? '',
+      )?.toLocal();
+      reassign = false;
+      reschedule = false;
+      dueDateReason.clear();
+      assignedTo = null;
       error = null;
-      assignedTo ??= assignees
-          .where((item) => item['id'] != task?['assigned_to'])
-          .map<int?>((item) => item['id'] as int?)
-          .firstOrNull;
     } on DioException catch (exception) {
       error =
           exception.response?.data?['message']?.toString() ??
@@ -1025,17 +1034,50 @@ class _TaskDetailsState extends State<_TaskDetails> {
     }
   }
 
+  Future<void> pickUpdateDueDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: updateDueAt ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(updateDueAt ?? DateTime.now()),
+    );
+    if (time == null || !mounted) return;
+    setState(
+      () => updateDueAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      ),
+    );
+  }
+
   Future<void> submit() async {
+    final workflow = task?['task_type'] != 'ticket';
+    final completing = workflow ? updateStatus == 'closed' : action == 'close';
+    final assigning = workflow ? reassign && !completing : action == 'assign';
+    if (workflow && reschedule && dueDateReason.text.trim().isEmpty) {
+      setState(
+        () => error = 'Please specify why you are changing the due date.',
+      );
+      return;
+    }
     if (remark.text.trim().isEmpty) {
       setState(() => error = 'Please enter a remark.');
       return;
     }
-    if (action == 'assign' && assignedTo == null) {
+    if (assigning && assignedTo == null) {
       setState(() => error = 'Select the next assignee.');
       return;
     }
 
-    if (action == 'close' &&
+    if (completing &&
         task?['attachment_required_on_completion'] == true &&
         attachments.isEmpty) {
       setState(
@@ -1044,37 +1086,36 @@ class _TaskDetailsState extends State<_TaskDetails> {
       );
       return;
     }
-    final isTicket = task?['task_type'] == 'ticket';
-    final workLabel = isTicket ? 'complaint' : 'workflow';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          action == 'close' ? LucideIcons.circleCheckBig : LucideIcons.forward,
-          color: action == 'close' ? AppColors.success : AppColors.primary,
-        ),
-        title: Text(
-          action == 'close' ? 'Close this $workLabel?' : 'Assign next?',
-        ),
-        content: Text(
-          action == 'close'
-              ? 'This $workLabel will move out of your active queue.'
-              : 'This $workLabel will stay active and move to the selected assignee.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const T('Cancel'),
+    if (completing || assigning) {
+      final isTicket = task?['task_type'] == 'ticket';
+      final workLabel = isTicket ? 'complaint' : 'workflow';
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: Icon(
+            completing ? LucideIcons.circleCheckBig : LucideIcons.forward,
+            color: completing ? AppColors.success : AppColors.primary,
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(action == 'close' ? 'Close $workLabel' : 'Assign'),
+          title: Text(completing ? 'Close this $workLabel?' : 'Assign next?'),
+          content: Text(
+            completing
+                ? 'This $workLabel will move out of your active queue.'
+                : 'This $workLabel will stay active and move to the selected assignee.',
           ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const T('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(completing ? 'Close $workLabel' : 'Assign'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
     setState(() {
       submitting = true;
       error = null;
@@ -1083,9 +1124,18 @@ class _TaskDetailsState extends State<_TaskDetails> {
       await context.read<ApiClient>().dio.post(
         'tasks/${widget.taskId}/action',
         data: FormData.fromMap({
-          'action': action,
+          'action': workflow ? 'update' : action,
+          if (workflow) ...{
+            'status': updateStatus,
+            'reassign': assigning ? 1 : 0,
+            'change_due_date': reschedule ? 1 : 0,
+            if (reschedule) ...{
+              'due_at': updateDueAt?.toIso8601String(),
+              'reason': dueDateReason.text.trim(),
+            },
+          },
           'remark': remark.text.trim(),
-          if (action == 'assign') 'assigned_to': assignedTo,
+          if (assigning) 'assigned_to': assignedTo,
           if (attachments.isNotEmpty)
             'attachments[]': [
               for (final file in attachments)
@@ -1187,6 +1237,20 @@ class _TaskDetailsState extends State<_TaskDetails> {
                 _DetailRow(
                   label: 'Due',
                   value: _TaskCard._date(task?['due_at']),
+                ),
+                _DetailRow(
+                  label: 'Last updated',
+                  value:
+                      DateTime.tryParse(
+                            task?['updated_at']?.toString() ?? '',
+                          ) ==
+                          null
+                      ? '—'
+                      : DateFormat('d MMM, hh:mm a').format(
+                          DateTime.parse(
+                            task!['updated_at'].toString(),
+                          ).toLocal(),
+                        ),
                   last: true,
                 ),
               ],
@@ -1237,7 +1301,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
               ),
             ),
         ],
-        if (canAct)
+        if (canAct && type == 'ticket')
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -1246,122 +1310,227 @@ class _TaskDetailsState extends State<_TaskDetails> {
               label: const T('Change due date'),
             ),
           ),
-        const SizedBox(height: 22),
-        const T(
-          'Activity',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        if (actions.isEmpty)
-          const T('No activity yet.', style: TextStyle(color: AppColors.muted))
-        else
-          ...actions.map((item) => _ActionTile(action: item)),
         if (canAct) ...[
           const SizedBox(height: 22),
-          const T(
-            'Take action',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                value: 'close',
-                icon: Icon(LucideIcons.checkCircle2),
-                label: T('Close'),
-              ),
-              ButtonSegment(
-                value: 'assign',
-                icon: Icon(LucideIcons.forward),
-                label: T('Assign next'),
-              ),
-            ],
-            selected: {action},
-            onSelectionChanged: (selection) {
-              setState(() => action = selection.first);
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: remark,
-            maxLines: 3,
-            scrollPadding: EdgeInsets.only(bottom: keyboardInset + 120),
-            decoration: const InputDecoration(
-              labelText: 'Remark *',
-              hintText: 'Describe work completed or next steps',
-            ),
-          ),
-          if (action == 'assign') ...[
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              initialValue: assignedTo,
-              decoration: const InputDecoration(labelText: 'Next assignee *'),
-              items: assignees
-                  .where((item) => item['id'] != task?['assigned_to'])
-                  .map(
-                    (item) => DropdownMenuItem<int>(
-                      value: item['id'] as int,
-                      child: Text(item['name']?.toString() ?? 'User'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => assignedTo = value),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Text(
-            task?['attachment_required_on_completion'] == true
-                ? 'Attachment required to complete'
-                : 'Attachments (optional)',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          Wrap(
-            spacing: 8,
-            children: [
-              TextButton.icon(
-                onPressed: submitting
-                    ? null
-                    : () => pickAttachments(ImageSource.camera),
-                icon: const Icon(LucideIcons.camera, size: 17),
-                label: const T('Take photo'),
-              ),
-              TextButton.icon(
-                onPressed: submitting
-                    ? null
-                    : () => pickAttachments(ImageSource.gallery),
-                icon: const Icon(LucideIcons.image, size: 17),
-                label: const T('Choose photos'),
-              ),
-            ],
-          ),
-          for (final file in attachments)
-            ListTile(
-              dense: true,
-              leading: const Icon(LucideIcons.paperclip, size: 17),
-              title: Text(file.name),
-              trailing: IconButton(
-                onPressed: submitting
-                    ? null
-                    : () => setState(() => attachments.remove(file)),
-                icon: const Icon(LucideIcons.x, size: 17),
-              ),
-            ),
-          if (error != null) ...[
-            const SizedBox(height: 10),
-            Text(error!, style: const TextStyle(color: AppColors.danger)),
-          ],
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: submitting ? null : submit,
-            icon: submitting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    action == 'close' ? LucideIcons.check : LucideIcons.send,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const T(
+                    'Task update',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
-            label: Text(submitting ? 'Saving…' : 'Submit action'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: remark,
+                    maxLines: 3,
+                    scrollPadding: EdgeInsets.only(bottom: keyboardInset + 120),
+                    decoration: const InputDecoration(
+                      labelText: 'Remark *',
+                      hintText: 'Describe work completed or next steps',
+                    ),
+                  ),
+                  if (type != 'ticket') ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: updateStatus,
+                      key: ValueKey('status$updateStatus'),
+                      decoration: const InputDecoration(labelText: 'Status *'),
+                      items: const [
+                        DropdownMenuItem(value: 'pending', child: T('Active')),
+                        DropdownMenuItem(
+                          value: 'in_progress',
+                          child: T('In progress'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'closed',
+                          child: T('Completed'),
+                        ),
+                      ],
+                      onChanged: submitting
+                          ? null
+                          : (value) => setState(() {
+                              updateStatus = value!;
+                              if (updateStatus == 'closed') reassign = false;
+                            }),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<bool>(
+                      isExpanded: true,
+                      initialValue: reassign,
+                      key: ValueKey('reassign$reassign'),
+                      decoration: const InputDecoration(
+                        labelText: 'Assign to someone else?',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: false,
+                          child: T('No — keep current owner'),
+                        ),
+                        DropdownMenuItem(value: true, child: T('Yes')),
+                      ],
+                      onChanged: submitting || updateStatus == 'closed'
+                          ? null
+                          : (value) =>
+                                setState(() => reassign = value ?? false),
+                    ),
+                  ] else ...[
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'close',
+                          icon: Icon(LucideIcons.checkCircle2),
+                          label: T('Close'),
+                        ),
+                        ButtonSegment(
+                          value: 'assign',
+                          icon: Icon(LucideIcons.forward),
+                          label: T('Assign next'),
+                        ),
+                      ],
+                      selected: {action},
+                      onSelectionChanged: (selection) {
+                        setState(() => action = selection.first);
+                      },
+                    ),
+                  ],
+                  if (type != 'ticket' ? reassign : action == 'assign') ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      initialValue: assignedTo,
+                      decoration: const InputDecoration(
+                        labelText: 'Next assignee *',
+                      ),
+                      items: assignees
+                          .where((item) => item['id'] != task?['assigned_to'])
+                          .map(
+                            (item) => DropdownMenuItem<int>(
+                              value: item['id'] as int,
+                              child: Text(item['name']?.toString() ?? 'User'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => assignedTo = value),
+                    ),
+                  ],
+                  if (type != 'ticket') ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<bool>(
+                      isExpanded: true,
+                      initialValue: reschedule,
+                      key: ValueKey('reschedule$reschedule'),
+                      decoration: const InputDecoration(
+                        labelText: 'Change due date?',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: false,
+                          child: T('No — keep current due date'),
+                        ),
+                        DropdownMenuItem(value: true, child: T('Yes')),
+                      ],
+                      onChanged: submitting
+                          ? null
+                          : (value) =>
+                                setState(() => reschedule = value ?? false),
+                    ),
+                    if (reschedule) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: submitting ? null : pickUpdateDueDate,
+                        icon: const Icon(LucideIcons.calendarClock),
+                        label: Text(
+                          updateDueAt == null
+                              ? 'Select due date'
+                              : DateFormat(
+                                  'd MMM yyyy, hh:mm a',
+                                ).format(updateDueAt!),
+                        ),
+                      ),
+                      if (updateDueAt != null)
+                        TextButton(
+                          onPressed: submitting
+                              ? null
+                              : () => setState(() => updateDueAt = null),
+                          child: const T('Remove due date'),
+                        ),
+                      TextField(
+                        controller: dueDateReason,
+                        maxLines: 2,
+                        maxLength: 3000,
+                        decoration: const InputDecoration(
+                          labelText: 'Reason for changing the due date *',
+                        ),
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 12),
+                  Text(
+                    task?['attachment_required_on_completion'] == true
+                        ? 'Attachment required to complete'
+                        : 'Attachments (optional)',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: submitting
+                            ? null
+                            : () => pickAttachments(ImageSource.camera),
+                        icon: const Icon(LucideIcons.camera, size: 17),
+                        label: const T('Take photo'),
+                      ),
+                      TextButton.icon(
+                        onPressed: submitting
+                            ? null
+                            : () => pickAttachments(ImageSource.gallery),
+                        icon: const Icon(LucideIcons.image, size: 17),
+                        label: const T('Choose photos'),
+                      ),
+                    ],
+                  ),
+                  for (final file in attachments)
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(LucideIcons.paperclip, size: 17),
+                      title: Text(file.name),
+                      trailing: IconButton(
+                        onPressed: submitting
+                            ? null
+                            : () => setState(() => attachments.remove(file)),
+                        icon: const Icon(LucideIcons.x, size: 17),
+                      ),
+                    ),
+                  if (error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      error!,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: submitting ? null : submit,
+                    icon: submitting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            type != 'ticket'
+                                ? LucideIcons.save
+                                : (action == 'close'
+                                      ? LucideIcons.check
+                                      : LucideIcons.send),
+                          ),
+                    label: Text(submitting ? 'Saving…' : 'Save update'),
+                  ),
+                ],
+              ),
+            ),
           ),
         ] else if (task?['status'] != 'closed') ...[
           const SizedBox(height: 18),
@@ -1375,6 +1544,16 @@ class _TaskDetailsState extends State<_TaskDetails> {
             ),
           ),
         ],
+        const SizedBox(height: 22),
+        const T(
+          'Activity',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        if (actions.isEmpty)
+          const T('No activity yet.', style: TextStyle(color: AppColors.muted))
+        else
+          ...actions.map((item) => _ActionTile(action: item)),
       ],
     );
   }

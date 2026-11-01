@@ -67,7 +67,7 @@
                             <article class="nx-activity-card">
                                 <div class="nx-activity-card-head">
                                     <div class="d-flex flex-wrap align-items-center gap-2">
-                                        <h4 class="nx-activity-title mb-0">{{ ($action->related_task_id ? 'Subtask · ' : '').match($action->action) { 'priority' => 'Priority changed', 'due_date' => 'Due date changed', 'close' => 'Completed', default => str($action->action)->headline() } }}</h4>
+                                        <h4 class="nx-activity-title mb-0">{{ ($action->related_task_id ? 'Subtask · ' : '').match($action->action) { 'priority' => 'Priority changed', 'due_date' => 'Due date changed', 'close' => 'Completed', 'update' => 'Progress update', 'status' => 'Status changed', default => str($action->action)->headline() } }}</h4>
                                         @if($loop->first)<span class="nx-activity-latest">Latest update</span>@endif
                                     </div>
                                     <time class="nx-activity-time" datetime="{{ $action->created_at->toIso8601String() }}"><i data-lucide="clock-3" aria-hidden="true"></i>{{ $action->created_at->format('d M Y') }} <span aria-hidden="true">·</span> {{ $action->created_at->format('h:i A') }}</time>
@@ -92,6 +92,9 @@
             </section>
         </div>
         <div class="col-xl-4">
+            @if(!$isTicket)
+                @include('tasks.partials.workflow-update')
+            @else
             <aside class="nx-card p-4 mb-4">
                 <h3 class="h6 fw-bold mb-3">Assignment</h3>
                 <div class="d-flex align-items-center gap-3 mb-4"><span class="nx-avatar">{{ strtoupper(substr($task->assignee->name, 0, 1)) }}</span><div><div class="fw-semibold">{{ $task->assignee->name }}</div><small class="text-secondary">Current assignee</small></div></div>
@@ -114,6 +117,7 @@
                     </form>
                 </aside>
                 <aside class="nx-card p-4 mt-4"><h3 class="h6 fw-bold mb-3">Change due date</h3><form method="POST" action="{{ route('tasks.due-date', $task) }}">@csrf<input type="hidden" name="_form" value="due-date"><label class="form-label">New due date & time</label><input class="form-control mb-3" type="datetime-local" name="due_at" value="{{ old('_form') === 'due-date' ? old('due_at') : $task->due_at?->format('Y-m-d\TH:i') }}"><label class="form-label">Reason for changing the due date *</label><textarea class="form-control mb-3" name="reason" rows="3" required maxlength="3000">{{ old('reason') }}</textarea><button class="btn btn-outline-primary w-100">Update due date</button></form></aside>
+            @endif
             @endif
         </div>
     </div>
