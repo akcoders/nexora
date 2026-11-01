@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
 use App\Notifications\TaskCompletedNotification;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -97,10 +98,7 @@ class TaskWorkflow
                         throw ValidationException::withMessages(['attachments' => 'Attach at least one file before completing this workflow.']);
                     }
                 }
-                if ($data['change_due_date'] ?? false) {
-                    $this->changeDueDate($task, $data['due_at'], $data['reason'], $by);
-                    $task->refresh();
-                }
+                $followUp = $this->updateFollowUp($task, $data);
                 $previousStatus = $task->status;
                 $attachments = [];
                 foreach ($data['attachments'] ?? [] as $file) {
@@ -115,6 +113,7 @@ class TaskWorkflow
                     'user_id' => $by->id, 'action' => $action, 'remark' => $data['remark'],
                     'assigned_to' => $action === 'assign' ? $data['assigned_to'] : null,
                     'attachments' => $attachments ?: null,
+                    ...$followUp,
                 ]);
                 if ($action === 'assign') {
                     $this->assign($task, $data['assigned_to']);
@@ -128,7 +127,7 @@ class TaskWorkflow
                     $task->update(['status' => $status, 'closed_at' => null]);
                     if ($status !== $previousStatus) {
                         $label = fn (string $value): string => match ($value) {
-                            'pending' => 'Active', 'in_progress' => 'In progress', 'closed' => 'Completed', default => $value,
+                            'pending' => 'Pending', 'in_progress' => 'In progress', 'closed' => 'Completed', default => $value,
                         };
                         $task->recordAction(['user_id' => $by->id, 'action' => 'status', 'remark' => 'Status changed from '.$label($previousStatus).' to '.$label($status).'.']);
                     }
@@ -190,20 +189,37 @@ class TaskWorkflow
         return $returnedParents;
     }
 
-    public function changeDueDate(Task $task, ?string $dueAt, string $reason, User $by): void
+    /** @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function updateFollowUp(Task $task, array $data): array
     {
-        DB::transaction(function () use ($task, $dueAt, $reason, $by): void {
-            $task = Task::lockForUpdate()->findOrFail($task->id);
-            abort_if($task->isClosed(), 422, 'Closed items cannot be rescheduled.');
-            $previous = $task->due_at?->format('d M Y, h:i A') ?? 'No due date';
-            $task->fill(['due_at' => $dueAt]);
-            if (! $task->isDirty('due_at')) {
-                return;
-            }
-            $next = $task->due_at?->format('d M Y, h:i A') ?? 'No due date';
-            $task->save();
-            $task->recordAction(['user_id' => $by->id, 'action' => 'due_date', 'remark' => 'Due date changed from '.$previous.' to '.$next.'. Reason: '.$reason]);
-        });
+        if (! array_key_exists('next_follow_up_at', $data)) {
+            return [];
+        }
+        $next = filled($data['next_follow_up_at']) ? Carbon::parse($data['next_follow_up_at'])->setTimezone(config('app.timezone')) : null;
+        if (($next && $task->next_follow_up_at && $next->equalTo($task->next_follow_up_at)) || ($next === null && $task->next_follow_up_at === null)) {
+            return [];
+        }
+        if ($next?->lt(today())) {
+            throw ValidationException::withMessages(['next_follow_up_at' => 'Choose today or a later follow-up date.']);
+        }
+        $revision = $next && $task->due_at && $next->gt($task->due_at);
+        $reason = trim($data['delay_reason'] ?? '');
+        if ($revision && $reason === '') {
+            throw ValidationException::withMessages(['delay_reason' => 'Please specify the reason for the delay.']);
+        }
+        $task->next_follow_up_at = $next;
+        if ($revision) {
+            $task->revised_due_at = $next;
+        }
+        $task->save();
+
+        return [
+            'next_follow_up_at' => $next,
+            'revised_due_at' => $revision ? $next : null,
+            'delay_reason' => $revision ? $reason : null,
+        ];
     }
 
     private function assign(Task $task, int $owner): void

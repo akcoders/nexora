@@ -20,9 +20,9 @@
     </section>
 
     <div class="row g-3 mb-4">
-        <div class="col-md-4"><a href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}" class="nx-card nx-metric text-dark"><div><div class="nx-metric-value">{{ $openCount }}</div><div class="nx-metric-label">Active</div></div><span class="nx-metric-icon"><i data-lucide="activity"></i></span></a></div>
+        <div class="col-md-4"><a href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}" class="nx-card nx-metric text-dark"><div><div class="nx-metric-value">{{ $openCount }}</div><div class="nx-metric-label">Pending</div></div><span class="nx-metric-icon"><i data-lucide="activity"></i></span></a></div>
         <div class="col-md-4"><a href="{{ route($moduleRoute.'.index', ['status' => 'closed']) }}" class="nx-card nx-metric text-dark"><div><div class="nx-metric-value">{{ $closedCount }}</div><div class="nx-metric-label">Completed</div></div><span class="nx-metric-icon"><i data-lucide="circle-check-big"></i></span></a></div>
-        <div class="col-md-4"><div class="nx-card nx-metric"><div><div class="nx-metric-value">{{ $overdueCount }}</div><div class="nx-metric-label">Overdue</div></div><span class="nx-metric-icon"><i data-lucide="alarm-clock"></i></span></div></div>
+        <div class="col-md-4"><a href="{{ route($moduleRoute.'.index', ['status' => 'overdue']) }}" class="nx-card nx-metric text-dark"><div><div class="nx-metric-value">{{ $overdueCount }}</div><div class="nx-metric-label">Overdue</div></div><span class="nx-metric-icon"><i data-lucide="alarm-clock"></i></span></a></div>
     </div>
 
     @if($errors->any())<div class="alert alert-danger d-flex align-items-center gap-2"><i data-lucide="circle-alert" style="width:18px"></i>{{ $errors->first() }}</div>@endif
@@ -31,8 +31,9 @@
         <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3">
             <nav class="nx-filter-pills" aria-label="Status">
                 <a class="{{ !request()->hasAny(['scope','status']) ? 'active' : '' }}" href="{{ route($moduleRoute.'.index') }}">All</a>
-                <a class="{{ request('scope') === 'open' ? 'active' : '' }}" href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}">Active</a>
+                <a class="{{ request('scope') === 'open' ? 'active' : '' }}" href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}">Pending</a>
                 <a class="{{ request('status') === 'closed' ? 'active' : '' }}" href="{{ route($moduleRoute.'.index', ['status' => 'closed']) }}">Completed</a>
+                <a class="{{ request('status') === 'overdue' ? 'active' : '' }}" href="{{ route($moduleRoute.'.index', ['status' => 'overdue']) }}">Overdue</a>
             </nav>
             <span class="small text-secondary">{{ $tasks->total() }} results · {{ $overdueCount }} overdue</span>
         </div>
@@ -52,7 +53,7 @@
     <section class="nx-card overflow-hidden">
         <div class="table-responsive">
             <table class="table nx-table nx-workflow-table mb-0">
-                <thead><tr><th class="ps-4">Work item</th><th>Responsible Person</th><th>Progress</th><th>Due</th><th>Latest activity</th><th>Status</th><th class="pe-4"></th></tr></thead>
+                <thead><tr><th class="ps-4">Work item</th><th>Responsible Person</th><th>Progress</th><th>Original due / follow-up</th><th>Latest activity</th><th>Status</th><th class="pe-4"></th></tr></thead>
                 <tbody>
                     @forelse($tasks as $task)
                         @php
@@ -67,10 +68,10 @@
                                 @if($task->observers->isNotEmpty())<div class="nx-avatar-stack my-2" aria-label="Observers">@foreach($task->observers->take(4) as $member)@if($member->user)<x-person-avatar :user="$member->user" :size="26" detail="Observer" />@endif @endforeach @if($task->observers->count() > 4)<span class="nx-avatar-more" title="{{ $task->observers->skip(4)->map(fn ($member) => $member->user?->name)->filter()->implode(', ') }}">+{{ $task->observers->count() - 4 }}</span>@endif</div>@endif
                                 <small class="text-secondary">{{ $task->customer?->name ?? 'Internal workflow' }}</small></div></div></td>
                             <td style="min-width:180px"><div class="d-flex align-items-center gap-2"><x-person-avatar :user="$task->assignee" :size="34" detail="Responsible Person" /><div><span class="small fw-semibold d-block">{{ $task->assignee?->name ?? 'Unassigned' }}</span><small class="text-secondary">{{ $task->assignee?->designation ?: 'Responsible Person' }}</small></div></div></td>
-                            <td style="min-width:180px"><div class="nx-flow-track"><span class="done"></span><span class="{{ $task->actions_count > 1 ? 'done' : 'active' }}"></span><span class="{{ $isOpen ? 'active' : 'done' }}"></span><span class="{{ $task->status === 'closed' ? 'done' : '' }}"></span></div><div class="d-flex justify-content-between nx-flow-label"><span>Created</span><span>Routed</span><span>{{ $isOpen ? 'Active' : 'Done' }}</span></div></td>
-                            <td style="min-width:145px"><span class="small {{ $isOverdue ? 'text-danger fw-bold' : 'fw-semibold' }}">{{ $task->due_at?->format('d M Y') ?? 'No due date' }}</span><small class="d-block {{ $isOverdue ? 'text-danger' : 'text-secondary' }}">{{ $isOverdue ? $task->due_at->diffForHumans() : ($task->due_at?->format('h:i A') ?? 'Flexible') }}</small></td>
+                            <td style="min-width:180px"><div class="nx-flow-track"><span class="done"></span><span class="{{ $task->actions_count > 1 ? 'done' : 'active' }}"></span><span class="{{ $isOpen ? 'active' : 'done' }}"></span><span class="{{ $task->status === 'closed' ? 'done' : '' }}"></span></div><div class="d-flex justify-content-between nx-flow-label"><span>Created</span><span>Routed</span><span>{{ $isOpen ? 'Pending' : 'Done' }}</span></div></td>
+                            <td style="min-width:145px"><span class="small {{ $isOverdue ? 'text-danger fw-bold' : 'fw-semibold' }}">{{ $task->due_at?->format('d M Y') ?? 'No due date' }}</span><small class="d-block {{ $isOverdue ? 'text-danger' : 'text-secondary' }}">{{ $isOverdue ? $task->due_at->diffForHumans() : ($task->due_at?->format('h:i A') ?? 'Flexible') }}</small>@if($task->next_follow_up_at)<small class="d-block text-primary mt-1">Follow-up: {{ $task->next_follow_up_at->format('d M, h:i A') }}</small>@endif @if($task->revised_due_at)<small class="d-block text-secondary">Revised: {{ $task->revised_due_at->format('d M, h:i A') }}</small>@endif</td>
                             <td style="min-width:220px">@if($task->latestAction)<div class="small fw-semibold">{{ str($task->latestAction->action)->headline() }} by {{ $task->latestAction->user?->name }}</div><div class="small text-secondary text-truncate" style="max-width:230px">{{ $task->latestAction->remark }}</div><small class="text-secondary">{{ $task->latestAction->created_at->diffForHumans() }}</small>@else<span class="small text-secondary">No activity yet</span>@endif</td>
-                            <td><span class="badge rounded-pill {{ $isOpen ? 'badge-soft-warning' : 'badge-soft-success' }}">{{ $isOpen ? 'Active' : 'Closed' }}</span></td>
+                            <td><span class="badge rounded-pill {{ $isOpen ? ($isOverdue ? 'badge-soft-danger' : 'badge-soft-warning') : 'badge-soft-success' }}">{{ $isOpen ? ($isOverdue ? 'Overdue' : 'Pending') : 'Completed' }}</span></td>
                             <td class="pe-4"><a class="nx-icon-btn" href="{{ route('tasks.show', $task) }}" aria-label="Open {{ $task->task_no }}"><i data-lucide="arrow-right" style="width:17px"></i></a></td>
                         </tr>
                     @empty

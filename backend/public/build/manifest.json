@@ -9,7 +9,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-DDi5MmmA.js",
+    "file": "assets/app-DqMrlE4z.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -19,7 +19,7 @@
     ]
   },
   "resources/js/kanban-board.js": {
-    "file": "assets/kanban-board-CqwiiHjV.js",
+    "file": "assets/kanban-board-BvcTktqK.js",
     "name": "kanban-board",
     "src": "resources/js/kanban-board.js",
     "isEntry": true

@@ -11,7 +11,12 @@ class TaskAction extends Model
 
     protected function casts(): array
     {
-        return ['attachments' => 'array'];
+        return ['attachments' => 'array', 'next_follow_up_at' => 'datetime', 'revised_due_at' => 'datetime'];
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 
     public function user(): BelongsTo

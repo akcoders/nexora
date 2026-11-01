@@ -78,7 +78,7 @@ class WorkflowRoutingAndUiTest extends TestCase
         $this->assertDatabaseHas('tasks', ['id' => $root->id, 'assigned_to' => $admin->id, 'status' => 'closed']);
     }
 
-    public function test_past_dates_are_refused_on_creation_and_both_rescheduling_endpoints(): void
+    public function test_past_dates_are_refused_on_creation_and_follow_up_updates(): void
     {
         [$admin, $creator, $worker, $parent, $child] = $this->workflow();
         $this->travelTo(now()->setDate(2026, 11, 1)->setTime(12, 0));
@@ -87,14 +87,14 @@ class WorkflowRoutingAndUiTest extends TestCase
 
         $this->postJson(route('workflows.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('due_at');
         $this->postJson(route('tasks.subtasks.store', $parent), $data)->assertUnprocessable()->assertJsonValidationErrors('due_at');
-        $this->postJson(route('tasks.action', $parent), ['action' => 'update', 'status' => 'pending', 'remark' => 'Reschedule.', 'change_due_date' => 1, 'due_at' => $data['due_at'], 'reason' => 'Waiting.'])
-            ->assertUnprocessable()->assertJsonValidationErrors('due_at');
+        $this->postJson(route('tasks.action', $parent), ['action' => 'update', 'status' => 'pending', 'remark' => 'Follow up.', 'next_follow_up_at' => $data['due_at']])
+            ->assertUnprocessable()->assertJsonValidationErrors('next_follow_up_at');
         $this->postJson(route('tasks.due-date', $parent), ['due_at' => $data['due_at'], 'reason' => 'Waiting.'])->assertUnprocessable()->assertJsonValidationErrors('due_at');
 
         $this->assertDatabaseMissing('tasks', ['title' => 'Invalid past date']);
         $this->assertSame('2026-11-15 17:00:00', $parent->fresh()->due_at->format('Y-m-d H:i:s'));
         $this->assertSame(0, $parent->actions()->count());
-        $this->postJson(route('tasks.due-date', $parent), ['due_at' => '2026-11-01 17:00:00', 'reason' => 'Today is available.'])->assertOk();
+        $this->postJson(route('tasks.action', $parent), ['action' => 'update', 'status' => 'pending', 'remark' => 'Today is available.', 'next_follow_up_at' => '2026-11-01 17:00:00'])->assertOk();
     }
 
     public function test_a_progress_remark_keeps_an_existing_overdue_date_unchanged(): void
@@ -103,7 +103,7 @@ class WorkflowRoutingAndUiTest extends TestCase
         $this->travelTo(now()->setDate(2026, 11, 1)->setTime(12, 0));
         $parent->update(['due_at' => '2026-10-31 17:00:00']);
 
-        $this->actingAs($worker)->postJson(route('tasks.action', $parent), ['action' => 'update', 'status' => 'in_progress', 'remark' => 'Following up today.', 'change_due_date' => 0])
+        $this->actingAs($worker)->postJson(route('tasks.action', $parent), ['action' => 'update', 'status' => 'in_progress', 'remark' => 'Following up today.'])
             ->assertOk();
 
         $this->assertSame('2026-10-31 17:00:00', $parent->fresh()->due_at->format('Y-m-d H:i:s'));

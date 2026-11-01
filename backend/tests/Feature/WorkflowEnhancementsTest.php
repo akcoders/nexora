@@ -90,29 +90,27 @@ class WorkflowEnhancementsTest extends TestCase
         $this->assertDatabaseHas('tasks', ['id' => $task->id, 'status' => 'pending', 'assigned_to' => $admin->id]);
     }
 
-    public function test_due_date_changes_require_a_reason_and_record_both_dates_in_parent_history(): void
+    public function test_follow_up_revisions_require_a_reason_and_are_mirrored_in_parent_history(): void
     {
         [$admin, $owner] = $this->users();
         $parent = $this->workflow($admin, $owner);
         $task = $this->workflow($admin, $owner, ['parent_task_id' => $parent->id, 'due_at' => '2026-11-05 17:00:00']);
         $this->actingAs($owner);
-        $url = route('tasks.due-date', $task);
+        $url = route('tasks.action', $task);
+        $data = ['action' => 'update', 'status' => 'pending', 'remark' => 'Following up.', 'next_follow_up_at' => '2026-11-07 17:00:00'];
 
-        $this->postJson($url, ['due_at' => '2026-11-07 17:00:00'])->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->postJson($url, $data)->assertUnprocessable()->assertJsonValidationErrors('delay_reason');
+        $this->postJson($url, array_merge($data, ['next_follow_up_at' => 'invalid', 'delay_reason' => 'Awaiting parts.']))->assertUnprocessable()->assertJsonValidationErrors('next_follow_up_at');
+        $this->assertSame(0, $task->actions()->count());
+        $this->postJson($url, array_merge($data, ['delay_reason' => 'Awaiting parts.']))->assertOk();
+
         $this->assertSame('2026-11-05 17:00:00', $task->fresh()->due_at->format('Y-m-d H:i:s'));
-        $this->postJson($url, ['due_at' => 'invalid', 'reason' => 'Awaiting parts.'])->assertUnprocessable()->assertJsonValidationErrors('due_at');
-        $this->postJson($url, ['due_at' => '2026-11-07 17:00:00', 'reason' => 'Awaiting parts.'])->assertOk();
-
-        $this->assertSame('2026-11-07 17:00:00', $task->fresh()->due_at->format('Y-m-d H:i:s'));
-        $remark = $task->actions()->where('action', 'due_date')->firstOrFail()->remark;
-        $this->assertStringContainsString('05 Nov 2026', $remark);
-        $this->assertStringContainsString('07 Nov 2026', $remark);
-        $this->assertStringContainsString('Awaiting parts.', $remark);
-        $this->assertDatabaseHas('task_actions', ['task_id' => $parent->id, 'related_task_id' => $task->id, 'action' => 'due_date']);
-
-        $this->postJson($url, ['due_at' => null])->assertJsonValidationErrors('reason');
-        $this->postJson($url, ['due_at' => null, 'reason' => 'Schedule to be confirmed.'])->assertOk();
-        $this->assertNull($task->fresh()->due_at);
+        $this->assertDatabaseHas('task_actions', ['task_id' => $parent->id, 'related_task_id' => $task->id, 'action' => 'update', 'revised_due_at' => '2026-11-07 17:00:00', 'delay_reason' => 'Awaiting parts.']);
+        $this->assertSame(1, $task->actions()->count());
+        $this->postJson($url, array_merge($data, ['next_follow_up_at' => null]))->assertOk();
+        $this->assertNull($task->fresh()->next_follow_up_at);
+        $this->assertNotNull($task->fresh()->revised_due_at);
+        $this->assertSame(1, $task->actions()->whereNotNull('revised_due_at')->count());
     }
 
     public function test_subtask_creation_assigns_parent_preserves_visibility_and_announces_completion(): void
@@ -207,7 +205,7 @@ class WorkflowEnhancementsTest extends TestCase
             'attachment_required_on_completion' => true, 'due_at' => '2026-11-05 17:00:00',
         ])->assertCreated();
         $child = $parent->subtasks()->firstOrFail();
-        $this->postJson('/api/v1/tasks/'.$child->id.'/due-date', ['due_at' => '2026-11-06 17:00:00', 'reason' => 'Delivery delayed.'])->assertOk();
+        $this->postJson('/api/v1/tasks/'.$child->id.'/action', ['action' => 'update', 'status' => 'pending', 'remark' => 'Awaiting delivery.', 'next_follow_up_at' => '2026-11-06 17:00:00', 'delay_reason' => 'Delivery delayed.'])->assertOk();
         $this->postJson('/api/v1/tasks/'.$child->id.'/action', ['action' => 'assign', 'assigned_to' => $admin->id, 'remark' => 'Please approve.'])->assertOk();
         $this->actingAs($admin)->postJson(route('tasks.priority', $child), ['priority' => 'high'])->assertOk();
         Sanctum::actingAs($admin);
@@ -216,7 +214,7 @@ class WorkflowEnhancementsTest extends TestCase
             'attachments' => [UploadedFile::fake()->create('approval.pdf', 10, 'application/pdf')],
         ], ['Accept' => 'application/json'])->assertOk();
 
-        foreach (['created', 'due_date', 'assign', 'priority', 'close'] as $action) {
+        foreach (['created', 'update', 'assign', 'priority', 'close'] as $action) {
             $this->assertDatabaseHas('task_actions', ['task_id' => $parent->id, 'related_task_id' => $child->id, 'action' => $action]);
         }
         $completion = $parent->actions()->where('action', 'close')->firstOrFail();

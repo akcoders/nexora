@@ -40,13 +40,16 @@ function initDateTimePicker(root) {
     const summary = root.querySelector('[data-schedule-summary]');
     const sync = () => {
         time.disabled = !date.value;
-        date.setCustomValidity(date.value && date.value < date.min ? 'Choose today or a later date.' : '');
         value.value = date.value ? `${date.value}T${time.value || '09:00'}` : '';
+        const unchanged = value.value !== '' && value.value === root.dataset.existingValue;
+        date.min = unchanged && date.value < root.dataset.today ? date.value : root.dataset.today;
+        date.setCustomValidity(date.value && date.value < date.min ? 'Choose today or a later date.' : '');
         const scheduled = value.value ? new Date(value.value) : null;
         summary.textContent = scheduled && !Number.isNaN(scheduled.getTime())
             ? scheduled.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
             : 'Choose today or a later date';
         root.querySelector('[data-schedule-clear]').hidden = !date.value;
+        value.dispatchEvent(new Event('change', { bubbles: true }));
     };
     root.closest('form')?.addEventListener('submit', event => {
         sync();
@@ -62,8 +65,23 @@ function initDateTimePicker(root) {
     sync();
 }
 
+function initFollowUp(root) {
+    const input = root.querySelector('[data-schedule-value]');
+    const fields = root.querySelector('[data-revision-fields]');
+    const sync = () => {
+        const revision = root.dataset.originalDue && input.value && new Date(input.value) > new Date(root.dataset.originalDue);
+        fields.hidden = !revision;
+        fields.disabled = !revision;
+        fields.querySelector('textarea').required = !!revision && input.value !== root.dataset.existingFollowUp;
+        root.querySelector('[data-revision-preview]').value = revision ? new Date(input.value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    };
+    input.addEventListener('change', sync);
+    sync();
+}
+
 const init = () => {
     document.querySelectorAll('[data-observer-picker]').forEach(initObserverPicker);
     document.querySelectorAll('[data-date-time-picker]').forEach(initDateTimePicker);
+    document.querySelectorAll('[data-follow-up]').forEach(initFollowUp);
 };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

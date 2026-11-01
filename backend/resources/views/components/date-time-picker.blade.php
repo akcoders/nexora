@@ -1,4 +1,4 @@
-@props(['name' => 'due_at', 'value' => null, 'id' => null, 'label' => 'Due date & time'])
+@props(['name' => 'due_at', 'value' => null, 'id' => null, 'label' => 'Due date & time', 'allowExisting' => false])
 @php
     $pickerId = $id ?? 'schedule-'.\Illuminate\Support\Str::uuid();
     try {
@@ -7,7 +7,7 @@
         $schedule = null;
     }
 @endphp
-<div class="nx-date-time-picker" data-date-time-picker>
+<div class="nx-date-time-picker" data-date-time-picker data-today="{{ today()->toDateString() }}" data-existing-value="{{ $allowExisting ? $schedule?->format('Y-m-d\TH:i') : '' }}">
     <label class="form-label" for="{{ $pickerId }}-date">{{ $label }}</label>
     <input type="hidden" name="{{ $name }}" value="{{ $schedule?->format('Y-m-d\TH:i') }}" data-schedule-value>
     <div class="nx-schedule-fields">

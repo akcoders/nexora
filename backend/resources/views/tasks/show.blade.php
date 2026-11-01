@@ -16,7 +16,7 @@
                     <div>
                         <div class="d-flex gap-2 mb-3">
                             <span class="badge rounded-pill {{ $isTicket ? 'badge-soft-success' : 'badge-soft-primary' }}">{{ $isTicket ? 'Customer Complaint' : 'Internal Workflow' }}</span>
-                            <span class="badge rounded-pill {{ $task->status === 'closed' ? 'badge-soft-success' : 'badge-soft-warning' }}">{{ $task->status === 'closed' ? 'Closed' : 'Active' }}</span>
+                            <span class="badge rounded-pill {{ $task->status === 'closed' ? 'badge-soft-success' : ($task->isOverdue() ? 'badge-soft-danger' : 'badge-soft-warning') }}">{{ $task->status === 'closed' ? 'Closed' : ($task->isOverdue() ? 'Overdue' : 'Pending') }}</span>
                             <span class="badge rounded-pill {{ $task->priority === 'very_high' ? 'badge-soft-danger' : 'badge-soft-primary' }}">{{ str($task->priority)->headline() }}</span>
                         </div>
                         <h2 class="h4 fw-bold">{{ $task->title }}</h2>
@@ -33,7 +33,9 @@
                 <div class="row g-3 small">
                     @if($isTicket)<div class="col-md-4"><span class="text-secondary d-block">Customer</span><strong>{{ $task->customer?->name }}</strong></div>@endif
                     <div class="col-md-4"><span class="text-secondary d-block">Completion attachment</span><strong>{{ $task->attachment_required_on_completion ? 'Required' : 'Optional' }}</strong></div>
-                    <div class="col-md-4"><span class="text-secondary d-block">Due date</span><strong>{{ $task->due_at?->format('d M Y, h:i A') ?? 'No due date' }}</strong></div>
+                    <div class="col-md-4"><span class="text-secondary d-block">Original due date</span><strong>{{ $task->due_at?->format('d M Y, h:i A') ?? 'No due date' }}</strong></div>
+                    @if($task->next_follow_up_at)<div class="col-md-4"><span class="text-secondary d-block">Next follow-up</span><strong>{{ $task->next_follow_up_at->format('d M Y, h:i A') }}</strong></div>@endif
+                    @if($task->revised_due_at)<div class="col-md-4"><span class="text-secondary d-block">Latest revised due date</span><strong>{{ $task->revised_due_at->format('d M Y, h:i A') }}</strong></div>@endif
                 </div>
             </section>
             @if(!$isTicket)
@@ -42,7 +44,7 @@
                         @if(!$task->isClosed() && auth()->user()->can('act', $task))<button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#taskModal"><i data-lucide="plus" style="width:16px"></i> Create subtask</button>@endif
                     </div>
                     <div class="d-grid gap-3">@forelse($task->subtasks as $subtask)
-                        <a class="nx-subtask-card d-block p-3 text-decoration-none" href="{{ route('tasks.show', $subtask) }}"><div class="d-flex justify-content-between gap-2"><strong class="small">{{ $subtask->task_no }} · Subtask</strong><span class="badge {{ $subtask->isClosed() ? 'badge-soft-success' : 'badge-soft-warning' }}">{{ $subtask->isClosed() ? 'Completed' : 'Active' }}</span></div><div class="fw-semibold text-dark mt-2">{{ $subtask->title }}</div><div class="small text-secondary mt-1">{{ $subtask->assignee?->name }} · Due {{ $subtask->due_at?->format('d M Y, h:i A') ?? 'Not set' }}</div></a>
+                        <a class="nx-subtask-card d-block p-3 text-decoration-none" href="{{ route('tasks.show', $subtask) }}"><div class="d-flex justify-content-between gap-2"><strong class="small">{{ $subtask->task_no }} · Subtask</strong><span class="badge {{ $subtask->isClosed() ? 'badge-soft-success' : 'badge-soft-warning' }}">{{ $subtask->isClosed() ? 'Completed' : 'Pending' }}</span></div><div class="fw-semibold text-dark mt-2">{{ $subtask->title }}</div><div class="small text-secondary mt-1">{{ $subtask->assignee?->name }} · Due {{ $subtask->due_at?->format('d M Y, h:i A') ?? 'Not set' }}</div></a>
                     @empty<div class="small text-secondary">No subtasks yet.</div>@endforelse</div>
                 </section>
             @endif
@@ -85,6 +87,7 @@
                                         <p class="nx-activity-note">{{ $action->remark }}</p>
                                     @endif
                                 @endif
+                                @if($action->next_follow_up_at)<div class="small text-secondary mt-1">Next follow-up: <strong>{{ $action->next_follow_up_at->format('d M Y, h:i A') }}</strong>@if($action->revised_due_at) · Revised due: <strong>{{ $action->revised_due_at->format('d M Y, h:i A') }}</strong><div class="text-warning">Reason for delay: {{ $action->delay_reason }}</div>@endif</div>@endif
                                 @if($action->attachments)<div class="nx-activity-attachments">@foreach($action->attachments as $index => $attachment)<a href="{{ route('tasks.attachments.show', [$task, $action, $index]) }}"><i data-lucide="paperclip" aria-hidden="true"></i>{{ $attachment['name'] }}</a>@endforeach</div>@endif
                             </article>
                         </li>
@@ -113,12 +116,13 @@
                         <label class="form-label">Remark *</label><textarea class="form-control mb-3" name="remark" rows="4" placeholder="Work completed, outcome or next step" required maxlength="3000">{{ old('remark') }}</textarea>
                         <label class="form-label">Action *</label><select class="form-select mb-3" name="action" id="taskAction" required><option value="assign">Assign next</option><option value="close">Close {{ $isTicket ? 'ticket' : 'workflow' }}</option></select>
                         <div id="nextAssignee" class="mb-3"><label class="form-label">Responsible Person</label><select class="form-select" name="assigned_to" data-v="required_if:action,assign"><option value="">Select user</option>@foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
+                        @include('tasks.partials.follow-up')
                         <div class="mb-3"><label class="form-label" for="taskAttachments">Attachments{{ $task->attachment_required_on_completion ? ' (required to complete)' : ' (optional)' }}</label><input type="file" class="form-control" id="taskAttachments" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"><div class="form-text">Up to 5 files, 10 MB each. Images, PDF, Word, Excel or text.</div></div>
                         @if($task->subtasks->contains(fn ($subtask) => !$subtask->isClosed()))<p class="small text-warning">Complete the open subtasks before completing this workflow.</p>@endif
                         <button class="btn btn-primary w-100">Submit action</button>
                     </form>
                 </aside>
-                <aside class="nx-card p-4 mt-4"><h3 class="h6 fw-bold mb-3">Change due date</h3><form method="POST" action="{{ route('tasks.due-date', $task) }}">@csrf<input type="hidden" name="_form" value="due-date"><div class="mb-3"><x-date-time-picker :value="old('_form') === 'due-date' ? old('due_at') : $task->due_at" id="complaintDueDate" label="New due date & time" /></div><label class="form-label">Reason for changing the due date *</label><textarea class="form-control mb-3" name="reason" rows="3" required maxlength="3000">{{ old('reason') }}</textarea><button class="btn btn-outline-primary w-100">Update due date</button></form></aside>
+
             @endif
             @endif
         </div>

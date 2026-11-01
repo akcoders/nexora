@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TaskController extends Controller
@@ -31,7 +32,8 @@ class TaskController extends Controller
         $tasks = (clone $visibleTasks)->with(['customer', 'assignee', 'creator', 'latestAction.user', 'parent', 'observers.user:id,name'])
             ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
             ->when($request->string('scope')->toString() === 'open', fn ($query) => $query->open())
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->when($request->input('status') === 'overdue', fn ($query) => $query->overdue())
+            ->when($request->filled('status') && $request->input('status') !== 'overdue', fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')))
             ->when($request->filled('assignee'), fn ($query) => $query->where('assigned_to', $request->integer('assignee')))
             ->when($request->filled('search'), fn ($query) => $query->where(fn ($query) => $query
@@ -106,16 +108,12 @@ class TaskController extends Controller
         return back()->with('success', 'Priority updated.');
     }
 
-    public function dueDate(Request $request, Task $task, TaskWorkflow $workflow): RedirectResponse|JsonResponse
+    public function dueDate(Request $request, Task $task): never
     {
         abort_unless(RecordVisibility::allows($request->user(), $task, 'tasks') && $request->user()->can('act', $task), 403);
-        $data = $request->validate(['due_at' => ['present', 'nullable', 'date', 'after_or_equal:today'], 'reason' => ['required', 'string', 'max:3000']], ['due_at.after_or_equal' => 'Choose today or a later due date.']);
-        $workflow->changeDueDate($task, $data['due_at'], $data['reason'], $request->user());
-        if ($request->expectsJson() || $request->is('api/*')) {
-            return response()->json(['message' => 'Due date updated.', 'task' => $task->fresh()]);
-        }
-
-        return back()->with('success', 'Due date updated with reason.');
+        throw ValidationException::withMessages([
+            'due_at' => 'The original due date cannot be changed. Set a next follow-up date instead.',
+        ]);
     }
 
     public function show(Request $request, Task $task): View

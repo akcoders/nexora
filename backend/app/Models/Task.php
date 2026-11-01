@@ -27,7 +27,7 @@ class Task extends Model
 
     protected function casts(): array
     {
-        return ['due_at' => 'datetime', 'closed_at' => 'datetime', 'attachment_required_on_completion' => 'boolean'];
+        return ['due_at' => 'datetime', 'next_follow_up_at' => 'datetime', 'revised_due_at' => 'datetime', 'closed_at' => 'datetime', 'attachment_required_on_completion' => 'boolean'];
     }
 
     public function parent(): BelongsTo
@@ -84,6 +84,11 @@ class Task extends Model
     public function scopeOpen(Builder $query): void
     {
         $query->where('status', '!=', self::STATUS_CLOSED);
+    }
+
+    public function scopeOverdue(Builder $query): void
+    {
+        $query->open()->where('due_at', '<', now());
     }
 
     public function scopeClosed(Builder $query): void

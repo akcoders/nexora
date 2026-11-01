@@ -29,6 +29,8 @@ class _TasksScreenState extends State<TasksScreen>
     with SingleTickerProviderStateMixin {
   late final TabController tabs;
   int reload = 0;
+  bool workflowOverdue = false;
+  bool complaintsOverdue = false;
 
   @override
   void initState() {
@@ -97,6 +99,51 @@ class _TasksScreenState extends State<TasksScreen>
     ];
   }
 
+  Widget taskQueue({required bool complaint}) {
+    final overdue = complaint ? complaintsOverdue : workflowOverdue;
+    final type = complaint ? 'ticket' : 'workflow';
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+          child: Row(
+            children: [
+              for (final option in [false, true]) ...[
+                ChoiceChip(
+                  label: Text(option ? 'Overdue' : 'Pending'),
+                  selected: overdue == option,
+                  onSelected: (_) => setState(() {
+                    if (complaint) {
+                      complaintsOverdue = option;
+                    } else {
+                      workflowOverdue = option;
+                    }
+                  }),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: _TaskList(
+            key: ValueKey('$type$reload$overdue'),
+            future: load(
+              scope: 'open',
+              type: type,
+              status: overdue ? 'overdue' : null,
+            ),
+            title: complaint ? 'Customer complaints' : 'My workflow',
+            subtitle: overdue
+                ? 'Past the original due date'
+                : 'Pending work assigned to you',
+            onRefresh: refresh,
+          ),
+        ),
+      ],
+    );
+  }
+
   void refresh() => setState(() => reload++);
 
   @override
@@ -150,20 +197,8 @@ class _TasksScreenState extends State<TasksScreen>
             future: loadServiceJobs(),
             onRefresh: refresh,
           ),
-          _TaskList(
-            key: ValueKey('workflow$reload'),
-            future: load(scope: 'open', type: 'workflow'),
-            title: 'My workflow',
-            subtitle: 'All active hand-offs, not only pending tasks',
-            onRefresh: refresh,
-          ),
-          _TaskList(
-            key: ValueKey('tickets$reload'),
-            future: load(scope: 'open', type: 'ticket'),
-            title: 'Customer complaints',
-            subtitle: 'Customer complaints assigned to you',
-            onRefresh: refresh,
-          ),
+          taskQueue(complaint: false),
+          taskQueue(complaint: true),
           _ClosedWorkList(
             key: ValueKey('closed$reload'),
             future: loadClosedWork(),
@@ -526,6 +561,11 @@ class _TaskCard extends StatelessWidget {
         ? AppColors.secondary
         : AppColors.primary;
     final isClosed = task['status']?.toString() == 'closed';
+    final originalDue = DateTime.tryParse(task['due_at']?.toString() ?? '');
+    final overdue =
+        !isClosed &&
+        originalDue != null &&
+        originalDue.isBefore(DateTime.now());
     final actionsCount = (task['actions_count'] as num?)?.toInt() ?? 0;
     return Card(
       color: task['parent_task_id'] != null ? const Color(0xFFFAF5FF) : null,
@@ -570,10 +610,14 @@ class _TaskCard extends StatelessWidget {
                           color: priorityColor,
                         ),
                         _Pill(
-                          text: isClosed ? 'CLOSED' : 'ACTIVE',
+                          text: isClosed
+                              ? 'CLOSED'
+                              : (overdue ? 'OVERDUE' : 'PENDING'),
                           color: isClosed
                               ? AppColors.success
-                              : AppColors.warning,
+                              : (overdue
+                                    ? AppColors.danger
+                                    : AppColors.warning),
                         ),
                       ],
                     ),
@@ -671,6 +715,17 @@ class _TaskCard extends StatelessWidget {
                     ],
                   ),
                 ),
+              if (task['next_follow_up_at'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Next follow-up: ${_date(task['next_follow_up_at']).replaceFirst('Due ', '')}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
               const Divider(height: 28),
               Row(
                 children: [
@@ -733,9 +788,8 @@ class _TaskDetailsState extends State<_TaskDetails> {
   String action = 'close';
   String updateStatus = 'pending';
   bool reassign = false;
-  bool reschedule = false;
-  DateTime? updateDueAt;
-  final dueDateReason = TextEditingController();
+  DateTime? nextFollowUpAt;
+  final delayReason = TextEditingController();
   final List<XFile> attachments = [];
   int? assignedTo;
   bool loading = true;
@@ -751,7 +805,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
   @override
   void dispose() {
     remark.dispose();
-    dueDateReason.dispose();
+    delayReason.dispose();
     super.dispose();
   }
 
@@ -763,12 +817,11 @@ class _TaskDetailsState extends State<_TaskDetails> {
       task = Map<String, dynamic>.from(response.data['task']);
       assignees = List<dynamic>.from(response.data['assignees'] ?? []);
       updateStatus = task?['status']?.toString() ?? 'pending';
-      updateDueAt = DateTime.tryParse(
-        task?['due_at']?.toString() ?? '',
+      nextFollowUpAt = DateTime.tryParse(
+        task?['next_follow_up_at']?.toString() ?? '',
       )?.toLocal();
       reassign = false;
-      reschedule = false;
-      dueDateReason.clear();
+      delayReason.clear();
       assignedTo = null;
       error = null;
     } on DioException catch (exception) {
@@ -815,114 +868,6 @@ class _TaskDetailsState extends State<_TaskDetails> {
       ),
     );
     if (mounted) await load();
-  }
-
-  Future<void> changeDueDate() async {
-    final today = DateUtils.dateOnly(DateTime.now());
-    final previous = DateTime.tryParse(
-      task?['due_at']?.toString() ?? '',
-    )?.toLocal();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: previous == null || previous.isBefore(today)
-          ? today
-          : previous,
-      firstDate: today,
-      lastDate: DateTime(2100),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(
-        DateTime.tryParse(task?['due_at']?.toString() ?? '')?.toLocal() ??
-            DateTime.now(),
-      ),
-    );
-    if (time == null || !mounted) return;
-    String reason = '';
-    String? validation;
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: const T('Change due date'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  DateFormat('d MMM yyyy, hh:mm a').format(
-                    DateTime(
-                      date.year,
-                      date.month,
-                      date.day,
-                      time.hour,
-                      time.minute,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  onChanged: (value) => reason = value,
-                  maxLength: 3000,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Reason for changing due date *',
-                    errorText: validation,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const T('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (reason.trim().isEmpty) {
-                  update(() => validation = 'Please enter a reason.');
-                  return;
-                }
-                Navigator.pop(dialogContext, true);
-              },
-              child: const T('Update'),
-            ),
-          ],
-        ),
-      ),
-    );
-    final reasonText = reason.trim();
-    if (saved != true || !mounted) return;
-    setState(() => submitting = true);
-    try {
-      await context.read<ApiClient>().dio.post(
-        'tasks/${widget.taskId}/due-date',
-        data: {
-          'due_at': DateTime(
-            date.year,
-            date.month,
-            date.day,
-            time.hour,
-            time.minute,
-          ).toIso8601String(),
-          'reason': reasonText,
-        },
-      );
-      widget.onUpdated();
-      if (mounted) await load();
-    } on DioException catch (exception) {
-      if (mounted) {
-        setState(
-          () => error =
-              exception.response?.data?['message']?.toString() ??
-              'Unable to change due date.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => submitting = false);
-    }
   }
 
   Future<void> createSubtask() async {
@@ -1078,24 +1023,24 @@ class _TaskDetailsState extends State<_TaskDetails> {
     }
   }
 
-  Future<void> pickUpdateDueDate() async {
+  Future<void> pickFollowUpDate() async {
     final today = DateUtils.dateOnly(DateTime.now());
     final date = await showDatePicker(
       context: context,
-      initialDate: updateDueAt == null || updateDueAt!.isBefore(today)
+      initialDate: nextFollowUpAt == null || nextFollowUpAt!.isBefore(today)
           ? today
-          : updateDueAt!,
+          : nextFollowUpAt!,
       firstDate: today,
       lastDate: DateTime(2100),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(updateDueAt ?? DateTime.now()),
+      initialTime: TimeOfDay.fromDateTime(nextFollowUpAt ?? DateTime.now()),
     );
     if (time == null || !mounted) return;
     setState(
-      () => updateDueAt = DateTime(
+      () => nextFollowUpAt = DateTime(
         date.year,
         date.month,
         date.day,
@@ -1105,14 +1050,30 @@ class _TaskDetailsState extends State<_TaskDetails> {
     );
   }
 
+  bool get followUpRevisesDue {
+    final due = DateTime.tryParse(task?['due_at']?.toString() ?? '');
+    return nextFollowUpAt != null &&
+        due != null &&
+        nextFollowUpAt!.isAfter(due);
+  }
+
+  bool get followUpChanged {
+    final previous = DateTime.tryParse(
+      task?['next_follow_up_at']?.toString() ?? '',
+    );
+    return previous == null
+        ? nextFollowUpAt != null
+        : nextFollowUpAt == null || !nextFollowUpAt!.isAtSameMomentAs(previous);
+  }
+
   Future<void> submit() async {
     final workflow = task?['task_type'] != 'ticket';
     final completing = workflow ? updateStatus == 'closed' : action == 'close';
     final assigning = workflow ? reassign && !completing : action == 'assign';
-    if (workflow && reschedule && dueDateReason.text.trim().isEmpty) {
-      setState(
-        () => error = 'Please specify why you are changing the due date.',
-      );
+    if (followUpRevisesDue &&
+        followUpChanged &&
+        delayReason.text.trim().isEmpty) {
+      setState(() => error = 'Please specify the reason for the delay.');
       return;
     }
     if (remark.text.trim().isEmpty) {
@@ -1146,8 +1107,8 @@ class _TaskDetailsState extends State<_TaskDetails> {
           title: Text(completing ? 'Close this $workLabel?' : 'Assign next?'),
           content: Text(
             completing
-                ? 'This $workLabel will move out of your active queue.'
-                : 'This $workLabel will stay active and move to the selected assignee.',
+                ? 'This $workLabel will move out of your pending queue.'
+                : 'This $workLabel will stay pending and move to the selected assignee.',
           ),
           actions: [
             TextButton(
@@ -1175,12 +1136,10 @@ class _TaskDetailsState extends State<_TaskDetails> {
           if (workflow) ...{
             'status': updateStatus,
             'reassign': assigning ? 1 : 0,
-            'change_due_date': reschedule ? 1 : 0,
-            if (reschedule) ...{
-              'due_at': updateDueAt?.toIso8601String(),
-              'reason': dueDateReason.text.trim(),
-            },
           },
+          'next_follow_up_at': nextFollowUpAt?.toIso8601String(),
+          if (followUpRevisesDue && followUpChanged)
+            'delay_reason': delayReason.text.trim(),
           'remark': remark.text.trim(),
           if (assigning) 'assigned_to': assignedTo,
           if (attachments.isNotEmpty)
@@ -1222,6 +1181,11 @@ class _TaskDetailsState extends State<_TaskDetails> {
         task?['status'] != 'closed' && task?['assigned_to'] == currentUserId;
     final actions = List<dynamic>.from(task?['actions'] ?? []);
     final type = task?['task_type']?.toString() ?? 'workflow';
+    final due = DateTime.tryParse(task?['due_at']?.toString() ?? '');
+    final overdue =
+        task?['status'] != 'closed' &&
+        due != null &&
+        due.isBefore(DateTime.now());
 
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return ListView(
@@ -1238,10 +1202,16 @@ class _TaskDetailsState extends State<_TaskDetails> {
             ),
             const SizedBox(width: 8),
             _Pill(
-              text: task?['status'].toString().toUpperCase() ?? '',
+              text: overdue
+                  ? 'OVERDUE'
+                  : (task?['status']
+                            ?.toString()
+                            .replaceAll('_', ' ')
+                            .toUpperCase() ??
+                        'PENDING'),
               color: task?['status'] == 'closed'
                   ? AppColors.success
-                  : AppColors.warning,
+                  : (overdue ? AppColors.danger : AppColors.warning),
             ),
             const Spacer(),
             Text(
@@ -1282,9 +1252,23 @@ class _TaskDetailsState extends State<_TaskDetails> {
                   value: task?['assignee']?['name']?.toString() ?? '—',
                 ),
                 _DetailRow(
-                  label: 'Due',
+                  label: 'Original due',
                   value: _TaskCard._date(task?['due_at']),
                 ),
+                if (task?['next_follow_up_at'] != null)
+                  _DetailRow(
+                    label: 'Next follow-up',
+                    value: _TaskCard._date(
+                      task?['next_follow_up_at'],
+                    ).replaceFirst('Due ', ''),
+                  ),
+                if (task?['revised_due_at'] != null)
+                  _DetailRow(
+                    label: 'Latest revised due',
+                    value: _TaskCard._date(
+                      task?['revised_due_at'],
+                    ).replaceFirst('Due ', ''),
+                  ),
                 _DetailRow(
                   label: 'Last updated',
                   value:
@@ -1365,21 +1349,12 @@ class _TaskDetailsState extends State<_TaskDetails> {
                 ),
                 title: Text(child['title']?.toString() ?? ''),
                 subtitle: Text(
-                  '${child['task_no']} · ${child['assignee']?['name'] ?? ''} · ${child['status'] == 'closed' ? 'Completed' : 'Active'}',
+                  '${child['task_no']} · ${child['assignee']?['name'] ?? ''} · ${child['status'] == 'closed' ? 'Completed' : 'Pending'}',
                 ),
                 onTap: () => openRelated(child['id'] as int),
               ),
             ),
         ],
-        if (canAct && type == 'ticket')
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: submitting ? null : changeDueDate,
-              icon: const Icon(LucideIcons.calendarClock, size: 17),
-              label: const T('Change due date'),
-            ),
-          ),
         if (canAct) ...[
           const SizedBox(height: 22),
           Card(
@@ -1409,7 +1384,7 @@ class _TaskDetailsState extends State<_TaskDetails> {
                       key: ValueKey('status$updateStatus'),
                       decoration: const InputDecoration(labelText: 'Status *'),
                       items: const [
-                        DropdownMenuItem(value: 'pending', child: T('Active')),
+                        DropdownMenuItem(value: 'pending', child: T('Pending')),
                         DropdownMenuItem(
                           value: 'in_progress',
                           child: T('In progress'),
@@ -1485,56 +1460,51 @@ class _TaskDetailsState extends State<_TaskDetails> {
                       onChanged: (value) => setState(() => assignedTo = value),
                     ),
                   ],
-                  if (type != 'ticket') ...[
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<bool>(
-                      isExpanded: true,
-                      initialValue: reschedule,
-                      key: ValueKey('reschedule$reschedule'),
-                      decoration: const InputDecoration(
-                        labelText: 'Change due date?',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: false,
-                          child: T('No — keep current due date'),
-                        ),
-                        DropdownMenuItem(value: true, child: T('Yes')),
-                      ],
-                      onChanged: submitting
-                          ? null
-                          : (value) =>
-                                setState(() => reschedule = value ?? false),
+                  const SizedBox(height: 12),
+                  const T(
+                    'Next follow-up date & time',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextButton.icon(
+                    onPressed: submitting ? null : pickFollowUpDate,
+                    icon: const Icon(LucideIcons.calendarClock),
+                    label: Text(
+                      nextFollowUpAt == null
+                          ? 'Select follow-up'
+                          : DateFormat(
+                              'd MMM yyyy, hh:mm a',
+                            ).format(nextFollowUpAt!),
                     ),
-                    if (reschedule) ...[
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: submitting ? null : pickUpdateDueDate,
-                        icon: const Icon(LucideIcons.calendarClock),
-                        label: Text(
-                          updateDueAt == null
-                              ? 'Select due date'
-                              : DateFormat(
-                                  'd MMM yyyy, hh:mm a',
-                                ).format(updateDueAt!),
-                        ),
+                  ),
+                  if (nextFollowUpAt != null)
+                    TextButton(
+                      onPressed: submitting
+                          ? null
+                          : () => setState(() => nextFollowUpAt = null),
+                      child: const T('Clear follow-up'),
+                    ),
+                  const T(
+                    'The original due date stays fixed.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                  if (followUpRevisesDue) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Revised due date: ${DateFormat('d MMM yyyy, hh:mm a').format(nextFollowUpAt!)}',
+                      style: const TextStyle(
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w600,
                       ),
-                      if (updateDueAt != null)
-                        TextButton(
-                          onPressed: submitting
-                              ? null
-                              : () => setState(() => updateDueAt = null),
-                          child: const T('Remove due date'),
-                        ),
+                    ),
+                    if (followUpChanged)
                       TextField(
-                        controller: dueDateReason,
+                        controller: delayReason,
                         maxLines: 2,
                         maxLength: 3000,
                         decoration: const InputDecoration(
-                          labelText: 'Reason for changing the due date *',
+                          labelText: 'Reason for delay *',
                         ),
                       ),
-                    ],
                   ],
                   const SizedBox(height: 12),
                   Text(
@@ -1748,6 +1718,16 @@ class _ActionTileState extends State<_ActionTile> {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (action['next_follow_up_at'] != null)
+            Text(
+              'Next follow-up: ${_TaskCard._date(action['next_follow_up_at']).replaceFirst('Due ', '')}',
+              style: const TextStyle(fontSize: 11, color: AppColors.primary),
+            ),
+          if (action['revised_due_at'] != null)
+            Text(
+              'Revised due: ${_TaskCard._date(action['revised_due_at']).replaceFirst('Due ', '')} · Reason for delay: ${action['delay_reason'] ?? ''}',
+              style: const TextStyle(fontSize: 11, color: AppColors.warning),
+            ),
           if (remark.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(

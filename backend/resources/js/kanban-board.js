@@ -26,7 +26,7 @@ const QUICK = ['mine', 'watching', 'created', 'overdue'];
 const HINTS = {
     owner: 'Drag a card to another owner to hand it over, or onto Closed to finish it. A remark is always required.',
     status: 'Drag a card onto Closed to finish it. Users who can update tasks may drag closed cards back to reopen them.',
-    priority: 'Drag an active card between lanes to change its priority. The change is recorded on the timeline.',
+    priority: 'Drag a pending card between lanes to change its priority. The change is recorded on the timeline.',
 };
 const REFRESH_MS = 60_000;
 const TOUCH_HOLD_MS = 220;
@@ -139,11 +139,11 @@ function init(root) {
 
     function lanes(visible) {
         if (state.mode === 'priority') {
-            return PRIORITIES.map((p) => ({ key: `priority:${p.key}`, title: `${p.label} priority`, subtitle: 'Active items', icon: p.icon, tone: p.tone }));
+            return PRIORITIES.map((p) => ({ key: `priority:${p.key}`, title: `${p.label} priority`, subtitle: 'Pending items', icon: p.icon, tone: p.tone }));
         }
         const closedLane = { key: 'closed', title: 'Closed', subtitle: `Latest ${state.closedLimit} closed`, icon: 'circle-check-big', tone: '#16a34a' };
         if (state.mode === 'status') {
-            return [{ key: 'pending', title: 'Active', subtitle: 'Pending until closed', icon: 'activity', tone: '#d97706' }, closedLane];
+            return [{ key: 'pending', title: 'Pending', subtitle: 'Pending until closed', icon: 'activity', tone: '#d97706' }, closedLane];
         }
 
         const ownerIds = new Set(visible.filter((task) => task.status !== 'closed' && task.assignee).map((task) => task.assignee.id));
@@ -205,7 +205,7 @@ function init(root) {
         const classes = ['nx-kanban-card', `type-${task.type}`, `prio-${task.priority}`, task.parent ? 'is-subtask' : '', task.overdue ? 'is-overdue' : '', task.status === 'closed' ? 'is-closed' : '', locked ? 'is-locked' : ''].filter(Boolean).join(' ');
         const due = task.status === 'closed'
             ? `<span class="nx-kc-due done"><i data-lucide="circle-check"></i>Closed</span>`
-            : `<span class="nx-kc-due ${task.overdue ? 'overdue' : (isToday(task.due_at) ? 'today' : '')}" title="Due date"><i data-lucide="${task.overdue ? 'alarm-clock' : 'calendar-clock'}"></i>${esc(task.due_label ?? 'No due date')}</span>`;
+            : `<span class="nx-kc-due ${task.overdue ? 'overdue' : (isToday(task.due_at) ? 'today' : '')}" title="Due date"><i data-lucide="${task.overdue ? 'alarm-clock' : 'calendar-clock'}"></i>${esc(task.due_label ?? 'No due date')}${task.overdue ? ' · Overdue' : ''}</span>${task.follow_up_label ? `<span class="nx-kc-due" title="Next follow-up">Follow-up: ${esc(task.follow_up_label)}</span>` : ''}`;
         const latest = task.latest && task.latest.action !== 'created'
             ? `<div class="nx-kc-latest" title="${esc(task.latest.remark)}"><i data-lucide="message-square-text"></i><span><strong>${esc(task.latest.by)}</strong> ${esc(task.latest.remark)}</span></div>`
             : '';
@@ -268,7 +268,7 @@ function init(root) {
         return `<section class="nx-kanban-col nx-kanban-add">
             <span class="nx-kanban-col-icon"><i data-lucide="user-plus"></i></span>
             <strong>Add an owner lane</strong>
-            <small class="text-secondary">Show someone with no active work so you can drag items to them.</small>
+            <small class="text-secondary">Show someone with no pending work so you can drag items to them.</small>
             <select class="form-select form-select-sm" data-add-lane aria-label="Add owner lane"><option value="">Select person</option>${options}</select>
         </section>`;
     }
@@ -284,7 +284,7 @@ function init(root) {
     function renderStats(visible) {
         const open = visible.filter((task) => task.status !== 'closed');
         const stats = [
-            ['activity', `${open.length} active`, ''],
+            ['activity', `${open.length} pending`, ''],
             ['alarm-clock', `${open.filter((task) => task.overdue).length} overdue`, 'danger'],
             ['calendar-check', `${open.filter((task) => isToday(task.due_at)).length} due today`, 'warning'],
             ['user-round-check', `${open.filter((task) => task.mine).length} mine`, ''],
@@ -335,7 +335,7 @@ function init(root) {
         board.innerHTML = laneList.map((lane) => laneHtml(lane, sortCards(grouped.get(lane.key)))).join('')
             + (state.mode === 'owner' ? addLaneHtml(shownOwners) : '');
         if (!visible.some((task) => task.status !== 'closed') && state.tasks.size) {
-            board.insertAdjacentHTML('afterbegin', '<div class="nx-kanban-nomatch"><i data-lucide="search-x"></i><span>No active items match these filters.</span></div>');
+            board.insertAdjacentHTML('afterbegin', '<div class="nx-kanban-nomatch"><i data-lucide="search-x"></i><span>No pending items match these filters.</span></div>');
         }
         board.scrollLeft = scroll;
         renderStats(visible);
