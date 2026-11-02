@@ -31,13 +31,12 @@ class TaskWorkflow
             }
             $observers = $parent ? $parent->observers()->whereNotIn('user_id', $parent->subtaskOnlyMembers()->pluck('user_id'))->pluck('user_id')->all() : ($data['observers'] ?? []);
             unset($data['observers'], $data['return_to']);
-            if ($data['task_type'] === Task::TYPE_WORKFLOW) {
-                $data['category'] = 'Internal';
-            }
-            $prefix = $data['task_type'] === Task::TYPE_TICKET ? 'TKT' : 'WFL';
+            $data['task_type'] = Task::TYPE_WORKFLOW;
+            $data['category'] = 'Internal';
+            $prefix = 'WFL';
             $task = Task::create(array_merge($data, [
                 'task_no' => $prefix.Str::ulid(),
-                'customer_id' => $data['task_type'] === Task::TYPE_TICKET ? $data['customer_id'] : null,
+                'customer_id' => null,
                 'parent_task_id' => $parent?->id,
                 'created_by' => $by->id,
                 'status' => 'pending',
@@ -254,6 +253,6 @@ class TaskWorkflow
     private function notifyAssigned(Task $task, ?string $title = null): void
     {
         $task->assignee->notify(new TaskAssignedNotification($task, $title));
-        $this->oneSignal->sendToUser($task->assignee, $title ?? 'New '.($task->task_type === Task::TYPE_TICKET ? 'complaint' : 'workflow').' assigned', $task->title, ['type' => $task->task_type.'_task', 'task_id' => $task->id]);
+        $this->oneSignal->sendToUser($task->assignee, $title ?? 'New workflow assigned', $task->title, ['type' => $task->task_type.'_task', 'task_id' => $task->id]);
     }
 }

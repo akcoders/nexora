@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Attendance;
+use App\Models\Complaint;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\DemoDataRecord;
@@ -27,9 +28,10 @@ class DemoDataManagementTest extends TestCase
         $this->assertSame(10, DemoDataRecord::where('model_type', Customer::class)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', CustomerGroup::class)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', ServiceJob::class)->count());
-        $this->assertSame(20, DemoDataRecord::where('model_type', Task::class)->count());
-        $this->assertSame(10, Task::where('task_type', Task::TYPE_WORKFLOW)->count());
-        $this->assertSame(10, Task::where('task_type', Task::TYPE_TICKET)->count());
+        $this->assertSame(10, DemoDataRecord::where('model_type', Task::class)->count());
+        $this->assertSame(10, DemoDataRecord::where('model_type', Complaint::class)->count());
+        $this->assertSame(0, Task::where('task_type', 'ticket')->count());
+        $this->assertSame(['closed', 'completed', 'in_progress', 'open', 'pending', 'scheduled', 'under_observation'], Complaint::query()->distinct()->orderBy('status')->pluck('status')->all());
         $this->assertSame(10, DemoDataRecord::where('model_type', Attendance::class)->count());
         $this->assertSame(10, DemoDataRecord::where('model_type', User::class)->count());
 

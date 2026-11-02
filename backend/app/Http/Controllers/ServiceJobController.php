@@ -42,8 +42,8 @@ class ServiceJobController extends Controller
             ->orderByRaw("CASE WHEN status IN ('completed','cancelled','customer_declined') THEN 2 ELSE 1 END")
             ->orderBy('scheduled_at')
             ->orderByDesc('id')
-            ->paginate(20)
-            ->withQueryString();
+            ->limit(5000)
+            ->get();
 
         return view('service-jobs.index', [
             'jobs' => $jobs,

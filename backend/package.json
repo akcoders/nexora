@@ -24,8 +24,13 @@
         "@popperjs/core": "^2.11.8",
         "apexcharts": "^7.8.0",
         "bootstrap": "^5.3.8",
+        "datatables.net-bs5": "3.1.4",
+        "datatables.net-buttons-bs5": "4.1.2",
+        "datatables.net-responsive-bs5": "4.1.1",
         "jquery": "^4.0.0",
+        "jszip": "3.10.1",
         "lucide": "^1.51.0",
+        "pdfmake": "0.3.11",
         "sweetalert2": "^11.26.25"
     }
 }

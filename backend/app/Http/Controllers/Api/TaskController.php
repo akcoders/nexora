@@ -24,17 +24,18 @@ class TaskController extends Controller
         $filters = $request->validate([
             'scope' => ['nullable', Rule::in(['open'])],
             'status' => ['nullable', Rule::in(['pending', 'closed', 'overdue'])],
-            'type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
+            // "ticket" is still accepted so older app builds get an empty list instead of an error.
+            'type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, 'ticket'])],
         ]);
 
         $tasks = RecordVisibility::scope(Task::query(), $request->user(), 'tasks')
             ->withVisibleParent($request->user())->with(['customer', 'assignee', 'latestAction.user', 'latestAction.assignee', 'observers.user:id,name'])
             ->withCount(['actions', 'subtasks', 'subtasks as completed_subtasks_count' => fn ($query) => $query->closed()])
-            ->whereIn('task_type', [Task::TYPE_WORKFLOW, Task::TYPE_TICKET])
             ->when(($filters['scope'] ?? null) === 'open', fn ($query) => $query->where('status', '!=', 'closed'))
             ->when(($filters['status'] ?? null) === 'overdue', fn ($query) => $query->overdue())
             ->when(isset($filters['status']) && $filters['status'] !== 'overdue', fn ($query) => $query->where('status', $filters['status']))
-            ->where('task_type', $filters['type'] ?? Task::TYPE_WORKFLOW)
+            ->where('task_type', Task::TYPE_WORKFLOW)
+            ->when(($filters['type'] ?? null) === 'ticket', fn ($query) => $query->whereRaw('1 = 0'))
             ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
             ->orderByRaw("CASE WHEN priority = 'very_high' THEN 1 WHEN priority = 'high' THEN 2 ELSE 3 END")
             ->orderBy('due_at')

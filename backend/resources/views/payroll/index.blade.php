@@ -2,6 +2,7 @@
     <x-slot name="title">Payroll</x-slot>
     <x-slot name="pageTitle">Payroll</x-slot>
     <x-slot name="breadcrumb">HR / Payroll</x-slot>
+    <div class="nx-page-header"><div><div class="nx-page-kicker">HR & people</div><h2>Payroll</h2><p>Generate, approve and pay monthly payroll from attendance and leave.</p></div></div>
 
     <div class="row g-4">
         <div class="col-xl-3">
@@ -42,8 +43,8 @@
                         @endif
                     </div>
                     <div class="table-responsive">
-                        <table class="table nx-table mb-0">
-                            <thead><tr><th class="ps-4">Employee</th><th>Attendance</th><th>Payable</th><th>Gross</th><th>Deductions</th><th>Net salary</th><th>Status</th><th class="pe-4">Slip</th></tr></thead>
+                        <table class="table nx-table mb-0" data-datatable data-dt-title="Payroll {{ $selectedRun->payroll_month }}" data-dt-page-length="50">
+                            <thead><tr><th class="ps-4">Employee</th><th>Attendance</th><th>Payable</th><th>Gross</th><th>Deductions</th><th>Net salary</th><th>Status</th><th class="pe-4 no-export no-sort" data-orderable="false">Slip</th></tr></thead>
                             <tbody>
                                 @foreach($selectedRun->entries as $entry)
                                     <tr>

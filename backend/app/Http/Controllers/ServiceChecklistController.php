@@ -15,7 +15,7 @@ class ServiceChecklistController extends Controller
     public function index(): View
     {
         return view('checklists.index', [
-            'checklists' => ServiceChecklist::with(['category', 'serviceType', 'items'])->latest()->paginate(12),
+            'checklists' => ServiceChecklist::with(['category', 'serviceType', 'items'])->latest()->get(),
             'categories' => ProductCategory::orderBy('name')->get(),
             'serviceTypes' => ServiceType::query()->where('active', true)->orderBy('name')->get(),
         ]);

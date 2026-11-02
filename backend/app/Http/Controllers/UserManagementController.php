@@ -16,7 +16,7 @@ class UserManagementController extends Controller
     {
         abort_unless($request->user()->can('users.read'), 403);
 
-        return view('users.index', ['users' => User::with('roles')->latest()->paginate(20), 'roles' => Role::orderBy('name')->get()]);
+        return view('users.index', ['users' => User::with('roles')->latest()->get(), 'roles' => Role::orderBy('name')->get()]);
     }
 
     public function store(Request $request): RedirectResponse

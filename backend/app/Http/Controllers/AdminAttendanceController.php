@@ -29,7 +29,7 @@ class AdminAttendanceController extends Controller
             ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
             ->when($request->filled('employee'), fn ($query) => $query->where('user_id', $request->integer('employee')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->latest('attendance_date')->latest('checked_in_at')->paginate(31)->withQueryString();
+            ->latest('attendance_date')->latest('checked_in_at')->get();
 
         return view('attendance.index', [
             'attendances' => $attendances,

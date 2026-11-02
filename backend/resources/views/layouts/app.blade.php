@@ -5,117 +5,143 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta name="nx-locations-url" content="{{ route('locations.india') }}">
+        <meta name="nx-search-url" content="{{ route('search') }}">
 
         <title>{{ isset($title) ? $title.' · ' : '' }}{{ config('app.name', 'Nexora') }}</title>
         @php
-            $nxUser = auth()->user();
-            $nxLanguageOptions = \App\Services\EmployeeMasterOptions::switcherLanguagesFor($nxUser);
-            $nxPreferredLanguage = \App\Services\EmployeeMasterOptions::preferredLanguageFor($nxUser);
             $nxOldModal = old('_modal');
             $nxOldInput = $nxOldModal ? \Illuminate\Support\Arr::except(session()->getOldInput(), ['_token', '_method', 'password', 'password_confirmation', 'current_password', 'temporary_password']) : null;
-            $nxUnread = $nxUser ? $nxUser->unreadNotifications()->count() : 0;
-            $nxPendingAttendance = \App\Models\Attendance::where('status', 'pending')->count();
-            $nxLanguageConfig = ['userId' => $nxUser?->id, 'preferred' => $nxPreferredLanguage, 'preferredCode' => \App\Services\EmployeeMasterOptions::languageCode($nxPreferredLanguage), 'options' => $nxLanguageOptions, 'saveUrl' => route('profile.language')];
+            $nxCrumbs = collect(explode('/', (string) ($breadcrumb ?? '')))->map(fn ($part) => trim($part))->filter()->values();
         @endphp
         <script>
             window.nxLanguage = @json($nxLanguageConfig);
             window.nxServerErrors = @json($errors->toArray());
             window.nxOldModal = @json($nxOldModal);
             window.nxOldInput = @json($nxOldInput);
+            try { if (localStorage.getItem('nx:sidebar') === 'collapsed' && window.innerWidth >= 992) document.documentElement.classList.add('nx-pre-collapsed'); } catch (e) {}
         </script>
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/css/theme.css', 'resources/js/app.js', 'resources/js/datatables.js'])
+        @stack('head')
     </head>
     <body>
+        <script>if (document.documentElement.classList.contains('nx-pre-collapsed')) document.body.classList.add('nx-sidebar-collapsed');</script>
+        <a class="visually-hidden-focusable position-absolute top-0 start-0 m-2 btn btn-primary" href="#nxContent">Skip to content</a>
         <div class="nx-shell">
-            <div class="nx-sidebar-backdrop" id="nxSidebarBackdrop" onclick="document.getElementById('nxSidebar').classList.remove('open');this.classList.remove('show')"></div>
-            <aside class="nx-sidebar" id="nxSidebar">
-                <a class="nx-brand notranslate" translate="no" href="{{ route('dashboard') }}"><span class="nx-brand-mark p-0 overflow-hidden bg-white"><img src="{{ asset('images/brand/classic-app-icon.png') }}" alt="Classic" class="w-100 h-100 object-fit-cover"></span><span>CLASSIC</span></a>
-                @php
-                    $workType = request()->route('task')?->task_type ?? (request()->routeIs('complaints.*') ? 'ticket' : (request()->routeIs('workflows.*') ? 'workflow' : request('type', 'workflow')));
-                    $workflowActive = (request()->routeIs('workflows.*') || request()->routeIs('tasks.*')) && $workType !== 'ticket';
-                    $workflowBoardActive = $workflowActive && request()->routeIs('workflows.board', 'tasks.board');
-                    $complaintsActive = (request()->routeIs('complaints.*') || request()->routeIs('tasks.*')) && $workType === 'ticket';
-                @endphp
-                <nav class="nx-nav" aria-label="Main navigation">
-                    <x-sidebar-group id="nav-workspace" label="Workspace" icon="layout-grid" :active="request()->routeIs('dashboard', 'reports.*', 'notifications.*', 'profile.*')" :badge="$nxUnread">
-                        <a class="nx-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" @if(request()->routeIs('dashboard')) aria-current="page"@endif href="{{ route('dashboard') }}"><i data-lucide="layout-dashboard"></i>Dashboard</a>
-                        <a class="nx-nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" @if(request()->routeIs('reports.*')) aria-current="page"@endif href="{{ route('reports.index') }}"><i data-lucide="chart-no-axes-combined"></i>Reports</a>
-                        <a class="nx-nav-link {{ request()->routeIs('notifications.*') ? 'active' : '' }}" @if(request()->routeIs('notifications.*')) aria-current="page"@endif href="{{ route('notifications.index') }}"><i data-lucide="bell"></i>Notifications @if($nxUnread)<span class="badge bg-danger ms-auto notranslate">{{ $nxUnread }}</span>@endif</a>
-                        <a class="nx-nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" @if(request()->routeIs('profile.*')) aria-current="page"@endif href="{{ route('profile.edit') }}"><i data-lucide="user-round"></i>My Profile</a>
-                    </x-sidebar-group>
-
-                    <x-sidebar-group id="nav-customers" label="Customers" icon="building-2" :active="request()->routeIs('customers.*', 'customer-groups.*') || $complaintsActive">
-                        <a class="nx-nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}" @if(request()->routeIs('customers.*')) aria-current="page"@endif href="{{ route('customers.index') }}"><i data-lucide="building-2"></i>Customers</a>
-                        <a class="nx-nav-link {{ request()->routeIs('customer-groups.*') ? 'active' : '' }}" @if(request()->routeIs('customer-groups.*')) aria-current="page"@endif href="{{ route('customer-groups.index') }}"><i data-lucide="tags"></i>Customer Groups</a>
-                        <a class="nx-nav-link {{ $complaintsActive ? 'active' : '' }}" @if($complaintsActive) aria-current="page"@endif href="{{ route('complaints.index', ['scope' => 'open']) }}"><i data-lucide="ticket-check"></i>Customer Complaints</a>
-                    </x-sidebar-group>
-
-                    <x-sidebar-group id="nav-service" label="Service & Catalog" icon="wrench" :active="request()->routeIs('service-jobs.*', 'products.*', 'product-categories.*', 'checklists.*', 'service-masters.*')">
-                        <a class="nx-nav-link {{ request()->routeIs('service-jobs.*') ? 'active' : '' }}" @if(request()->routeIs('service-jobs.*')) aria-current="page"@endif href="{{ route('service-jobs.index') }}"><i data-lucide="wrench"></i>Service Jobs</a>
-                        <a class="nx-nav-link {{ request()->routeIs('products.*', 'product-categories.*') ? 'active' : '' }}" @if(request()->routeIs('products.*', 'product-categories.*')) aria-current="page"@endif href="{{ route('products.index') }}"><i data-lucide="package"></i>Products</a>
-                        <a class="nx-nav-link {{ request()->routeIs('checklists.*') ? 'active' : '' }}" @if(request()->routeIs('checklists.*')) aria-current="page"@endif href="{{ route('checklists.index') }}"><i data-lucide="clipboard-check"></i>Service Checklists</a>
-                        @can('checklists.read')<a class="nx-nav-link {{ request()->routeIs('service-masters.*') ? 'active' : '' }}" @if(request()->routeIs('service-masters.*')) aria-current="page"@endif href="{{ route('service-masters.index') }}"><i data-lucide="sliders-horizontal"></i>Service Masters</a>@endcan
-                    </x-sidebar-group>
-
-                    <x-sidebar-group id="nav-work" label="Work Management" icon="git-branch" :active="$workflowActive">
-                        <a class="nx-nav-link {{ $workflowActive && !$workflowBoardActive ? 'active' : '' }}" @if($workflowActive && !$workflowBoardActive) aria-current="page"@endif href="{{ route('workflows.index', ['scope' => 'open']) }}"><i data-lucide="git-branch"></i>Internal Workflow</a>
-                        <a class="nx-nav-link {{ $workflowBoardActive ? 'active' : '' }}" @if($workflowBoardActive) aria-current="page"@endif href="{{ route('workflows.board') }}"><i data-lucide="square-kanban"></i>Workflow Board</a>
-                    </x-sidebar-group>
-
-                    <x-sidebar-group id="nav-people" label="HR & People" icon="users-round" :active="request()->routeIs('employees.*', 'attendance.*', 'premises.*', 'hr.*', 'payroll.*')" :badge="$nxPendingAttendance" badge-tone="warning">
-                        @can('employees.read')<a class="nx-nav-link {{ request()->routeIs('employees.*') ? 'active' : '' }}" @if(request()->routeIs('employees.*')) aria-current="page"@endif href="{{ route('employees.index') }}"><i data-lucide="contact-round"></i>Employees</a>@endcan
-                        <a class="nx-nav-link {{ request()->routeIs('attendance.*', 'premises.*') ? 'active' : '' }}" @if(request()->routeIs('attendance.*', 'premises.*')) aria-current="page"@endif href="{{ route('attendance.index') }}"><i data-lucide="map-pin-check"></i>Attendance @if($nxPendingAttendance)<span class="badge bg-warning text-dark ms-auto notranslate">{{ $nxPendingAttendance }}</span>@endif</a>
-                        @can('hr.read')<a class="nx-nav-link {{ request()->routeIs('hr.*') ? 'active' : '' }}" @if(request()->routeIs('hr.*')) aria-current="page"@endif href="{{ route('hr.index') }}"><i data-lucide="calendar-heart"></i>Leave & Expenses</a>@endcan
-                        @can('payroll.read')<a class="nx-nav-link {{ request()->routeIs('payroll.*') ? 'active' : '' }}" @if(request()->routeIs('payroll.*')) aria-current="page"@endif href="{{ route('payroll.index') }}"><i data-lucide="wallet-cards"></i>Payroll</a>@endcan
-                    </x-sidebar-group>
-
-                    <x-sidebar-group id="nav-admin" label="Administration" icon="settings-2" :active="request()->routeIs('companies.*', 'users.*', 'roles.*', 'settings.*')">
-                        @can('companies.read')<a class="nx-nav-link {{ request()->routeIs('companies.*') ? 'active' : '' }}" @if(request()->routeIs('companies.*')) aria-current="page"@endif href="{{ route('companies.index') }}"><i data-lucide="landmark"></i>Company Master</a>@endcan
-                        <a class="nx-nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" @if(request()->routeIs('users.*')) aria-current="page"@endif href="{{ route('users.index') }}"><i data-lucide="users-round"></i>User Accounts</a>
-                        @can('roles.read')<a class="nx-nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}" @if(request()->routeIs('roles.*')) aria-current="page"@endif href="{{ route('roles.index') }}"><i data-lucide="shield-check"></i>Roles & Permissions</a>@endcan
-                        <a class="nx-nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" @if(request()->routeIs('settings.*')) aria-current="page"@endif href="{{ route('settings.index') }}"><i data-lucide="settings"></i>Settings</a>
-                    </x-sidebar-group>
+            <div class="nx-sidebar-backdrop" id="nxSidebarBackdrop" data-sidebar-close></div>
+            <aside class="nx-sidebar" id="nxSidebar" aria-label="Main navigation">
+                <a class="nx-brand" href="{{ route('dashboard') }}" title="Dashboard">
+                    <span class="nx-brand-mark"><img src="{{ asset('images/brand/classic-app-icon.png') }}" alt="" class="w-100 h-100 object-fit-cover"></span>
+                    <span class="nx-brand-text notranslate" translate="no">CLASSIC<small>Service ERP</small></span>
+                </a>
+                <div class="nx-sidebar-search">
+                    <label><i data-lucide="search" aria-hidden="true"></i><input type="search" placeholder="Find a menu…" data-sidebar-search aria-label="Find a menu"></label>
+                </div>
+                <nav class="nx-nav" data-sidebar-nav>
+                    @foreach($nxMenu as $section)
+                        <div class="nx-nav-section" data-nav-section="{{ $section['key'] }}">
+                            <button class="nx-nav-section-title" type="button" data-nav-toggle aria-expanded="true">{{ $section['label'] }}<i data-lucide="chevron-down" aria-hidden="true"></i></button>
+                            <div class="nx-nav-items">
+                                @foreach($section['items'] as $item)
+                                    <a class="nx-nav-link {{ $item['active'] ? 'active' : '' }}" href="{{ $item['url'] }}" title="{{ $item['label'] }}" @if($item['active']) aria-current="page" @endif data-nav-item>
+                                        <i data-lucide="{{ $item['icon'] }}" aria-hidden="true"></i><span class="nx-nav-label">{{ $item['label'] }}</span>
+                                        @if(! empty($item['badge']))<span class="badge bg-{{ $item['tone'] ?? 'danger' }} {{ ($item['tone'] ?? '') === 'warning' ? 'text-dark' : '' }} notranslate">{{ $item['badge'] }}</span>@endif
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                    <div class="nx-nav-empty" data-nav-empty>No menu matches your search.</div>
                 </nav>
                 <div class="nx-user-card">
                     <a class="nx-avatar notranslate" href="{{ route('profile.edit') }}" title="My profile">{{ strtoupper(substr($nxUser->name, 0, 1)) }}</a>
-                    <div class="min-w-0 flex-grow-1"><a class="text-white small fw-semibold text-truncate d-block notranslate" href="{{ route('profile.edit') }}">{{ $nxUser->name }}</a><div class="small text-truncate" style="color:#93c5fd">{{ $nxUser->getRoleNames()->first() ?? 'User' }}</div></div>
-                    <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn p-1 text-white" title="Logout"><i data-lucide="log-out" style="width:17px"></i></button></form>
+                    <div class="min-w-0 flex-grow-1 nx-user-meta"><a class="small fw-semibold text-truncate d-block notranslate" href="{{ route('profile.edit') }}">{{ $nxUser->name }}</a><small class="d-block text-truncate">{{ $nxUser->getRoleNames()->first() ?? 'User' }}</small></div>
+                    <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn" title="Log out" aria-label="Log out"><i data-lucide="log-out"></i></button></form>
                 </div>
             </aside>
+
             <div class="nx-main">
                 <header class="nx-topbar">
-                    <div class="d-flex align-items-center gap-3 min-w-0">
-                        <button class="nx-icon-btn d-lg-none flex-shrink-0" type="button" aria-label="Open menu" onclick="document.getElementById('nxSidebar').classList.toggle('open');document.getElementById('nxSidebarBackdrop').classList.toggle('show')"><i data-lucide="menu"></i></button>
-                        <div class="min-w-0"><div class="nx-eyebrow text-truncate">Classic / {{ $breadcrumb ?? 'Workspace' }}</div><h1 class="nx-page-title text-truncate">{{ $pageTitle ?? 'Dashboard' }}</h1></div>
+                    <div class="nx-topbar-title">
+                        <button class="nx-icon-btn d-lg-none" type="button" aria-label="Open menu" data-sidebar-open><i data-lucide="menu"></i></button>
+                        <button class="nx-icon-btn d-none d-lg-grid" type="button" aria-label="Collapse menu" title="Collapse / expand menu" data-sidebar-collapse><i data-lucide="panel-left"></i></button>
+                        <div class="min-w-0">
+                            <ol class="nx-breadcrumb" aria-label="Breadcrumb">
+                                <li><a href="{{ route('dashboard') }}">Home</a></li>
+                                @foreach($nxCrumbs as $crumb)<li>{{ $crumb }}</li>@endforeach
+                            </ol>
+                            <h1 class="nx-page-title text-truncate">{{ $pageTitle ?? 'Dashboard' }}</h1>
+                        </div>
                     </div>
+
+                    <div class="nx-global-search" data-global-search>
+                        <i data-lucide="search" class="nx-search-icon" aria-hidden="true"></i>
+                        <input type="search" placeholder="Search complaints, customers, employees…" autocomplete="off" aria-label="Search everything" data-global-search-input>
+                        <kbd>Ctrl K</kbd>
+                        <div class="nx-search-results d-none" data-global-search-results role="listbox"></div>
+                    </div>
+
                     <div class="d-flex align-items-center gap-2 flex-shrink-0">
                         <div class="dropdown nx-language" data-language-switcher>
-                            <button class="nx-icon-btn nx-language-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Change interface language"><i data-lucide="languages" style="width:18px"></i><span class="nx-language-current notranslate" data-language-label>{{ $nxPreferredLanguage }}</span></button>
-                            <div class="dropdown-menu dropdown-menu-end nx-language-menu shadow">
-                                <div class="nx-language-head"><strong>Interface language</strong><small class="text-secondary d-block">Languages from your employee profile</small></div>
+                            <button class="nx-icon-btn nx-language-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Change interface language"><i data-lucide="languages"></i><span class="nx-language-current notranslate visually-hidden" data-language-label>{{ $nxPreferredLanguage }}</span></button>
+                            <div class="dropdown-menu dropdown-menu-end nx-language-menu">
+                                <div class="nx-language-head"><strong>Interface language</strong><small class="text-secondary d-block">Translate menus, labels and buttons</small></div>
                                 <div data-language-menu></div>
                             </div>
                         </div>
-                        <a class="nx-icon-btn position-relative" href="{{ route('notifications.index') }}" title="Notifications"><i data-lucide="bell" style="width:18px"></i>@if($nxUnread)<span class="position-absolute top-0 end-0 translate-middle p-1 bg-danger border border-light rounded-circle"></span>@endif</a>
                         <div class="dropdown">
-                            <button class="btn btn-primary d-none d-sm-inline-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i data-lucide="plus" style="width:17px"></i>New</button>
-                            <div class="dropdown-menu dropdown-menu-end nx-quick-create shadow">
+                            <button class="nx-icon-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications"><i data-lucide="bell"></i>@if($nxUnread)<span class="nx-dot" aria-hidden="true"></span><span class="visually-hidden">{{ $nxUnread }} unread</span>@endif</button>
+                            <div class="dropdown-menu dropdown-menu-end nx-notify-menu">
+                                <div class="nx-notify-head"><strong>Notifications</strong>@if($nxUnread)<span class="badge badge-soft-danger rounded-pill">{{ $nxUnread }} new</span>@endif</div>
+                                @forelse($nxNotifications as $notification)
+                                    <a class="nx-notify-item {{ $notification->read_at ? '' : 'is-unread' }}" href="{{ $notification->data['url'] ?? (isset($notification->data['task_id']) ? route('tasks.show', $notification->data['task_id']) : route('notifications.index')) }}">
+                                        <span class="nx-notify-icon"><i data-lucide="{{ $notification->data['icon'] ?? 'bell' }}"></i></span>
+                                        <span class="min-w-0"><strong>{{ $notification->data['title'] ?? 'Notification' }}</strong><span class="text-truncate">{{ $notification->data['message'] ?? '' }}</span><small>{{ $notification->created_at->diffForHumans() }}</small></span>
+                                    </a>
+                                @empty
+                                    <div class="nx-empty py-4"><i data-lucide="bell-off"></i><div>No notifications yet.</div></div>
+                                @endforelse
+                                <a class="nx-notify-foot" href="{{ route('notifications.index') }}">View all notifications</a>
+                            </div>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-primary d-none d-sm-inline-flex" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i data-lucide="plus"></i>New</button>
+                            <div class="dropdown-menu dropdown-menu-end nx-quick-create">
+                                <h6 class="dropdown-header">Create</h6>
+                                @can('complaints.create')<a class="dropdown-item" href="{{ route('complaints.create') }}"><i data-lucide="clipboard-plus"></i>Customer complaint</a>@endcan
                                 <a class="dropdown-item" href="{{ route('customers.create') }}"><i data-lucide="building-2"></i>Customer</a>
                                 <a class="dropdown-item" href="{{ route('service-jobs.create') }}"><i data-lucide="wrench"></i>Service job</a>
+                                <a class="dropdown-item" href="{{ route('workflows.board') }}"><i data-lucide="git-branch"></i>Internal workflow</a>
                                 @can('employees.create')<a class="dropdown-item" href="{{ route('employees.create') }}"><i data-lucide="contact-round"></i>Employee</a>@endcan
                                 @can('companies.create')<a class="dropdown-item" href="{{ route('companies.create') }}"><i data-lucide="landmark"></i>Company</a>@endcan
-                                <a class="dropdown-item" href="{{ route('complaints.index', ['scope' => 'open']) }}"><i data-lucide="ticket-check"></i>Customer complaint</a>
-                                <a class="dropdown-item" href="{{ route('workflows.board') }}"><i data-lucide="square-kanban"></i>Internal workflow board</a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="{{ route('reports.builder') }}"><i data-lucide="table-properties"></i>Custom report</a>
+                            </div>
+                        </div>
+                        <div class="dropdown">
+                            <button class="nx-user-chip" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span class="nx-avatar notranslate">{{ strtoupper(substr($nxUser->name, 0, 1)) }}</span>
+                                <span class="d-none d-xl-block text-start"><strong class="notranslate">{{ \Illuminate\Support\Str::limit($nxUser->name, 18) }}</strong><small>{{ $nxUser->getRoleNames()->first() ?? 'User' }}</small></span>
+                                <i data-lucide="chevron-down" class="d-none d-xl-block" style="width:14px"></i>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <h6 class="dropdown-header notranslate">{{ $nxUser->email }}</h6>
+                                <a class="dropdown-item" href="{{ route('profile.edit') }}"><i data-lucide="user-round"></i>My profile</a>
+                                <a class="dropdown-item" href="{{ route('notifications.index') }}"><i data-lucide="bell"></i>Notifications</a>
+                                <a class="dropdown-item" href="{{ route('settings.index') }}"><i data-lucide="settings"></i>Settings</a>
+                                <div class="dropdown-divider"></div>
+                                <form method="POST" action="{{ route('logout') }}">@csrf<button class="dropdown-item text-danger" type="submit"><i data-lucide="log-out"></i>Log out</button></form>
                             </div>
                         </div>
                     </div>
                 </header>
-                <main class="nx-content">
-                    @if(session('success'))<div class="alert alert-success nx-flash border-0 shadow-sm d-flex align-items-start gap-2" role="status"><i data-lucide="circle-check" style="width:18px;flex:0 0 auto;margin-top:2px"></i><div>{{ session('success') }}</div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>@endif
-                    @if(session('error'))<div class="alert alert-danger nx-flash border-0 shadow-sm d-flex align-items-start gap-2" role="alert"><i data-lucide="circle-alert" style="width:18px;flex:0 0 auto;margin-top:2px"></i><div>{{ session('error') }}</div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>@endif
-                    @if(session('warning'))<div class="alert alert-warning nx-flash border-0 shadow-sm d-flex align-items-start gap-2" role="alert"><i data-lucide="triangle-alert" style="width:18px;flex:0 0 auto;margin-top:2px"></i><div>{{ session('warning') }}</div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>@endif
+
+                <main class="nx-content" id="nxContent">
+                    @if(session('success'))<div class="alert alert-success nx-flash d-flex align-items-start gap-2" role="status"><i data-lucide="circle-check" style="width:18px;flex:0 0 auto;margin-top:1px"></i><div>{{ session('success') }}</div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>@endif
+                    @if(session('error'))<div class="alert alert-danger nx-flash d-flex align-items-start gap-2" role="alert"><i data-lucide="circle-alert" style="width:18px;flex:0 0 auto;margin-top:1px"></i><div>{{ session('error') }}</div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>@endif
+                    @if(session('warning'))<div class="alert alert-warning nx-flash d-flex align-items-start gap-2" role="alert"><i data-lucide="triangle-alert" style="width:18px;flex:0 0 auto;margin-top:1px"></i><div>{{ session('warning') }}</div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Dismiss"></button></div>@endif
                     {{ $slot }}
                 </main>
+                <footer class="nx-footer d-flex flex-wrap justify-content-between gap-2"><span><span class="notranslate">CLASSIC</span> Service ERP · {{ now()->year }}</span><span>Signed in as <span class="notranslate">{{ $nxUser->name }}</span></span></footer>
             </div>
         </div>
         @stack('scripts')

@@ -58,7 +58,7 @@ class WorkflowFollowUpTest extends TestCase
 
         $report = $this->actingAs($task->creator)->get(route('reports.index'))->assertOk()
             ->assertSee('Parts delayed.')->assertSee('Courier rescheduled.')->assertSee('07 Nov 2026')->assertSee('09 Nov 2026');
-        $this->assertSame(2, $report->viewData('revisions')->total());
+        $this->assertSame(2, $report->viewData('revisions')->count());
     }
 
     #[TestWith(['2026-11-03 09:00:00'])]

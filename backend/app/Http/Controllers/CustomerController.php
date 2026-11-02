@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCustomerEquipmentRequest;
 use App\Http\Requests\StoreCustomerFloorPlanRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\ActivityLog;
+use App\Models\Complaint;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\CustomerRoom;
@@ -35,8 +36,8 @@ class CustomerController extends Controller
                     ->orWhere('city', 'like', '%'.$request->string('search').'%');
             }))
             ->latest()
-            ->paginate(15)
-            ->withQueryString();
+            ->limit(5000)
+            ->get();
 
         return view('customers.index', compact('customers'));
     }
@@ -71,6 +72,9 @@ class CustomerController extends Controller
             'products' => Product::where('active', true)->orderBy('name')->get(),
             'equipmentTypes' => ServiceMasterOption::where('type', 'equipment_type')->where('active', true)->orderBy('sort_order')->get(),
             'equipmentCapacities' => ServiceMasterOption::where('type', 'ac_capacity')->where('active', true)->orderBy('sort_order')->get(),
+            'complaints' => $request->user()->canAny(['complaints.read', 'complaints.view_own'])
+                ? Complaint::query()->visibleTo($request->user())->where('customer_id', $customer->id)->with('technician:id,name')->withCount('visits')->latest('registered_at')->limit(500)->get()
+                : null,
         ]);
     }
 

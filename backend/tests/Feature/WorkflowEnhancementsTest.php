@@ -146,28 +146,24 @@ class WorkflowEnhancementsTest extends TestCase
         $this->actingAs($owner)->postJson(route('tasks.action', $parent), ['action' => 'close', 'remark' => 'Workflow finished.'])->assertOk();
     }
 
-    public function test_complaints_and_internal_workflows_have_separate_lists_counts_boards_and_creation(): void
+    public function test_internal_workflows_reject_customer_links_and_the_old_ticket_url_opens_the_complaint_register(): void
     {
         [$admin, $owner] = $this->users();
         $internal = $this->workflow($admin, $owner, ['title' => 'INTERNAL-ONLY-ITEM']);
-        $complaint = $this->workflow($admin, $owner, ['title' => 'COMPLAINT-ONLY-ITEM', 'task_type' => Task::TYPE_TICKET, 'customer_id' => Customer::firstOrFail()->id]);
 
-        $this->actingAs($admin)->get(route('workflows.index', ['type' => 'ticket']))->assertOk()->assertSee($internal->title)->assertDontSee($complaint->title)->assertDontSee('name="customer_id"', false)->assertViewHas('workType', Task::TYPE_WORKFLOW);
-        $this->get(route('complaints.index', ['type' => 'workflow']))->assertOk()->assertSee($complaint->title)->assertDontSee($internal->title)->assertSee('name="customer_id"', false);
-        $this->getJson(route('workflows.board'))->assertJsonFragment(['task_no' => $internal->task_no])->assertJsonMissing(['task_no' => $complaint->task_no]);
-        $this->getJson(route('complaints.board'))->assertJsonFragment(['task_no' => $complaint->task_no])->assertJsonMissing(['task_no' => $internal->task_no]);
-        $this->post(route('complaints.store'), ['title' => 'Missing customer', 'task_type' => 'workflow', 'priority' => 'normal', 'assigned_to' => $owner->id])->assertSessionHasErrors('customer_id');
+        $this->actingAs($admin)->get(route('workflows.index'))->assertOk()->assertSee($internal->title)->assertDontSee('name="customer_id"', false)->assertViewHas('workType', Task::TYPE_WORKFLOW);
+        $this->getJson(route('workflows.board'))->assertJsonFragment(['task_no' => $internal->task_no]);
+        $this->post(route('workflows.store'), ['title' => 'Linked to a customer', 'priority' => 'normal', 'assigned_to' => $owner->id, 'customer_id' => Customer::firstOrFail()->id])->assertSessionHasErrors('customer_id');
+        $this->get('/customer-complaints')->assertRedirect('/complaints');
     }
 
-    public function test_closed_workflows_and_customer_complaints_cannot_receive_subtasks(): void
+    public function test_closed_workflows_cannot_receive_subtasks(): void
     {
         [$admin, $owner] = $this->users();
         $closed = $this->workflow($admin, $owner, ['status' => 'closed']);
-        $complaint = $this->workflow($admin, $owner, ['task_type' => Task::TYPE_TICKET]);
         $data = ['title' => 'Invalid subtask', 'priority' => 'normal', 'assigned_to' => $owner->id];
 
         $this->actingAs($admin)->postJson(route('tasks.subtasks.store', $closed), $data)->assertUnprocessable();
-        $this->postJson(route('tasks.subtasks.store', $complaint), $data)->assertUnprocessable();
         $this->assertDatabaseMissing('tasks', ['title' => 'Invalid subtask']);
         $this->postJson(route('tasks.due-date', $closed), ['due_at' => '2026-11-06', 'reason' => 'Reschedule.'])->assertUnprocessable();
     }

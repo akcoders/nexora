@@ -12,7 +12,7 @@ class NotificationController extends Controller
     public function index(Request $request): View
     {
         return view('notifications.index', [
-            'notifications' => $request->user()->notifications()->paginate(20),
+            'notifications' => $request->user()->notifications()->latest()->limit(500)->get(),
             'activities' => ActivityLog::latest()->limit(20)->get(),
         ]);
     }

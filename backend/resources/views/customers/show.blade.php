@@ -54,11 +54,27 @@
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#customerOverview" type="button"><i data-lucide="layout-dashboard"></i>Overview</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerAssets" type="button"><i data-lucide="air-vent"></i>Units & floor plans <span class="badge bg-primary ms-1">{{ $customer->equipments->count() }}</span></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerPeople" type="button"><i data-lucide="users"></i>Branches & contacts</button></li>
+        @if($complaints !== null)<li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerComplaints" type="button"><i data-lucide="clipboard-list"></i>Complaints <span class="nx-count notranslate">{{ $complaints->count() }}</span></button></li>@endif
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerService" type="button"><i data-lucide="history"></i>Service history</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#customerComplaintQr" type="button"><i data-lucide="qr-code"></i>Complaint QR</button></li>
     </ul>
 
     <div class="tab-content">
+        @if($complaints !== null)
+        <div class="tab-pane fade" id="customerComplaints">
+            <section class="nx-card nx-datatable-card">
+                <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="clipboard-list"></i>Complaint history</h3><p class="nx-card-subtitle">Every complaint registered for this customer, with visits and status.</p></div>@can('complaints.create')<a class="btn btn-sm btn-primary" href="{{ route('complaints.create', ['customer' => $customer->id]) }}"><i data-lucide="circle-plus"></i>Register complaint</a>@endcan</div>
+                <table class="table nx-table" data-datatable data-dt-title="Complaints · {{ $customer->name }}" data-dt-page-length="10" data-dt-empty="No complaints registered for this customer yet.">
+                    <thead><tr><th>Complaint</th><th>Registered</th><th>Call type</th><th>Nature</th><th>Equipment</th><th>Technician</th><th>Visits</th><th>Status</th><th>Closed</th></tr></thead>
+                    <tbody>
+                        @foreach($complaints as $complaint)
+                            <tr><td><a class="nx-code notranslate" href="{{ route('complaints.show', $complaint) }}">{{ $complaint->complaint_no }}</a></td><td data-order="{{ $complaint->registered_at->timestamp }}">{{ $complaint->registered_at->format('d M Y') }}</td><td>{{ $complaint->callTypeLabel() }}</td><td>{{ $complaint->nature_of_complaint }}</td><td>{{ $complaint->equipmentSummary() }}</td><td>{{ $complaint->technician?->name ?? '—' }}</td><td class="notranslate">{{ $complaint->visits_count }}</td><td><x-pill :tone="$complaint->statusMeta()['tone']" :label="$complaint->statusMeta()['label']" /></td><td data-order="{{ $complaint->closed_at?->timestamp }}">{{ $complaint->closed_at?->format('d M Y') ?? '—' }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </section>
+        </div>
+        @endif
         <div class="tab-pane fade" id="customerComplaintQr">
             <section class="nx-card p-4 text-center"><div class="fw-bold text-primary fs-4" style="letter-spacing:4px">NEXORA</div><h3 class="h5 fw-bold mt-3">Customer complaint QR</h3><p class="small text-secondary">Print this card and share it with your customer. Scanning opens the complaint page.</p><img class="d-block mx-auto" width="260" height="260" src="{{ asset('images/brand/nexora-complaint-qr.png') }}" alt="Nexora complaint QR code"><a class="btn btn-primary mt-3" href="{{ route('customers.complaint-qr', $customer) }}" target="_blank" rel="noopener"><i data-lucide="printer" style="width:17px"></i>Open print card</a><p class="small text-secondary mt-3 mb-0">The complaint form will be added to this page later. The printed QR will stay the same.</p></section>
         </div>

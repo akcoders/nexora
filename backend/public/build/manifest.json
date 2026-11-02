@@ -1,6 +1,32 @@
 {
+  "_report-chart-D9zZlu-I.js": {
+    "file": "assets/report-chart-D9zZlu-I.js",
+    "name": "report-chart"
+  },
+  "_rolldown-runtime-Dd_uD5pT.js": {
+    "file": "assets/rolldown-runtime-Dd_uD5pT.js",
+    "name": "rolldown-runtime"
+  },
+  "node_modules/pdfmake/build/pdfmake.js": {
+    "file": "assets/pdfmake-DAev2ol7.js",
+    "name": "pdfmake",
+    "src": "node_modules/pdfmake/build/pdfmake.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-Dd_uD5pT.js"
+    ]
+  },
+  "node_modules/pdfmake/build/vfs_fonts.js": {
+    "file": "assets/vfs_fonts-BV-Ul9v2.js",
+    "name": "vfs_fonts",
+    "src": "node_modules/pdfmake/build/vfs_fonts.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-Dd_uD5pT.js"
+    ]
+  },
   "resources/css/app.css": {
-    "file": "assets/app-9pwAekzT.css",
+    "file": "assets/app-C9X7wNKA.css",
     "name": "app",
     "names": [
       "app.css"
@@ -8,21 +34,68 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/css/theme.css": {
+    "file": "assets/theme-DZfTJ1iG.css",
+    "name": "theme",
+    "names": [
+      "theme.css"
+    ],
+    "src": "resources/css/theme.css",
+    "isEntry": true
+  },
   "resources/js/app.js": {
-    "file": "assets/app-BWfPFccl.js",
+    "file": "assets/app-B9cfdnG1.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
+      "_rolldown-runtime-Dd_uD5pT.js",
       "resources/js/validation.js",
       "resources/js/validation.js"
     ]
   },
+  "resources/js/complaints.js": {
+    "file": "assets/complaints-DvzaLKQQ.js",
+    "name": "complaints",
+    "src": "resources/js/complaints.js",
+    "isEntry": true
+  },
+  "resources/js/dashboard.js": {
+    "file": "assets/dashboard-fKyZ76BG.js",
+    "name": "dashboard",
+    "src": "resources/js/dashboard.js",
+    "isEntry": true,
+    "imports": [
+      "_report-chart-D9zZlu-I.js"
+    ]
+  },
+  "resources/js/datatables.js": {
+    "file": "assets/datatables-DHVa0qhy.js",
+    "name": "datatables",
+    "src": "resources/js/datatables.js",
+    "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-Dd_uD5pT.js"
+    ],
+    "dynamicImports": [
+      "node_modules/pdfmake/build/pdfmake.js",
+      "node_modules/pdfmake/build/vfs_fonts.js"
+    ]
+  },
   "resources/js/kanban-board.js": {
-    "file": "assets/kanban-board-Bx83IJ8d.js",
+    "file": "assets/kanban-board-DWja2Tuu.js",
     "name": "kanban-board",
     "src": "resources/js/kanban-board.js",
     "isEntry": true
+  },
+  "resources/js/report-builder.js": {
+    "file": "assets/report-builder-CstCAoaT.js",
+    "name": "report-builder",
+    "src": "resources/js/report-builder.js",
+    "isEntry": true,
+    "imports": [
+      "_report-chart-D9zZlu-I.js"
+    ]
   },
   "resources/js/validation.js": {
     "file": "assets/validation-DnLw_Jnd.js",

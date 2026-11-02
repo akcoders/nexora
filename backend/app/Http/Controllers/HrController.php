@@ -24,8 +24,8 @@ class HrController extends Controller
         return view('hr.index', [
             'holidays' => Holiday::query()->whereYear('holiday_date', $request->integer('year', now()->year))->orderBy('holiday_date')->get(),
             'leaveTypes' => LeaveType::query()->orderBy('name')->get(),
-            'leaveRequests' => LeaveRequest::query()->with(['user', 'leaveType', 'reviewer'])->latest()->paginate(15, ['*'], 'leave_page')->withQueryString(),
-            'vouchers' => ExpenseVoucher::query()->with(['user', 'reviewer'])->latest()->paginate(15, ['*'], 'voucher_page')->withQueryString(),
+            'leaveRequests' => LeaveRequest::query()->with(['user', 'leaveType', 'reviewer'])->latest()->limit(2000)->get(),
+            'vouchers' => ExpenseVoucher::query()->with(['user', 'reviewer'])->latest()->limit(2000)->get(),
             'metrics' => [
                 'pending_leaves' => LeaveRequest::where('status', 'pending')->count(),
                 'pending_vouchers' => ExpenseVoucher::where('status', 'pending')->count(),

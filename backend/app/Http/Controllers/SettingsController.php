@@ -39,6 +39,11 @@ class SettingsController extends Controller
             'require_attendance_for_tasks' => ['nullable', 'boolean'],
             'onesignal_app_id' => ['nullable', 'uuid'],
             'onesignal_rest_api_key' => ['nullable', 'string', 'max:500'],
+            'complaint_prefix' => ['nullable', 'string', 'max:12', 'regex:/^[A-Za-z0-9-]+$/'],
+            'complaint_branch_code' => ['nullable', 'string', 'max:12', 'regex:/^[A-Za-z0-9-]+$/'],
+        ], [
+            'complaint_prefix.regex' => 'Use letters, numbers and dashes only (for example CCSPL).',
+            'complaint_branch_code.regex' => 'Use letters, numbers and dashes only (for example MUM).',
         ]);
 
         foreach ($data as $key => $value) {
@@ -48,7 +53,10 @@ class SettingsController extends Controller
                 }
                 $value = Crypt::encryptString($value);
             }
-            Setting::updateOrCreate(['key' => $key], ['value' => $value, 'group' => str_starts_with($key, 'company_') ? 'company' : 'operations']);
+            if (in_array($key, ['complaint_prefix', 'complaint_branch_code'], true)) {
+                $value = strtoupper((string) $value);
+            }
+            Setting::updateOrCreate(['key' => $key], ['value' => $value, 'group' => str_starts_with($key, 'company_') ? 'company' : (str_starts_with($key, 'complaint_') ? 'complaints' : 'operations')]);
         }
         if (! $request->has('require_attendance_for_tasks')) {
             Setting::updateOrCreate(['key' => 'require_attendance_for_tasks'], ['value' => '0', 'group' => 'operations', 'type' => 'boolean']);

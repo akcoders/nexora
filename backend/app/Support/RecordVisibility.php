@@ -24,9 +24,9 @@ final class RecordVisibility
         }
 
         return $query->where(function (Builder $query) use ($user, $assignable): void {
-            $query->where('created_by', $user->id);
+            $query->where($query->qualifyColumn('created_by'), $user->id);
             if ($assignable) {
-                $query->orWhere('assigned_to', $user->id);
+                $query->orWhere($query->qualifyColumn('assigned_to'), $user->id);
             }
             if ($query->getModel() instanceof Task) {
                 $query->orWhereHas('members', fn (Builder $members) => $members->where('user_id', $user->id)->where('role', '!=', TaskMember::ROLE_SUBTASK_ONLY));

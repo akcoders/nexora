@@ -40,8 +40,7 @@ class EmployeeController extends Controller
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->when($request->filled('department'), fn ($query) => $query->where('department', $request->string('department')))
             ->orderBy('name')
-            ->paginate(20)
-            ->withQueryString();
+            ->get();
 
         return view('employees.index', [
             'employees' => $employees,

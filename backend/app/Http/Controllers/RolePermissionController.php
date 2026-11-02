@@ -22,7 +22,7 @@ class RolePermissionController extends Controller
         $sections = [
             ['name' => 'Operations', 'description' => 'Customer work, field service and daily workflows', 'icon' => 'briefcase-business', 'modules' => [
                 'customers' => 'Customers', 'products' => 'Products', 'checklists' => 'Service checklists', 'service_jobs' => 'Service jobs',
-                'attendance' => 'Attendance', 'tasks' => 'Workflow & tickets',
+                'complaints' => 'Customer complaints', 'attendance' => 'Attendance', 'tasks' => 'Internal workflows',
             ]],
             ['name' => 'People & finance', 'description' => 'Employee records, requests and payroll', 'icon' => 'users-round', 'modules' => [
                 'employees' => 'Employees', 'hr' => 'HR', 'leaves' => 'Leave requests', 'vouchers' => 'Expense vouchers', 'payroll' => 'Payroll',
