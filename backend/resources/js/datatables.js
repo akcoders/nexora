@@ -29,6 +29,18 @@ import JSZip from 'jszip';
 
 DataTable.Buttons.jszip(JSZip);
 
+// Use DataTables' own layout classes instead of the Bootstrap grid (.row has negative
+// gutters that pushed "Show … rows" outside the card). theme.css styles these classes.
+DataTable.ext.classes.layout = {
+    row: 'dt-layout-row',
+    cell: 'dt-layout-cell',
+    tableRow: 'dt-layout-table',
+    tableCell: '',
+    start: 'dt-layout-start',
+    end: 'dt-layout-end',
+    full: 'dt-layout-full',
+};
+
 let pdfMakeReady = null;
 
 /** pdfmake (with fonts) is large, so it is only downloaded the first time someone exports a PDF. */
@@ -148,15 +160,14 @@ function initTable(table) {
     const searching = table.dataset.dtSearch !== 'false';
     const pageLength = Number(table.dataset.dtPageLength || 25);
 
+    // One toolbar row: rows-per-page and the export group on the left, search on the right.
+    const toolbar = [paging ? 'pageLength' : null, showButtons ? 'buttons' : null].filter(Boolean);
     const layout = {
-        topStart: paging ? 'pageLength' : null,
+        topStart: toolbar.length ? toolbar : null,
         topEnd: searching ? 'search' : null,
         bottomStart: 'info',
         bottomEnd: paging ? 'paging' : null,
     };
-    if (showButtons) {
-        layout.top = 'buttons';
-    }
 
     const instance = new DataTable(table, {
         layout,

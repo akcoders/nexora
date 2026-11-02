@@ -282,7 +282,7 @@
             <div class="tab-pane fade {{ $tab === 'parts' ? 'show active' : '' }}" id="tab-parts" role="tabpanel">
                 <div class="nx-card-body">
                     <div class="nx-section-head"><h3>Parts replaced</h3><span class="small text-secondary">Recorded on visit reports</span></div>
-                    <table class="table nx-table nx-table-sm mb-4" data-datatable data-dt-title="Parts used · {{ $complaint->complaint_no }}" data-dt-page-length="10" data-dt-empty="No parts replaced yet.">
+                    <table class="table nx-table nx-table-sm" data-datatable data-dt-title="Parts used · {{ $complaint->complaint_no }}" data-dt-page-length="10" data-dt-empty="No parts replaced yet.">
                         <thead><tr><th>Visit</th><th>Part code</th><th>Part name</th><th>Category</th><th>Make</th><th>Qty</th><th>UOM</th><th>Source</th><th>Part type</th><th>Warranty</th><th>Stock location</th><th>Est. cost</th><th>Billable</th><th>OEM warranty</th><th>Old part returned</th><th>Old part no</th><th>Remarks</th></tr></thead>
                         <tbody>
                             @foreach($usedParts as $part)

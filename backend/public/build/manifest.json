@@ -35,7 +35,7 @@
     "isEntry": true
   },
   "resources/css/theme.css": {
-    "file": "assets/theme-DZfTJ1iG.css",
+    "file": "assets/theme-BcnBGPhc.css",
     "name": "theme",
     "names": [
       "theme.css"
@@ -70,7 +70,7 @@
     ]
   },
   "resources/js/datatables.js": {
-    "file": "assets/datatables-DHVa0qhy.js",
+    "file": "assets/datatables-B6cLwCf7.js",
     "name": "datatables",
     "src": "resources/js/datatables.js",
     "isEntry": true,
