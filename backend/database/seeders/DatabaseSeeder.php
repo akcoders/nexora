@@ -37,7 +37,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(IndiaLocationSeeder::class);
 
-        $permissions = collect(['customers', 'products', 'checklists', 'users', 'attendance', 'tasks', 'reports', 'settings', 'employees', 'companies', 'roles', 'hr', 'leaves', 'vouchers', 'payroll'])
+        $permissions = collect(['customers', 'products', 'checklists', 'users', 'attendance', 'tasks', 'complaints', 'reports', 'settings', 'employees', 'companies', 'roles', 'hr', 'leaves', 'vouchers', 'payroll'])
             ->flatMap(fn (string $module) => collect(['create', 'read', 'update', 'delete', 'approve', 'assign', 'export'])
                 ->map(fn (string $action) => "$module.$action"));
 
@@ -46,7 +46,7 @@ class DatabaseSeeder extends Seeder
                 ->map(fn (string $action) => "service_jobs.$action")
         );
 
-        $permissions = $permissions->merge(['customers.view_own', 'service_jobs.view_own', 'tasks.view_own']);
+        $permissions = $permissions->merge(['customers.view_own', 'service_jobs.view_own', 'tasks.view_own', 'complaints.view_own']);
 
         $permissions->each(fn (string $permission) => Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']));
 
@@ -57,8 +57,8 @@ class DatabaseSeeder extends Seeder
         Role::firstOrCreate(['name' => 'Viewer', 'guard_name' => 'web']);
         $superAdmin->syncPermissions(Permission::all());
         $adminRole->syncPermissions(Permission::where('name', 'not like', 'settings.%')->get());
-        $managerRole->syncPermissions(Permission::whereIn('name', ['attendance.read', 'attendance.approve', 'attendance.export', 'tasks.read', 'tasks.assign', 'reports.read', 'reports.export', 'service_jobs.read', 'service_jobs.assign', 'service_jobs.approve', 'service_jobs.view_financials', 'employees.read', 'hr.read', 'leaves.read', 'leaves.approve', 'vouchers.read', 'vouchers.approve'])->get());
-        $technicianRole->syncPermissions(Permission::whereIn('name', ['service_jobs.view_own', 'tasks.view_own', 'service_jobs.inspect', 'service_jobs.create_estimate', 'service_jobs.perform', 'service_jobs.payment', 'service_jobs.complete'])->get());
+        $managerRole->syncPermissions(Permission::whereIn('name', ['attendance.read', 'attendance.approve', 'attendance.export', 'tasks.read', 'tasks.assign', 'reports.read', 'reports.export', 'service_jobs.read', 'service_jobs.assign', 'service_jobs.approve', 'service_jobs.view_financials', 'employees.read', 'hr.read', 'leaves.read', 'leaves.approve', 'vouchers.read', 'vouchers.approve', 'complaints.create', 'complaints.read', 'complaints.update', 'complaints.assign', 'complaints.approve', 'complaints.export'])->get());
+        $technicianRole->syncPermissions(Permission::whereIn('name', ['service_jobs.view_own', 'tasks.view_own', 'service_jobs.inspect', 'service_jobs.create_estimate', 'service_jobs.perform', 'service_jobs.payment', 'service_jobs.complete', 'complaints.view_own', 'complaints.update'])->get());
 
         $admin = User::firstOrNew(['email' => 'admin@nexora.test']);
         $admin->fill([
@@ -118,11 +118,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $task = Task::firstOrCreate(['task_no' => 'TSK000001'], [
-            'task_type' => 'ticket',
-            'title' => 'Quarterly HVAC preventive maintenance',
-            'description' => 'Complete the standard preventive-maintenance checklist and upload readings.',
-            'customer_id' => $customer->id,
-            'category' => 'Preventive Maintenance',
+            'task_type' => 'workflow',
+            'title' => 'Plan quarterly HVAC preventive maintenance',
+            'description' => 'Prepare the preventive-maintenance schedule and share it with the service team.',
+            'category' => 'Internal',
             'priority' => 'high',
             'due_at' => now()->addDay(),
             'created_by' => $admin->id,

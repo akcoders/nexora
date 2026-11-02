@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\AdminAttendanceController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\ComplaintController;
+use App\Http\Controllers\ComplaintMasterController;
+use App\Http\Controllers\ComplaintVisitController;
 use App\Http\Controllers\CustomerComplaintQrController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDraftController;
@@ -9,6 +12,7 @@ use App\Http\Controllers\CustomerGroupController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoDataController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\HrController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
@@ -16,6 +20,7 @@ use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PremisesController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportBuilderController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalarySlipController;
@@ -41,7 +46,9 @@ Route::post('/service-feedback/{token}', [ServiceFeedbackController::class, 'sto
 Route::get('/salary-slips/{payrollEntry}', SalarySlipController::class)->middleware('signed')->name('salary-slips.download');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/preferences', [DashboardController::class, 'preferences'])->name('dashboard.preferences');
+    Route::get('/search', GlobalSearchController::class)->middleware('throttle:60,1')->name('search');
     Route::get('/locations/india', [LocationController::class, 'india'])->name('locations.india');
     Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::get('/customers/{customer}/complaint-qr', [CustomerComplaintQrController::class, 'show'])->name('customers.complaint-qr');
@@ -75,9 +82,30 @@ Route::middleware('auth')->group(function () {
     Route::get('/internal-workflows', [TaskController::class, 'index'])->name('workflows.index');
     Route::post('/internal-workflows', [TaskController::class, 'store'])->name('workflows.store');
     Route::get('/internal-workflows/board', [TaskController::class, 'board'])->name('workflows.board');
-    Route::get('/customer-complaints', [TaskController::class, 'index'])->name('complaints.index');
-    Route::post('/customer-complaints', [TaskController::class, 'store'])->name('complaints.store');
-    Route::get('/customer-complaints/board', [TaskController::class, 'board'])->name('complaints.board');
+    Route::redirect('/customer-complaints', '/complaints');
+    Route::get('/complaints', [ComplaintController::class, 'index'])->name('complaints.index');
+    Route::get('/complaints/create', [ComplaintController::class, 'create'])->name('complaints.create');
+    Route::post('/complaints', [ComplaintController::class, 'store'])->name('complaints.store');
+    Route::get('/complaints/pending', [ComplaintController::class, 'pendingBoard'])->name('complaints.pending');
+    Route::get('/complaints/customers/{customer}/context', [ComplaintController::class, 'customerContext'])->name('complaints.customer-context');
+    Route::get('/complaint-masters', [ComplaintMasterController::class, 'index'])->name('complaint-masters.index');
+    Route::post('/complaint-masters', [ComplaintMasterController::class, 'store'])->name('complaint-masters.store');
+    Route::patch('/complaint-masters/{option}/toggle', [ComplaintMasterController::class, 'toggle'])->name('complaint-masters.toggle');
+    Route::get('/complaints/{complaint}', [ComplaintController::class, 'show'])->name('complaints.show');
+    Route::put('/complaints/{complaint}', [ComplaintController::class, 'update'])->name('complaints.update');
+    Route::get('/complaints/{complaint}/print', [ComplaintController::class, 'print'])->name('complaints.print');
+    Route::post('/complaints/{complaint}/pending', [ComplaintController::class, 'pending'])->name('complaints.pending.store');
+    Route::post('/complaints/{complaint}/follow-ups', [ComplaintController::class, 'followUp'])->name('complaints.follow-ups.store');
+    Route::put('/complaints/{complaint}/commercial', [ComplaintController::class, 'commercial'])->name('complaints.commercial');
+    Route::post('/complaints/{complaint}/close', [ComplaintController::class, 'close'])->name('complaints.close');
+    Route::post('/complaints/{complaint}/cancel', [ComplaintController::class, 'cancel'])->name('complaints.cancel');
+    Route::post('/complaints/{complaint}/reopen', [ComplaintController::class, 'reopen'])->name('complaints.reopen');
+    Route::post('/complaints/{complaint}/visits', [ComplaintVisitController::class, 'store'])->name('complaints.visits.store');
+    Route::scopeBindings()->group(function (): void {
+        Route::get('/complaints/{complaint}/visits/{visit}/report', [ComplaintVisitController::class, 'edit'])->name('complaints.visits.edit');
+        Route::put('/complaints/{complaint}/visits/{visit}', [ComplaintVisitController::class, 'update'])->name('complaints.visits.update');
+        Route::post('/complaints/{complaint}/visits/{visit}/cancel', [ComplaintVisitController::class, 'cancel'])->name('complaints.visits.cancel');
+    });
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/board', [TaskController::class, 'board'])->name('tasks.board');
@@ -88,6 +116,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/actions/{action}/attachments/{attachment}', [TaskController::class, 'attachment'])->whereNumber('attachment')->name('tasks.attachments.show');
     Route::post('/tasks/{task}/priority', [TaskController::class, 'priority'])->name('tasks.priority');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/builder', [ReportBuilderController::class, 'index'])->name('reports.builder');
+    Route::post('/reports/builder/preview', [ReportBuilderController::class, 'preview'])->middleware('throttle:120,1')->name('reports.builder.preview');
+    Route::post('/reports/saved', [ReportBuilderController::class, 'store'])->name('reports.saved.store');
+    Route::put('/reports/saved/{savedReport}', [ReportBuilderController::class, 'update'])->name('reports.saved.update');
+    Route::delete('/reports/saved/{savedReport}', [ReportBuilderController::class, 'destroy'])->name('reports.saved.destroy');
+    Route::patch('/reports/saved/{savedReport}/pin', [ReportBuilderController::class, 'pin'])->name('reports.saved.pin');
+    Route::get('/reports/saved/{savedReport}/data', [ReportBuilderController::class, 'data'])->name('reports.saved.data');
     Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
     Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');

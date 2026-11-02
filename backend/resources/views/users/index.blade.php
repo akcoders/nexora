@@ -1,8 +1,78 @@
 <x-app-layout>
-    <x-slot name="title">Users & Roles</x-slot><x-slot name="pageTitle">Users & permissions</x-slot><x-slot name="breadcrumb">Administration / Users</x-slot>
-    <div class="d-flex justify-content-between align-items-center mb-4"><div><h2 class="h5 mb-1">Team access</h2><div class="small text-secondary">Create employees and manage role-based access.</div></div><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal"><i data-lucide="user-plus" style="width:17px"></i> New user</button></div>
+    <x-slot name="title">User accounts</x-slot>
+    <x-slot name="pageTitle">User accounts</x-slot>
+    <x-slot name="breadcrumb">Administration / User accounts</x-slot>
+
+    <div class="nx-page-header">
+        <div><div class="nx-page-kicker">Administration</div><h2>Team access</h2><p>Login accounts, roles and access status. Employee details are managed from the employee master.</p></div>
+        <div class="nx-page-actions">
+            <a class="btn btn-light border" href="{{ route('roles.index') }}"><i data-lucide="shield-check"></i>Roles & permissions</a>
+            @can('users.create')<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal"><i data-lucide="user-plus"></i>New user</button>@endcan
+        </div>
+    </div>
     @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
-    <section class="nx-card overflow-hidden"><div class="table-responsive"><table class="table nx-table mb-0"><thead><tr><th class="ps-4">Employee</th><th>Contact</th><th>Department</th><th>Role</th><th>Status</th><th class="text-end pe-4">Manage</th></tr></thead><tbody>@foreach($users as $user)<tr><td class="ps-4"><div class="d-flex align-items-center gap-3"><span class="nx-avatar">{{ strtoupper(substr($user->name,0,1)) }}</span><div><div class="fw-semibold">{{ $user->name }}</div><small class="text-secondary">{{ $user->employee_code ?: 'No employee code' }}</small></div></div></td><td><div>{{ $user->email }}</div><small class="text-secondary">{{ $user->phone }}</small></td><td>{{ $user->department ?: '—' }}<small class="d-block text-secondary">{{ $user->designation }}</small></td><td><span class="badge badge-soft-primary">{{ $user->getRoleNames()->first() ?? 'Unassigned' }}</span></td><td><span class="badge rounded-pill {{ $user->status === 'active' ? 'badge-soft-success' : 'bg-light text-secondary' }}">{{ ucfirst($user->status) }}</span></td><td class="text-end pe-4"><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#manage{{ $user->id }}">Manage</button></td></tr>@endforeach</tbody></table></div>@if($users->hasPages())<div class="p-3">{{ $users->links() }}</div>@endif</section>
-    <div class="modal fade" id="userModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><form method="POST" action="{{ route('users.store') }}" class="modal-content">@csrf<div class="modal-header"><h5 class="modal-title">Create employee account</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3"><div class="col-md-6"><label class="form-label">Full name *</label><input class="form-control" name="name" required data-v="person_name" maxlength="255"></div><div class="col-md-6"><label class="form-label">Email *</label><input type="email" class="form-control" name="email" required></div><div class="col-md-4"><label class="form-label">Phone</label><input class="form-control" name="phone"></div><div class="col-md-4"><label class="form-label">Employee code</label><input class="form-control" name="employee_code" data-v="alpha_dash" maxlength="30"></div><div class="col-md-4"><label class="form-label">Role *</label><select class="form-select" name="role" required>@foreach($roles as $role)<option>{{ $role->name }}</option>@endforeach</select></div><div class="col-md-6"><label class="form-label">Department</label><input class="form-control" name="department" maxlength="100"></div><div class="col-md-6"><label class="form-label">Designation</label><input class="form-control" name="designation" maxlength="100"></div><div class="col-12"><label class="form-label">Temporary password *</label><input type="password" class="form-control" name="password" required minlength="8" autocomplete="new-password"></div></div></div><div class="modal-footer"><button class="btn btn-primary">Create user</button></div></form></div></div>
-    @foreach($users as $user)<div class="modal fade" id="manage{{ $user->id }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form method="POST" action="{{ route('users.update',$user) }}" class="modal-content">@csrf @method('PUT')<div class="modal-header"><div><h5 class="modal-title">Manage {{ $user->name }}</h5><small class="text-secondary">Role and access status</small></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">Role</label><select class="form-select mb-3" name="role" required>@foreach($roles as $role)<option @selected($user->hasRole($role))>{{ $role->name }}</option>@endforeach</select><label class="form-label">Account status</label><select class="form-select" name="status" required><option value="active" @selected($user->status==='active')>Active</option><option value="inactive" @selected($user->status==='inactive')>Inactive</option></select></div><div class="modal-footer"><button class="btn btn-primary">Save access</button></div></form></div></div>@endforeach
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-xl-3"><x-kpi label="Accounts" :value="$users->count()" icon="users-round" tone="primary" /></div>
+        <div class="col-6 col-xl-3"><x-kpi label="Active" :value="$users->where('status', 'active')->count()" icon="badge-check" tone="success" /></div>
+        <div class="col-6 col-xl-3"><x-kpi label="Inactive" :value="$users->where('status', '!=', 'active')->count()" icon="user-x" tone="secondary" /></div>
+        <div class="col-6 col-xl-3"><x-kpi label="Roles in use" :value="$users->flatMap->roles->pluck('name')->unique()->count()" icon="shield-check" tone="purple" /></div>
+    </div>
+
+    <section class="nx-card nx-datatable-card">
+        <table class="table nx-table" data-datatable data-dt-title="User accounts" data-dt-empty="No users yet.">
+            <thead><tr><th data-priority="1">Name</th><th>Employee code</th><th>Email</th><th>Phone</th><th>Department</th><th>Designation</th><th data-priority="2">Role</th><th>Status</th><th>Created</th><th class="no-export no-sort text-end" data-orderable="false"></th></tr></thead>
+            <tbody>
+                @foreach($users as $user)
+                    <tr>
+                        <td><div class="d-flex align-items-center gap-2"><span class="nx-avatar notranslate" style="width:32px;height:32px;font-size:12px">{{ strtoupper(substr($user->name, 0, 1)) }}</span><span class="nx-row-title notranslate">{{ $user->name }}</span></div></td>
+                        <td class="nx-code notranslate">{{ $user->employee_code ?: '—' }}</td>
+                        <td class="notranslate">{{ $user->email }}</td>
+                        <td class="notranslate">{{ $user->phone ?: '—' }}</td>
+                        <td>{{ $user->department ?: '—' }}</td>
+                        <td>{{ $user->designation ?: '—' }}</td>
+                        <td><span class="badge badge-soft-primary">{{ $user->getRoleNames()->first() ?? 'Unassigned' }}</span></td>
+                        <td><x-pill :tone="$user->status === 'active' ? 'success' : 'secondary'" :label="ucfirst($user->status)" /></td>
+                        <td data-order="{{ $user->created_at?->timestamp }}">{{ $user->created_at?->format('d M Y') }}</td>
+                        <td class="text-end">@can('users.update')<button class="btn btn-sm btn-light border" data-bs-toggle="modal" data-bs-target="#manageUserModal" data-manage-url="{{ route('users.update', $user) }}" data-manage-name="{{ $user->name }}" data-manage-role="{{ $user->getRoleNames()->first() }}" data-manage-status="{{ $user->status }}">Manage</button>@endcan</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </section>
+
+    @can('users.create')
+    <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalTitle"><div class="modal-dialog modal-lg modal-dialog-centered"><form method="POST" action="{{ route('users.store') }}" class="modal-content">@csrf
+        <div class="modal-header"><h5 class="modal-title" id="userModalTitle">Create user account</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Full name *</label><input class="form-control" name="name" value="{{ old('name') }}" required data-v="person_name" maxlength="255"></div>
+            <div class="col-md-6"><label class="form-label">Email *</label><input type="email" class="form-control" name="email" value="{{ old('email') }}" required></div>
+            <div class="col-md-4"><label class="form-label">Phone</label><input class="form-control" name="phone" value="{{ old('phone') }}"></div>
+            <div class="col-md-4"><label class="form-label">Employee code</label><input class="form-control" name="employee_code" value="{{ old('employee_code') }}" data-v="alpha_dash" maxlength="30"></div>
+            <div class="col-md-4"><label class="form-label">Role *</label><select class="form-select" name="role" required>@foreach($roles as $role)<option @selected(old('role') === $role->name)>{{ $role->name }}</option>@endforeach</select></div>
+            <div class="col-md-6"><label class="form-label">Department</label><input class="form-control" name="department" value="{{ old('department') }}" maxlength="100"></div>
+            <div class="col-md-6"><label class="form-label">Designation</label><input class="form-control" name="designation" value="{{ old('designation') }}" maxlength="100"></div>
+            <div class="col-12"><label class="form-label">Temporary password *</label><input type="password" class="form-control" name="password" required minlength="8" autocomplete="new-password"></div>
+        </div></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Create user</button></div>
+    </form></div></div>
+    @endcan
+
+    @can('users.update')
+    <div class="modal fade" id="manageUserModal" tabindex="-1" aria-labelledby="manageUserTitle"><div class="modal-dialog modal-dialog-centered"><form method="POST" action="#" class="modal-content" data-manage-form>@csrf @method('PUT')
+        <div class="modal-header"><div><h5 class="modal-title" id="manageUserTitle">Manage access</h5><small class="text-secondary notranslate" data-manage-label></small></div><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body"><label class="form-label">Role</label><select class="form-select mb-3" name="role" required data-manage-role-input>@foreach($roles as $role)<option>{{ $role->name }}</option>@endforeach</select><label class="form-label">Account status</label><select class="form-select" name="status" required data-manage-status-input><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save access</button></div>
+    </form></div></div>
+    @push('scripts')<script>
+        document.getElementById('manageUserModal')?.addEventListener('show.bs.modal', (event) => {
+            const trigger = event.relatedTarget, form = event.target.querySelector('[data-manage-form]');
+            if (!trigger || !form) return;
+            form.action = trigger.dataset.manageUrl;
+            form.querySelector('[data-manage-label]').textContent = trigger.dataset.manageName;
+            form.querySelector('[data-manage-role-input]').value = trigger.dataset.manageRole || form.querySelector('[data-manage-role-input]').value;
+            form.querySelector('[data-manage-status-input]').value = trigger.dataset.manageStatus === 'active' ? 'active' : 'inactive';
+        });
+    </script>@endpush
+    @endcan
 </x-app-layout>

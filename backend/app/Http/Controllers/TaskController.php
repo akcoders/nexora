@@ -6,7 +6,6 @@ use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\TaskActionRequest;
 use App\Http\Requests\UpdateTaskPriorityRequest;
 use App\Http\Resources\TaskBoardCardResource;
-use App\Models\Customer;
 use App\Models\Task;
 use App\Models\TaskAction;
 use App\Models\User;
@@ -17,7 +16,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -44,12 +42,12 @@ class TaskController extends Controller
                 ->orWhere('task_no', 'like', '%'.$request->string('search').'%')
                 ->orWhereHas('customer', fn ($query) => $query->where('name', 'like', '%'.$request->string('search').'%'))))
             ->orderByRaw("CASE WHEN status = 'closed' THEN 2 ELSE 1 END")
-            ->byUrgency()->orderByDesc('id')->paginate(20)->withQueryString();
+            ->byUrgency()->orderByDesc('id')->limit(2000)->get();
 
         return view('tasks.index', [
             'tasks' => $tasks, 'workType' => $workType,
             'users' => User::active()->orderBy('name')->get(),
-            'customers' => $workType === Task::TYPE_TICKET ? Customer::where('status', 'active')->orderBy('name')->get() : collect(),
+            'customers' => collect(),
             'openCount' => (clone $visibleTasks)->open()->count(),
             'closedCount' => (clone $visibleTasks)->closed()->count(),
             'overdueCount' => (clone $visibleTasks)->open()->where('due_at', '<', now())->count(),
@@ -84,7 +82,7 @@ class TaskController extends Controller
             return view('tasks.board', [
                 'workType' => $workType,
                 'users' => User::active()->orderBy('name')->get(),
-                'customers' => $workType === Task::TYPE_TICKET ? Customer::where('status', 'active')->orderBy('name')->get() : collect(),
+                'customers' => collect(),
             ]);
         }
         $user = $request->user();
@@ -152,17 +150,10 @@ class TaskController extends Controller
         return Storage::disk('local')->download($file['path'], $file['name']);
     }
 
+    /** Only internal workflows are managed here; customer complaints have their own register. */
     private function workType(Request $request): string
     {
-        if ($request->routeIs('complaints.*')) {
-            return Task::TYPE_TICKET;
-        }
-        if ($request->routeIs('workflows.*')) {
-            return Task::TYPE_WORKFLOW;
-        }
-        $request->validate(['type' => ['nullable', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])]]);
-
-        return $request->input('type', Task::TYPE_WORKFLOW) ?: Task::TYPE_WORKFLOW;
+        return Task::TYPE_WORKFLOW;
     }
 
     /** @return array<string, mixed> */

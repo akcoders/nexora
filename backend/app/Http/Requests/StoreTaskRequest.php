@@ -21,16 +21,7 @@ class StoreTaskRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->route('task') instanceof Task) {
-            $this->merge(['task_type' => Task::TYPE_WORKFLOW]);
-        } elseif ($this->routeIs('complaints.store')) {
-            $this->merge(['task_type' => Task::TYPE_TICKET]);
-        } elseif ($this->routeIs('workflows.store')) {
-            $this->merge(['task_type' => Task::TYPE_WORKFLOW]);
-        }
-        if ($this->input('task_type') === Task::TYPE_WORKFLOW) {
-            $this->merge(['category' => 'Internal']);
-        }
+        $this->merge(['task_type' => Task::TYPE_WORKFLOW, 'category' => 'Internal']);
     }
 
     public function messages(): array
@@ -42,13 +33,9 @@ class StoreTaskRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
-            'task_type' => ['required', Rule::in([Task::TYPE_WORKFLOW, Task::TYPE_TICKET])],
+            'task_type' => ['required', Rule::in([Task::TYPE_WORKFLOW])],
             'description' => ['nullable', 'string', 'max:5000'],
-            'customer_id' => [
-                Rule::requiredIf(fn (): bool => $this->input('task_type') === Task::TYPE_TICKET),
-                Rule::prohibitedIf(fn (): bool => $this->input('task_type') === Task::TYPE_WORKFLOW),
-                'nullable', 'exists:customers,id',
-            ],
+            'customer_id' => ['prohibited'],
             'category' => ['nullable', 'string', 'max:60'],
             'priority' => ['required', Rule::in(Task::PRIORITIES)],
             'due_at' => ['nullable', 'date', 'after_or_equal:today'],

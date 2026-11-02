@@ -6,7 +6,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ config('app.name', 'Nexora') }}</title>
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/css/theme.css', 'resources/js/app.js'])
     </head>
     <body>{{ $slot }}</body>
 </html>

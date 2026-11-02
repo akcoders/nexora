@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
 use App\Models\Premises;
 use App\Models\ProductCategory;
 use App\Models\ServiceChecklist;
@@ -55,11 +54,9 @@ class AdminOperationsTest extends TestCase
 
         $this->actingAs($admin)->post(route('tasks.store'), [
             'title' => 'Inspect VRV installation',
-            'task_type' => 'ticket',
+            'task_type' => 'workflow',
             'priority' => 'high',
             'assigned_to' => $technician->id,
-            'category' => 'Inspection',
-            'customer_id' => Customer::query()->firstOrFail()->id,
         ])->assertRedirect();
         $this->assertDatabaseHas('tasks', ['title' => 'Inspect VRV installation', 'assigned_to' => $technician->id]);
 

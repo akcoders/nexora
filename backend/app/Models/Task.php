@@ -16,8 +16,6 @@ class Task extends Model
 {
     use SoftDeletes;
 
-    public const TYPE_TICKET = 'ticket';
-
     public const TYPE_WORKFLOW = 'workflow';
 
     public const STATUS_CLOSED = 'closed';
@@ -105,10 +103,10 @@ class Task extends Model
         return $this->members()->where('role', 'observer');
     }
 
-    /** Internal workflows and customer tickets (excludes legacy task types). */
+    /** Internal workflows (customer complaints live in the complaint register). */
     public function scopeWorkItems(Builder $query): void
     {
-        $query->whereIn('task_type', [self::TYPE_WORKFLOW, self::TYPE_TICKET]);
+        $query->where('task_type', self::TYPE_WORKFLOW);
     }
 
     public function scopeOpen(Builder $query): void

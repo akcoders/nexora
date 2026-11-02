@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Attendance;
+use App\Models\Complaint;
 use App\Models\Customer;
+use App\Models\CustomerBranch;
 use App\Models\CustomerEquipment;
 use App\Models\CustomerGroup;
 use App\Models\DemoDataRecord;
@@ -21,6 +23,8 @@ use App\Models\ServiceJob;
 use App\Models\ServiceType;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\ComplaintOptions;
+use App\Services\ComplaintService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -206,30 +210,27 @@ class DemoDataSeeder extends Seeder
             ]);
 
             $taskAssignee = $case === 1 ? $primaryTechnician : $technician;
-            foreach (['workflow', 'ticket'] as $taskType) {
-                $taskNo = $taskType === 'workflow'
-                    ? 'WFLDEMO'.str_pad((string) $case, 4, '0', STR_PAD_LEFT)
-                    : ($case === 1 ? 'TSK000001' : 'TKTDEMO'.str_pad((string) $case, 4, '0', STR_PAD_LEFT));
-                $task = Task::withTrashed()->updateOrCreate(['task_no' => $taskNo], [
-                    'task_type' => $taskType,
-                    'title' => ($taskType === 'workflow' ? 'Internal workflow' : 'Customer ticket').' case '.$case.' · '.$complaints[$case - 1],
-                    'description' => 'Complete linked demo work with ownership, due date and activity history.',
-                    'customer_id' => $taskType === 'ticket' ? $customer->id : null,
-                    'category' => $taskType === 'workflow' ? 'Approval' : 'Customer Support',
-                    'priority' => $case % 3 === 0 ? 'very_high' : 'high',
-                    'due_at' => now()->addDays($case - 4),
-                    'created_by' => $admin->id,
-                    'assigned_to' => $taskAssignee->id,
-                    'status' => in_array($case, [4, 8], true) ? 'closed' : 'pending',
-                    'closed_at' => in_array($case, [4, 8], true) ? now()->subHours($case) : null,
-                    'deleted_at' => null,
-                ]);
-                $task->actions()->firstOrCreate(['action' => 'created'], ['user_id' => $admin->id, 'assigned_to' => $taskAssignee->id, 'remark' => 'Demo '.$taskType.' created and assigned.']);
-                if ($task->status === 'closed') {
-                    $task->actions()->firstOrCreate(['action' => 'close'], ['user_id' => $taskAssignee->id, 'remark' => 'Demo '.$taskType.' completed successfully.']);
-                }
-                $this->register($task, $scenarioKey);
+            $task = Task::withTrashed()->updateOrCreate(['task_no' => 'WFLDEMO'.str_pad((string) $case, 4, '0', STR_PAD_LEFT)], [
+                'task_type' => Task::TYPE_WORKFLOW,
+                'title' => 'Internal workflow case '.$case.' · '.$complaints[$case - 1],
+                'description' => 'Complete linked demo work with ownership, due date and activity history.',
+                'customer_id' => null,
+                'category' => 'Internal',
+                'priority' => $case % 3 === 0 ? 'very_high' : 'high',
+                'due_at' => now()->addDays($case - 4),
+                'created_by' => $admin->id,
+                'assigned_to' => $taskAssignee->id,
+                'status' => in_array($case, [4, 8], true) ? 'closed' : 'pending',
+                'closed_at' => in_array($case, [4, 8], true) ? now()->subHours($case) : null,
+                'deleted_at' => null,
+            ]);
+            $task->actions()->firstOrCreate(['action' => 'created'], ['user_id' => $admin->id, 'assigned_to' => $taskAssignee->id, 'remark' => 'Demo workflow created and assigned.']);
+            if ($task->status === 'closed') {
+                $task->actions()->firstOrCreate(['action' => 'close'], ['user_id' => $taskAssignee->id, 'remark' => 'Demo workflow completed successfully.']);
             }
+            $this->register($task, $scenarioKey);
+
+            $this->register($this->seedComplaint($case, $customer, $branch, $equipment, $taskAssignee, $admin, $complaints[$case - 1]), $scenarioKey);
 
             $attendance = Attendance::updateOrCreate([
                 'user_id' => $technician->id,
@@ -338,6 +339,122 @@ class DemoDataSeeder extends Seeder
                 $serviceJob->feedback()->updateOrCreate([], ['customer_id' => $customer->id, 'technician_id' => $technician->id, 'token' => Str::uuid(), 'rating' => 5, 'comments' => 'Excellent demo service experience.', 'issue_still_exists' => false, 'request_callback' => false, 'submitted_at' => now()]);
             }
         }
+    }
+
+    /**
+     * One demo complaint per scenario, each at a different stage of the complaint process.
+     */
+    private function seedComplaint(int $case, Customer $customer, CustomerBranch $branch, CustomerEquipment $equipment, User $technician, User $admin, string $nature): Complaint
+    {
+        $stages = [
+            1 => ['status' => 'open', 'type' => 'preventive', 'priority' => 'medium', 'days' => 0, 'visits' => 0],
+            2 => ['status' => 'scheduled', 'type' => 'breakdown', 'priority' => 'critical', 'days' => 0, 'visits' => 1],
+            3 => ['status' => 'in_progress', 'type' => 'site_visit', 'priority' => 'high', 'days' => 1, 'visits' => 1],
+            4 => ['status' => 'pending', 'type' => 'breakdown', 'priority' => 'high', 'days' => 6, 'visits' => 1, 'pending' => ['materials', 'Spare parts required', 'Compressor replacement', 'purchase', 'Arrange compressor from OEM', 0, 'material_shortage']],
+            5 => ['status' => 'pending', 'type' => 'breakdown', 'priority' => 'medium', 'days' => 12, 'visits' => 1, 'pending' => ['customer', 'Customer approval pending', null, 'customer', 'Follow up on quotation approval', -1, 'approval_delay']],
+            6 => ['status' => 'under_observation', 'type' => 'breakdown', 'priority' => 'medium', 'days' => 4, 'visits' => 2],
+            7 => ['status' => 'completed', 'type' => 'installation', 'priority' => 'low', 'days' => 3, 'visits' => 1],
+            8 => ['status' => 'closed', 'type' => 'breakdown', 'priority' => 'high', 'days' => 9, 'visits' => 2],
+            9 => ['status' => 'pending', 'type' => 'breakdown', 'priority' => 'critical', 'days' => 17, 'visits' => 2, 'pending' => ['technical', 'OEM support required', null, 'oem', 'Escalate to OEM service head', 1, 'technical_complexity']],
+            10 => ['status' => 'closed', 'type' => 'preventive', 'priority' => 'medium', 'days' => 20, 'visits' => 1],
+        ];
+        $stage = $stages[$case];
+        $closed = $stage['status'] === 'closed';
+        $registeredAt = now()->subDays($stage['days'])->setTime(10, $case);
+        $sla = ComplaintOptions::slaFor($stage['priority']);
+        $existing = Complaint::withTrashed()->where('description', 'like', 'Demo complaint case '.$case.' %')->first();
+        [$financialYear, $sequence, $number] = $existing
+            ? [$existing->financial_year, $existing->sequence, $existing->complaint_no]
+            : app(ComplaintService::class)->nextNumber($registeredAt);
+        $pending = $stage['pending'] ?? null;
+        $contract = in_array($case % 5, [1, 3], true);
+
+        $complaint = Complaint::withTrashed()->updateOrCreate(['complaint_no' => $number], [
+            'financial_year' => $financialYear, 'sequence' => $sequence, 'registered_at' => $registeredAt,
+            'customer_id' => $customer->id, 'customer_branch_id' => $branch->id, 'site_location' => $branch->name,
+            'address' => collect([$customer->address_line_1, $customer->city, $customer->state])->filter()->join(', '),
+            'contact_person' => 'Demo Contact '.$case, 'contact_no' => '920000'.str_pad((string) $case, 4, '0', STR_PAD_LEFT),
+            'complaint_given_by' => 'Demo Contact '.$case, 'call_taken_by' => $admin->id,
+            'call_mode' => ['phone', 'whatsapp', 'email', 'portal', 'amc_visit'][$case % 5],
+            'complaint_source' => ['customer', 'amc_pm', 'technician', 'architect', 'internal'][$case % 5],
+            'call_type' => $stage['type'], 'nature_of_complaint' => $nature, 'description' => 'Demo complaint case '.$case.' · '.$nature,
+            'priority' => $stage['priority'], 'sla_response_hours' => $sla['response'], 'sla_resolution_hours' => $sla['resolution'],
+            'response_due_at' => $registeredAt->copy()->addHours($sla['response']), 'resolution_due_at' => $registeredAt->copy()->addHours($sla['resolution']),
+            'first_response_at' => $stage['visits'] > 0 && $stage['status'] !== 'scheduled' ? $registeredAt->copy()->addHours(2) : null,
+            'unit_location' => $equipment->location, 'customer_equipment_id' => $equipment->id, 'equipment_tag' => $equipment->serial_no,
+            'equipment_type' => 'split', 'equipment_criticality' => $case % 4 === 0 ? 'critical' : 'normal', 'make' => $equipment->brand,
+            'model' => $equipment->model, 'capacity' => $equipment->capacity, 'serial_no' => $equipment->serial_no, 'refrigerant' => 'R32',
+            'compressor_type' => 'rotary', 'technology' => $case % 2 ? 'inverter' : 'non_inverter', 'power_supply' => 'single_phase',
+            'installation_date' => $equipment->installed_at, 'service_category' => ['warranty', 'amc', 'paid', 'company_amc', 'gsc'][$case % 5],
+            'contract_no' => $contract ? 'AMC-26/27-'.str_pad((string) $case, 3, '0', STR_PAD_LEFT) : null,
+            'contract_expiry' => $contract ? now()->addMonths(6)->toDateString() : null,
+            'status' => $stage['status'], 'assigned_to' => $stage['visits'] > 0 ? $technician->id : null,
+            'pending_group' => $pending[0] ?? null, 'pending_reason' => $pending[1] ?? null, 'pending_sub_reason' => $pending[2] ?? null,
+            'pending_owner' => $pending[3] ?? null, 'responsible_user_id' => $pending ? $admin->id : null,
+            'next_action' => $pending[4] ?? ($stage['status'] === 'under_observation' ? 'Check temperature log after 48 hours' : null),
+            'follow_up_date' => $pending ? now()->addDays($pending[5])->toDateString() : ($stage['status'] === 'under_observation' ? today()->toDateString() : null),
+            'target_date' => $pending ? now()->addDays(5)->toDateString() : null, 'delay_reason' => $pending[6] ?? null,
+            'pending_since' => $pending || $stage['status'] === 'under_observation' ? $registeredAt->copy()->addDay() : null,
+            'visit_charges' => $closed ? 500 : 0, 'labour_charges' => $closed ? 800 : 0, 'gst_percent' => 18,
+            'gst_amount' => $closed ? 234 : 0, 'total_amount' => $closed ? 1534 : 0, 'payment_status' => $closed ? 'paid' : 'not_applicable',
+            'fsr_checked' => $closed, 'fsr_checked_by' => $closed ? $admin->id : null, 'happy_call_required' => true,
+            'happy_call_at' => $closed ? now()->subDay() : null, 'happy_call_by' => $closed ? $admin->id : null,
+            'customer_feedback' => $closed ? 'Unit cooling well, technician was polite.' : null,
+            'customer_rating' => $closed ? 5 : null, 'team_rating' => $closed ? 4 : null,
+            'root_cause' => in_array($stage['status'], ['closed', 'completed'], true) ? 'Lack of maintenance' : null,
+            'complaint_category' => in_array($stage['status'], ['closed', 'completed'], true) ? 'Mechanical' : null,
+            'closed_at' => $closed ? now()->subDay() : null, 'closed_by' => $closed ? $admin->id : null, 'closure_approved_by' => $closed ? $admin->id : null,
+            'created_by' => $admin->id, 'updated_by' => $admin->id, 'deleted_at' => null,
+        ]);
+
+        $complaint->activities()->firstOrCreate(['type' => 'created'], ['user_id' => $admin->id, 'title' => 'Complaint registered', 'status_to' => 'open', 'created_at' => $registeredAt]);
+        for ($visitNo = 1; $visitNo <= $stage['visits']; $visitNo++) {
+            $isLast = $visitNo === $stage['visits'];
+            $visitStatus = match (true) {
+                ! $isLast => 'completed',
+                $stage['status'] === 'scheduled' => 'scheduled',
+                $stage['status'] === 'in_progress' => 'on_site',
+                default => 'completed',
+            };
+            $outcome = $visitStatus !== 'completed' ? null : (! $isLast ? 'pending' : match ($stage['status']) {
+                'pending' => 'pending',
+                'under_observation' => 'observation',
+                default => 'resolved',
+            });
+            $started = $visitStatus !== 'scheduled';
+            $done = $visitStatus === 'completed';
+            $at = $registeredAt->copy()->addDays($visitNo - 1)->addHours(3);
+            $visit = $complaint->visits()->updateOrCreate(['visit_no' => $visitNo], [
+                'status' => $visitStatus, 'reason_for_visit' => $visitNo === 1 ? 'Diagnosis' : 'Part replacement and testing',
+                'technician_id' => $technician->id, 'assigned_by' => $admin->id, 'assigned_at' => $at->copy()->subHours(2), 'assignment_method' => 'whatsapp',
+                'appointment_at' => $stage['status'] === 'scheduled' ? now()->addDay()->setTime(14, 0) : $at,
+                'special_instructions' => 'Call the customer 30 minutes before reaching site.',
+                'accepted_at' => $started ? $at->copy()->subHour() : null, 'en_route_at' => $started ? $at->copy()->subMinutes(40) : null,
+                'arrived_at' => $started ? $at : null, 'started_at' => $started ? $at->copy()->addMinutes(10) : null,
+                'ended_at' => $done ? $at->copy()->addHours(2) : null, 'travel_minutes' => $started ? 40 : null, 'labour_hours' => $done ? 1.83 : null,
+                'checks' => $done ? ['unit_checked_before' => 'yes', 'photo_taken' => 'yes', 'informed_customer' => 'yes', 'informed_back_office' => 'yes', 'unit_checked_after' => 'yes', 'equipment_working_normally' => $outcome === 'resolved' ? 'yes' : 'no', 'customer_confirmation' => 'yes'] : null,
+                'diagnosis' => $started ? ['suction_pressure' => 65 + $case, 'discharge_pressure' => 280 + $case, 'voltage' => 230, 'current' => 6.4, 'ambient_temp' => 34, 'idu_supply_temp' => 14, 'idu_return_temp' => 26, 'delta_t' => 12, 'compressor_condition' => $outcome === 'pending' ? 'faulty' : 'good', 'filter_condition' => 'poor'] : null,
+                'observation' => 'Unit checked as per standard procedure.',
+                'fault_category' => $outcome === 'pending' ? 'Refrigerant circuit' : 'Airflow',
+                'root_cause' => $outcome === 'resolved' ? 'Lack of maintenance' : ($outcome === 'pending' ? 'Compressor failure' : null),
+                'problem_diagnosis' => $done ? ($outcome === 'pending' ? 'Compressor drawing high current; needs replacement.' : 'Choked filters and low airflow.') : null,
+                'work_performed' => $done ? ($outcome === 'pending' ? 'Diagnosed fault, informed customer and back office.' : 'Cleaned filters and coils, tested cooling.') : null,
+                'final_result' => $done ? (in_array($outcome, ['resolved', 'observation'], true) ? 'working' : 'not_working') : null,
+                'outcome' => $outcome, 'customer_signed_name' => $done ? 'Demo Contact '.$case : null,
+                'customer_rating' => $done ? 4 : null, 'created_by' => $admin->id,
+            ]);
+            $complaint->activities()->firstOrCreate(['type' => 'visit_assigned', 'complaint_visit_id' => $visit->id], ['user_id' => $admin->id, 'title' => $visit->label().' assigned to '.$technician->name, 'created_at' => $at->copy()->subHours(2)]);
+            if ($outcome === 'pending' && $isLast) {
+                $complaint->parts()->updateOrCreate(['complaint_visit_id' => $visit->id, 'kind' => 'recommended'], [
+                    'part_name' => 'Rotary compressor', 'part_code' => 'CMP-R32-15', 'category' => 'Compressor', 'make' => $equipment->brand,
+                    'quantity' => 1, 'uom' => 'nos', 'part_type' => 'warranty', 'estimated_cost' => 9500, 'billable_rate' => 12500,
+                    'recommended_action' => 'Replace compressor', 'customer_approval_required' => true, 'customer_approval_status' => 'pending',
+                    'approval_status' => 'pending', 'purchase_status' => 'requested', 'estimated_days' => 4,
+                ]);
+            }
+        }
+
+        return $complaint;
     }
 
     private function register(Model $model, string $scenarioKey): void

@@ -1,5 +1,5 @@
 /**
- * Interactive Kanban board for internal workflows and customer tickets.
+ * Interactive Kanban board for internal workflows.
  *
  *   <section data-kanban data-feed-url="/tasks/board"> … <div data-board></div> </section>
  *
@@ -200,7 +200,6 @@ function init(root) {
     }
 
     function cardHtml(task) {
-        const isTicket = task.type === 'ticket';
         const locked = !canDrag(task);
         const classes = ['nx-kanban-card', `type-${task.type}`, `prio-${task.priority}`, task.parent ? 'is-subtask' : '', task.overdue ? 'is-overdue' : '', task.status === 'closed' ? 'is-closed' : '', locked ? 'is-locked' : ''].filter(Boolean).join(' ');
         const due = task.status === 'closed'
@@ -217,7 +216,7 @@ function init(root) {
         return `<article class="${classes}" data-id="${task.id}" aria-label="${esc(task.task_no)}: ${esc(task.title)}">
             <div class="nx-kc-top">
                 <span class="nx-kc-no">${esc(task.task_no)}</span>
-                <span class="badge rounded-pill ${isTicket ? 'badge-soft-info' : 'badge-soft-primary'}">${isTicket ? 'Complaint' : (task.parent ? 'Subtask' : 'Workflow')}</span>
+                <span class="badge rounded-pill badge-soft-primary">${task.parent ? 'Subtask' : 'Workflow'}</span>
                 ${task.status !== 'closed' ? `<span class="nx-kc-prio prio-${task.priority}">${esc(PRIORITY_LABEL[task.priority] ?? task.priority)}</span>` : ''}
                 <div class="dropdown ms-auto">
                     <button class="nx-kc-menu" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Actions for ${esc(task.task_no)}"><i data-lucide="ellipsis"></i></button>
@@ -225,7 +224,7 @@ function init(root) {
                 </div>
             </div>
             <a class="nx-kc-title" href="${esc(task.url)}">${esc(task.title)}</a>
-            <div class="nx-kc-meta"><i data-lucide="${isTicket ? 'building-2' : 'git-branch'}"></i><span>${esc(task.customer ?? 'Internal workflow')}</span></div>
+            <div class="nx-kc-meta"><i data-lucide="git-branch"></i><span>Internal workflow</span></div>
             ${task.parent ? `<a class="nx-parent-link small" href="${esc(task.parent.url)}"><i data-lucide="corner-down-right" style="width:14px"></i> ${esc(task.parent.task_no)}</a>` : ''}
             ${task.subtasks_count ? `<div class="small text-secondary">${task.completed_subtasks_count}/${task.subtasks_count} subtasks completed</div>` : ''}
             ${task.attachment_required_on_completion ? '<div class="small text-secondary"><i data-lucide="paperclip" style="width:13px"></i> Completion attachment required</div>' : ''}

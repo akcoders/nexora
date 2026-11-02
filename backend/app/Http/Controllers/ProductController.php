@@ -26,7 +26,7 @@ class ProductController extends Controller
                 ->where('name', 'like', '%'.$request->string('search').'%')
                 ->orWhere('code', 'like', '%'.$request->string('search').'%')
                 ->orWhere('brand', 'like', '%'.$request->string('search').'%')))
-            ->latest()->paginate(15)->withQueryString();
+            ->latest()->limit(5000)->get();
 
         return view('products.index', [
             'products' => $products,

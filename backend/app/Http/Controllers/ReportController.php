@@ -25,7 +25,7 @@ class ReportController extends Controller
         }
 
         return view('reports.index', [
-            'revisions' => $revisions->with(['task', 'user'])->latest('id')->paginate(25, ['*'], 'revisions_page')->withQueryString(),
+            'revisions' => $revisions->with(['task', 'user'])->latest('id')->limit(1000)->get(),
             'summary' => [
                 'customers' => Customer::count(),
                 'technicians' => User::whereHas('roles', fn ($query) => $query->where('name', 'Technician'))->count(),

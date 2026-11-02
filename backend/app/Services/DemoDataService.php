@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\Complaint;
+use App\Models\ComplaintVisit;
 use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\DemoDataRecord;
@@ -20,6 +22,7 @@ class DemoDataService
 {
     /** @var list<class-string<Model>> */
     private const DELETE_ORDER = [
+        Complaint::class,
         ServiceJob::class,
         Task::class,
         Attendance::class,
@@ -66,6 +69,7 @@ class DemoDataService
             'customers' => DemoDataRecord::where('model_type', Customer::class)->count(),
             'service_jobs' => DemoDataRecord::where('model_type', ServiceJob::class)->count(),
             'tasks' => DemoDataRecord::where('model_type', Task::class)->count(),
+            'complaints' => DemoDataRecord::where('model_type', Complaint::class)->count(),
             'technicians' => DemoDataRecord::where('model_type', User::class)->count(),
         ];
     }
@@ -82,6 +86,14 @@ class DemoDataService
                 ->orWhereIn('created_by', $demoUserIds)
                 ->orWhereIn('customer_id', $demoCustomerIds))
             ->forceDelete();
+
+        // Complaints for demo customers, and any visit a demo technician made, would block deleting them.
+        $deleted += Complaint::withTrashed()
+            ->where(fn ($query) => $query
+                ->whereIn('customer_id', $demoCustomerIds)
+                ->orWhereIn('created_by', $demoUserIds))
+            ->forceDelete();
+        $deleted += ComplaintVisit::query()->whereIn('technician_id', $demoUserIds)->delete();
 
         $deleted += Task::withTrashed()
             ->where(fn ($query) => $query

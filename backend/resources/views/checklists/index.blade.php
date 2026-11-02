@@ -3,32 +3,36 @@
     <x-slot name="pageTitle">Service checklists</x-slot>
     <x-slot name="breadcrumb">Masters / Checklists</x-slot>
 
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4"><div><h2 class="h5 mb-1">Product service checklists</h2><div class="small text-secondary">Standardise preventive maintenance and safety checks.</div></div><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checklistModal"><i data-lucide="plus" style="width:17px"></i>New checklist</button></div>
+    <div class="nx-page-header">
+        <div><div class="nx-page-kicker">Service & catalog</div><h2>Product service checklists</h2><p>Standardise preventive maintenance and safety checks used by technicians.</p></div>
+        @can('checklists.create')<div class="nx-page-actions"><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checklistModal"><i data-lucide="plus"></i>New checklist</button></div>@endcan
+    </div>
     @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
 
-    <div class="row g-3">
-        @forelse($checklists as $checklist)
-            <div class="col-md-6 col-xl-4">
-                <article class="nx-card p-4 h-100">
-                    <div class="d-flex justify-content-between gap-3">
-                        <span class="nx-metric-icon"><i data-lucide="clipboard-check"></i></span>
-                        <div class="d-flex gap-1">
-                            @can('checklists.update')<button class="btn btn-sm btn-link" type="button" data-bs-toggle="modal" data-bs-target="#editChecklist{{ $checklist->id }}" aria-label="Edit {{ $checklist->name }}"><i data-lucide="pencil" style="width:16px"></i></button>@endcan
-                            @can('checklists.delete')<form method="POST" action="{{ route('checklists.destroy', $checklist) }}" onsubmit="return confirm('Remove checklist?')">@csrf @method('DELETE')<button class="btn btn-sm btn-link text-danger" aria-label="Delete {{ $checklist->name }}"><i data-lucide="trash-2" style="width:16px"></i></button></form>@endcan
-                        </div>
-                    </div>
-                    <h3 class="h6 fw-bold mt-3 mb-1">{{ $checklist->name }}</h3>
-                    <div class="small text-secondary mb-3">{{ $checklist->serviceType?->name ?? $checklist->category?->name ?? 'All services' }}{{ $checklist->equipment_type ? ' · '.$checklist->equipment_type : '' }}</div>
-                    <div class="d-flex flex-wrap gap-2 mb-3"><span class="badge badge-soft-primary text-uppercase">{{ $checklist->phase }}</span><span class="badge badge-soft-primary">{{ $checklist->frequency ?: 'On demand' }}</span><span class="badge bg-light text-secondary">{{ $checklist->estimated_minutes ?: 0 }} min</span></div>
-                    <div class="small fw-semibold mb-2">{{ $checklist->items->count() }} checks</div>
-                    <ul class="small text-secondary ps-3 mb-0">@foreach($checklist->items->take(4) as $item)<li class="mb-1">{{ $item->label }} @if($item->photo_required)<span class="text-primary">· photo</span>@endif</li>@endforeach @if($checklist->items->count() > 4)<li>+ {{ $checklist->items->count()-4 }} more</li>@endif</ul>
-                </article>
-            </div>
-        @empty
-            <div class="col-12"><div class="nx-card text-center py-5 text-secondary">No service checklists created.</div></div>
-        @endforelse
-    </div>
-    <div class="mt-3">{{ $checklists->links() }}</div>
+    <section class="nx-card nx-datatable-card">
+        <table class="table nx-table" data-datatable data-dt-title="Service checklists" data-dt-empty="No service checklists created.">
+            <thead><tr><th data-priority="1">Checklist</th><th>Service / category</th><th>Equipment</th><th>Phase</th><th>Frequency</th><th>Duration</th><th>Checks</th><th>Sample items</th><th>Status</th><th class="no-export no-sort text-end" data-orderable="false"></th></tr></thead>
+            <tbody>
+                @foreach($checklists as $checklist)
+                    <tr>
+                        <td class="nx-row-title" style="min-width:180px">{{ $checklist->name }}</td>
+                        <td>{{ $checklist->serviceType?->name ?? $checklist->category?->name ?? 'All services' }}</td>
+                        <td>{{ $checklist->equipment_type ?: '—' }}</td>
+                        <td><span class="badge badge-soft-primary text-uppercase">{{ $checklist->phase }}</span></td>
+                        <td>{{ $checklist->frequency ?: 'On demand' }}</td>
+                        <td class="notranslate" data-order="{{ (int) $checklist->estimated_minutes }}">{{ $checklist->estimated_minutes ?: 0 }} min</td>
+                        <td class="notranslate">{{ $checklist->items->count() }}</td>
+                        <td style="min-width:220px"><span class="nx-row-sub text-body">{{ $checklist->items->take(3)->pluck('label')->join(' · ') }}{{ $checklist->items->count() > 3 ? ' …' : '' }}</span></td>
+                        <td><x-pill :tone="$checklist->active ? 'success' : 'secondary'" :label="$checklist->active ? 'Active' : 'Inactive'" /></td>
+                        <td class="text-end text-nowrap">
+                            @can('checklists.update')<button class="btn btn-sm btn-light border btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#editChecklist{{ $checklist->id }}" aria-label="Edit {{ $checklist->name }}" title="Edit"><i data-lucide="pencil"></i></button>@endcan
+                            @can('checklists.delete')<form class="d-inline" method="POST" action="{{ route('checklists.destroy', $checklist) }}" data-confirm="Remove the checklist “{{ $checklist->name }}”?">@csrf @method('DELETE')<button class="btn btn-sm btn-light border btn-icon text-danger" aria-label="Delete {{ $checklist->name }}" title="Delete"><i data-lucide="trash-2"></i></button></form>@endcan
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </section>
 
     <div class="modal fade" id="checklistModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">

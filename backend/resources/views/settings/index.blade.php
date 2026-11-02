@@ -37,6 +37,15 @@
                     </div>
                 </section>
                 <section class="nx-card p-4 mt-4">
+                    <div class="d-flex align-items-center gap-3 mb-4"><span class="nx-metric-icon"><i data-lucide="clipboard-list"></i></span><div><h2 class="h6 fw-bold mb-1">Complaint numbering</h2><div class="small text-secondary">Complaint numbers look like PREFIX/BRANCH/26-27/001 and restart every financial year (April).</div></div></div>
+                    @php $complaintExample = collect([strtoupper(old('complaint_prefix', $settings['complaint_prefix'] ?? 'CCSPL')), strtoupper(old('complaint_branch_code', $settings['complaint_branch_code'] ?? 'MUM')), \App\Services\ComplaintOptions::financialYear(), '001'])->filter()->join('/'); @endphp
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label">Company prefix</label><input class="form-control text-uppercase notranslate" name="complaint_prefix" value="{{ old('complaint_prefix', $settings['complaint_prefix'] ?? 'CCSPL') }}" maxlength="12" data-v="pattern:[A-Za-z0-9-]+"></div>
+                        <div class="col-md-4"><label class="form-label">Branch code</label><input class="form-control text-uppercase notranslate" name="complaint_branch_code" value="{{ old('complaint_branch_code', $settings['complaint_branch_code'] ?? 'MUM') }}" maxlength="12" data-v="pattern:[A-Za-z0-9-]+"></div>
+                        <div class="col-md-4"><label class="form-label">Next number looks like</label><input class="form-control notranslate" value="{{ $complaintExample }}" readonly></div>
+                    </div>
+                </section>
+                <section class="nx-card p-4 mt-4">
                     <div class="d-flex align-items-center gap-3 mb-4"><span class="nx-metric-icon"><i data-lucide="bell-ring"></i></span><div><h2 class="h6 fw-bold mb-1">OneSignal push notifications</h2><div class="small text-secondary">Mobile push credentials used for task, workflow, leave and expense alerts.</div></div></div>
                     <div class="row g-3"><div class="col-12"><label class="form-label">OneSignal App ID</label><input class="form-control" name="onesignal_app_id" value="{{ old('onesignal_app_id',$settings['onesignal_app_id']??'') }}" placeholder="00000000-0000-0000-0000-000000000000" data-v="uuid"></div><div class="col-12"><label class="form-label">REST API Key</label><input type="password" class="form-control" name="onesignal_rest_api_key" placeholder="{{ $hasOneSignalKey?'Stored securely — leave blank to keep':'Enter API key' }}" maxlength="500"><div class="form-text">The key is encrypted before storage.</div></div></div>
                 </section>

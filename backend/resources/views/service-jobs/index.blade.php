@@ -3,9 +3,9 @@
     <x-slot name="pageTitle">Service management</x-slot>
     <x-slot name="breadcrumb">Operations / Service Jobs</x-slot>
 
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div><h2 class="h5 mb-1">Field service jobs</h2><div class="small text-secondary">Track every visit from assignment through inspection, payment and completion.</div></div>
-        @can('create', App\Models\ServiceJob::class)<a href="{{ route('service-jobs.create') }}" class="btn btn-primary"><i data-lucide="plus" style="width:17px"></i>New service job</a>@endcan
+    <div class="nx-page-header">
+        <div><div class="nx-page-kicker">Service & catalog</div><h2>Field service jobs</h2><p>Mobile-app service jobs from assignment through inspection, payment and completion.</p></div>
+        @can('create', App\Models\ServiceJob::class)<div class="nx-page-actions"><a href="{{ route('service-jobs.create') }}" class="btn btn-primary"><i data-lucide="plus"></i>New service job</a></div>@endcan
     </div>
 
     @php
@@ -23,7 +23,7 @@
         @endforeach
     </div>
 
-    <section class="nx-card overflow-hidden">
+    <section class="nx-card nx-datatable-card">
         <form class="p-3 p-lg-4 border-bottom" method="GET">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-4"><label class="form-label">Search</label><input class="form-control" name="search" value="{{ request('search') }}" placeholder="Job no, customer or complaint"></div>
@@ -34,8 +34,8 @@
             </div>
         </form>
         <div class="table-responsive">
-            <table class="table nx-table align-middle mb-0">
-                <thead><tr><th class="ps-4">Job</th><th>Customer & complaint</th><th>Schedule</th><th>Technician</th><th>Status</th><th class="text-end pe-4">Action</th></tr></thead>
+            <table data-datatable data-dt-title="Service jobs" class="table nx-table align-middle mb-0">
+                <thead><tr><th class="ps-4">Job</th><th>Customer & complaint</th><th>Schedule</th><th>Technician</th><th>Status</th><th class="text-end pe-4 no-export no-sort" data-orderable="false">Action</th></tr></thead>
                 <tbody>
                     @forelse($jobs as $job)
                         @php
@@ -55,6 +55,6 @@
                 </tbody>
             </table>
         </div>
-        @if($jobs->hasPages())<div class="p-3 border-top">{{ $jobs->links() }}</div>@endif
+        
     </section>
 </x-app-layout>

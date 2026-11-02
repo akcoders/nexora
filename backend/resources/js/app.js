@@ -12,6 +12,7 @@ import './india-address.js';
 import './modal-flow.js';
 import './language-switcher.js';
 import './role-permissions.js';
+import './shell.js';
 import './task-controls.js';
 import './employee-details.js';
 
