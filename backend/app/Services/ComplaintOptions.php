@@ -44,6 +44,21 @@ class ComplaintOptions
         'observation' => ['label' => 'Under observation', 'tone' => 'purple', 'status' => 'under_observation'],
     ];
 
+    /**
+     * Yes / no checks on the visit report, answered before the service and after the repair.
+     *
+     * @var array<string, array{label: string, stage: string}>
+     */
+    public const VISIT_CHECKS = [
+        'unit_checked_before' => ['label' => 'Unit checked before service?', 'stage' => 'before'],
+        'photo_taken' => ['label' => 'Photograph taken?', 'stage' => 'before'],
+        'informed_customer' => ['label' => 'Informed the customer?', 'stage' => 'before'],
+        'informed_back_office' => ['label' => 'Informed the back office?', 'stage' => 'before'],
+        'unit_checked_after' => ['label' => 'Unit checked after repair / service?', 'stage' => 'after'],
+        'equipment_working_normally' => ['label' => 'Equipment working normally?', 'stage' => 'after'],
+        'customer_confirmation' => ['label' => 'Customer confirmation received?', 'stage' => 'after'],
+    ];
+
     /** @var array<string, array{label: string, response: int, resolution: int, tone: string}> SLA hours per priority */
     public const PRIORITIES = [
         'critical' => ['label' => 'Critical', 'response' => 2, 'resolution' => 24, 'tone' => 'danger'],

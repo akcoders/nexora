@@ -224,7 +224,7 @@ class _ServiceJobCard extends StatelessWidget {
                 job['customer']?['name']?.toString() ?? 'Customer',
                 style: const TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 5),
@@ -330,7 +330,7 @@ class _Pill extends StatelessWidget {
     ),
     child: Text(
       text.toUpperCase(),
-      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800),
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700),
     ),
   );
 }
@@ -358,7 +358,7 @@ class _ServiceEmpty extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(

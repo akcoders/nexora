@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Complaints;
 
+use App\Models\ComplaintVisit;
 use App\Services\ComplaintOptions;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -42,7 +43,7 @@ class ComplaintVisitReportRequest extends FormRequest
             'ended_at' => ['nullable', 'date', 'after_or_equal:started_at', 'before_or_equal:'.now()->addHour()->toDateTimeString()],
             'travel_minutes' => ['nullable', 'integer', 'between:0,1440'],
             'labour_hours' => ['nullable', 'numeric', 'between:0,200'],
-            'checks' => ['nullable', 'array:unit_checked_before,photo_taken,informed_customer,informed_back_office,unit_checked_after,equipment_working_normally,customer_confirmation'],
+            'checks' => ['nullable', 'array:'.implode(',', array_keys(ComplaintOptions::VISIT_CHECKS))],
             'checks.*' => ['nullable', $yesNo],
             'abnormality_found' => ['nullable', 'string', 'max:2000'],
             'diagnosis' => ['nullable', 'array:'.implode(',', array_keys(ComplaintOptions::DIAGNOSIS_FIELDS))],
@@ -93,6 +94,17 @@ class ComplaintVisitReportRequest extends FormRequest
         $bytes = base64_decode(substr($data, strlen('data:image/png;base64,')), true);
 
         return $bytes !== false && str_starts_with($bytes, "\x89PNG") ? $bytes : null;
+    }
+
+    /** Confirmation for the saved report, worded by the outcome chosen. */
+    public function resultMessage(ComplaintVisit $visit): string
+    {
+        return match ($this->input('outcome')) {
+            'resolved' => $visit->label().' completed. The complaint is ready for closure checks.',
+            'pending' => $visit->label().' completed. Complaint is pending: '.$this->input('pending.pending_reason').'.',
+            'observation' => $visit->label().' completed. Complaint is under observation.',
+            default => $visit->label().' progress saved.',
+        };
     }
 
     /** @return array<string, string> */

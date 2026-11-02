@@ -1,140 +1,204 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/config/app_info.dart';
+import '../../core/config/env.dart';
 import '../../core/i18n/app_language.dart';
+import '../../core/i18n/language_picker.dart';
 import '../../core/i18n/t.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/ui.dart';
 import '../auth/auth_controller.dart';
+import '../auth/sign_out.dart';
 import '../hr/hr_self_service_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key, required this.onOpenMenu});
+  const ProfileScreen({
+    super.key,
+    required this.onOpenMenu,
+    required this.onOpenHr,
+  });
 
   final VoidCallback onOpenMenu;
+  final Future<void> Function(int tab) onOpenHr;
+
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthController>();
-    final user = auth.user ?? {};
+    final user = context.watch<AuthController>().user ?? const {};
+    final language = context.watch<AppLanguageController>();
+    final profile = user['employee_profile'] is Map
+        ? Map<String, dynamic>.from(user['employee_profile'])
+        : const {};
+    final joined = DateTime.tryParse(
+      profile['date_of_joining']?.toString() ?? '',
+    );
+    final name = user['name']?.toString() ?? 'Technician';
+    final roles = List<dynamic>.from(
+      user['roles'] ?? [],
+    ).map((role) => role['name']).whereType<String>().join(', ');
+
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: onOpenMenu,
-          icon: const Icon(LucideIcons.menu),
-        ),
-        title: const T('Profile'),
+        leading: MenuButton(onPressed: onOpenMenu),
+        title: const T('My profile'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(22),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 34,
-                    backgroundColor: const Color(0xFFDBEAFE),
-                    child: Text(
-                      (user['name']?.toString() ?? 'T')
-                          .substring(0, 1)
-                          .toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user['name']?.toString() ?? 'Technician',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user['designation']?.toString() ?? 'HVAC Technician',
-                          style: const TextStyle(color: AppColors.muted),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user['employee_code']?.toString() ?? '',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
           Card(
             child: Column(
               children: [
-                _ProfileTile(
-                  icon: LucideIcons.briefcaseBusiness,
-                  title: 'My HR, leave & payroll',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const HrSelfServiceScreen(),
-                    ),
+                SizedBox(
+                  height: 104,
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 64,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppColors.navy, Color(0xFF1F3A6B)],
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: AppAvatar(name: name, size: 68),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const Divider(height: 1, indent: 62),
-                _ProfileTile(
-                  icon: LucideIcons.languages,
-                  title: 'App language',
-                  trailing: context.watch<AppLanguageController>().current.name,
-                  onTap: () => _pickLanguage(context),
-                ),
-                const Divider(height: 1, indent: 62),
-                const _ProfileTile(
-                  icon: LucideIcons.bell,
-                  title: 'Notification preferences',
-                ),
-                const Divider(height: 1, indent: 62),
-                const _ProfileTile(
-                  icon: Icons.info_outline,
-                  title: 'App version',
-                  trailing: '1.4.0',
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                  child: Column(
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.heading,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        user['designation']?.toString() ?? 'Employee',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (user['employee_code'] != null) ...[
+                        const SizedBox(height: 8),
+                        Pill(
+                          user['employee_code'].toString(),
+                          tone: Tone.primary,
+                          icon: LucideIcons.idCard,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'Employee details',
+            icon: LucideIcons.userRound,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Column(
+              children: [
+                InfoRow(label: 'Email', value: user['email']?.toString() ?? ''),
+                InfoRow(label: 'Phone', value: user['phone']?.toString() ?? ''),
+                InfoRow(
+                  label: 'Department',
+                  value: user['department']?.toString() ?? '',
+                ),
+                InfoRow(label: 'Role', value: roles),
+                InfoRow(
+                  label: 'Joining date',
+                  value: joined == null
+                      ? ''
+                      : DateFormat('d MMM yyyy').format(joined),
+                  last: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'HR & payroll',
+            icon: LucideIcons.briefcaseBusiness,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              children: [
+                _Tile(
+                  icon: LucideIcons.idCard,
+                  title: 'HR overview & leave balance',
+                  onTap: () => onOpenHr(HrTab.overview),
+                ),
+                _Tile(
+                  icon: LucideIcons.calendarPlus,
+                  title: 'Leave requests',
+                  onTap: () => onOpenHr(HrTab.leave),
+                ),
+                _Tile(
+                  icon: LucideIcons.receiptIndianRupee,
+                  title: 'Expense vouchers',
+                  onTap: () => onOpenHr(HrTab.vouchers),
+                ),
+                _Tile(
+                  icon: LucideIcons.walletCards,
+                  title: 'Salary slips',
+                  onTap: () => onOpenHr(HrTab.payslips),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            title: 'App settings',
+            icon: LucideIcons.settings,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              children: [
+                _Tile(
+                  icon: LucideIcons.languages,
+                  title: 'App language',
+                  trailing: language.current.name,
+                  onTap: () => showLanguagePicker(context),
+                ),
+                const _Tile(
+                  icon: LucideIcons.smartphone,
+                  title: 'App version',
+                  trailing: AppInfo.version,
+                ),
+                _Tile(
+                  icon: LucideIcons.server,
+                  title: 'Server',
+                  trailing: Uri.tryParse(Env.baseUrl)?.host ?? Env.baseUrl,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           OutlinedButton.icon(
-            onPressed: () async {
-              await auth.logout();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (_) => false,
-                );
-              }
-            },
+            onPressed: () => confirmAndSignOut(context),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.danger,
-              side: const BorderSide(color: Color(0xFFFECACA)),
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              side: const BorderSide(color: Color(0xFFF5C2C2)),
+              minimumSize: const Size.fromHeight(48),
             ),
-            icon: const Icon(LucideIcons.logOut),
+            icon: const Icon(LucideIcons.logOut, size: 18),
             label: const T('Sign out'),
           ),
         ],
@@ -143,106 +207,50 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-Future<void> _pickLanguage(BuildContext context) async {
-  final language = context.read<AppLanguageController>();
-  final chosen = await showModalBottomSheet<AppLanguage>(
-    context: context,
-    showDragHandle: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(22, 4, 22, 6),
-            child: Row(
-              children: [
-                Icon(LucideIcons.languages, color: AppColors.primary),
-                SizedBox(width: 10),
-                Expanded(
-                  child: T(
-                    'Choose app language',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(22, 0, 22, 10),
-            child: T(
-              'Only the languages set on your employee profile are available here.',
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
-          ),
-          Flexible(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                for (final option in language.known)
-                  ListTile(
-                    leading: Container(
-                      width: 42,
-                      height: 30,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE9FE),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        option.code.toUpperCase(),
-                        style: const TextStyle(
-                          color: Color(0xFF6D28D9),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      option.name,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    trailing: option.code == language.current.code
-                        ? const Icon(
-                            LucideIcons.check,
-                            color: AppColors.success,
-                          )
-                        : null,
-                    onTap: () => Navigator.pop(sheetContext, option),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
-  );
-  if (chosen != null) {
-    await language.select(chosen);
-  }
-}
-
-class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({
+class _Tile extends StatelessWidget {
+  const _Tile({
     required this.icon,
     required this.title,
     this.trailing,
     this.onTap,
   });
+
   final IconData icon;
   final String title;
   final String? trailing;
   final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) => ListTile(
     onTap: onTap,
-    leading: Icon(icon, color: AppColors.primary),
-    title: T(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-    trailing: trailing == null
-        ? const Icon(Icons.chevron_right)
-        : Text(trailing!, style: const TextStyle(color: AppColors.muted)),
+    dense: true,
+    visualDensity: const VisualDensity(vertical: -1),
+    leading: Icon(icon, size: 19, color: AppColors.primary),
+    title: T(
+      title,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: AppColors.ink,
+      ),
+    ),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: const TextStyle(color: AppColors.muted, fontSize: 13),
+          ),
+        if (onTap != null) ...[
+          const SizedBox(width: 4),
+          const Icon(
+            LucideIcons.chevronRight,
+            size: 17,
+            color: AppColors.subtle,
+          ),
+        ],
+      ],
+    ),
   );
 }

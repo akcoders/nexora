@@ -1,27 +1,31 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/i18n/t.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/ui.dart';
 import '../auth/auth_controller.dart';
+import '../complaints/complaint_visit_screen.dart';
+import '../hr/hr_self_service_screen.dart';
 import '../service_jobs/service_job_detail_screen.dart';
-import '../service_jobs/service_jobs_screen.dart';
-import '../../core/i18n/t.dart';
+import '../tasks/tasks_screen.dart';
+import 'app_shell.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.onNavigate,
     required this.onOpenMenu,
+    required this.onOpenHr,
     required this.refreshKey,
   });
 
-  final ValueChanged<int> onNavigate;
+  final void Function(int page, {int? tab}) onNavigate;
   final VoidCallback onOpenMenu;
+  final Future<void> Function(int tab) onOpenHr;
   final int refreshKey;
 
   @override
@@ -29,12 +33,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const closedJobStatuses = {
+    'completed',
+    'cancelled',
+    'customer_declined',
+  };
+
   Map<String, dynamic>? today;
-  List<dynamic> activeTasks = [];
-  List<dynamic> todayServiceJobs = [];
-  int closedCount = 0;
+  List<dynamic> workflow = [];
+  List<dynamic> todayJobs = [];
+  List<dynamic> openJobs = [];
+  List<dynamic> visits = [];
   bool loading = true;
-  bool checkingOut = false;
+  bool failed = false;
 
   @override
   void initState() {
@@ -48,568 +59,640 @@ class _HomeScreenState extends State<HomeScreen> {
     if (oldWidget.refreshKey != widget.refreshKey) load();
   }
 
+  /// Each block loads on its own so one failing endpoint never blanks the dashboard.
   Future<void> load() async {
     if (mounted) setState(() => loading = true);
-    try {
-      final api = context.read<ApiClient>().dio;
-      final responses = await Future.wait([
-        api.get('attendance/today'),
-        api.get('tasks', queryParameters: {'scope': 'open'}),
-        api.get('tasks', queryParameters: {'status': 'closed'}),
-        api.get('service-jobs', queryParameters: {'scope': 'today'}),
-      ]);
-      today = responses[0].data['attendance'];
-      activeTasks = List<dynamic>.from(responses[1].data['data'] ?? []);
-      closedCount =
-          (responses[2].data['total'] as num?)?.toInt() ??
-          List<dynamic>.from(responses[2].data['data'] ?? []).length;
-      todayServiceJobs = List<dynamic>.from(responses[3].data['data'] ?? []);
-    } catch (_) {
-      // Keep the dashboard usable and allow a manual refresh.
-    }
-    if (mounted) setState(() => loading = false);
-  }
-
-  Future<Position> _locate() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      throw Exception('Turn on location services to check out.');
-    }
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      throw Exception('Location permission is required to check out.');
-    }
-    return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
-  }
-
-  Future<void> checkOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(LucideIcons.logOut, color: AppColors.danger),
-        title: const T('Confirm checkout'),
-        content: const T(
-          'Your current location and checkout time will be recorded. Continue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const T('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const T('Check out'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
     final api = context.read<ApiClient>().dio;
-    setState(() => checkingOut = true);
-    try {
-      final position = await _locate();
-      final response = await api.post(
-        'attendance/check-out',
-        data: {'latitude': position.latitude, 'longitude': position.longitude},
-      );
-      today = Map<String, dynamic>.from(response.data['attendance']);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: T('Checkout recorded successfully.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+    var failures = 0;
+    Future<R?> fetch<R>(Future<R> Function() request) async {
+      try {
+        return await request();
+      } catch (_) {
+        failures++;
+        return null;
       }
-    } on DioException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.response?.data?['message']?.toString() ??
-                  'Unable to check out.',
-            ),
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => checkingOut = false);
     }
+
+    final results = await Future.wait([
+      fetch(() => api.get('attendance/today')),
+      fetch(
+        () => api.get(
+          'tasks',
+          queryParameters: {'scope': 'open', 'type': 'workflow'},
+        ),
+      ),
+      fetch(() => api.get('service-jobs', queryParameters: {'scope': 'today'})),
+      fetch(() => api.get('service-jobs')),
+      fetch(
+        () => api.get('complaint-visits', queryParameters: {'scope': 'open'}),
+      ),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      if (results[0] != null) today = results[0]!.data['attendance'];
+      if (results[1] != null) {
+        workflow = List<dynamic>.from(results[1]!.data['data'] ?? []);
+      }
+      if (results[2] != null) {
+        todayJobs = List<dynamic>.from(results[2]!.data['data'] ?? []);
+      }
+      if (results[3] != null) {
+        openJobs = List<dynamic>.from(
+          results[3]!.data['data'] ?? [],
+        ).where((job) => !closedJobStatuses.contains(job['status'])).toList();
+      }
+      if (results[4] != null) {
+        visits = List<dynamic>.from(results[4]!.data['data'] ?? []);
+      }
+      failed = failures == results.length;
+      loading = false;
+    });
   }
+
+  Future<void> openPage(Widget page) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+    await load();
+  }
+
+  int get overdueCount => workflow.where((task) {
+    final due = DateTime.tryParse(task['due_at']?.toString() ?? '');
+    return due != null && due.isBefore(DateTime.now());
+  }).length;
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user;
-    final firstName = (user?['name']?.toString() ?? 'Technician')
-        .split(' ')
-        .first;
-    final hasCheckedIn = today != null;
-    final hasCheckedOut = today?['checked_out_at'] != null;
-    final priorityTask = activeTasks.isEmpty
-        ? null
-        : Map<String, dynamic>.from(activeTasks.first);
-    final cardColors = hasCheckedIn
-        ? const [Color(0xFF166534), Color(0xFF16A34A), Color(0xFF22C55E)]
-        : const [Color(0xFF1E3A8A), AppColors.primary, AppColors.secondary];
+    final user = context.watch<AuthController>().user ?? const {};
+    final name = user['name']?.toString() ?? 'Technician';
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good morning'
+        : hour < 17
+        ? 'Good afternoon'
+        : 'Good evening';
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: widget.onOpenMenu,
-          icon: const Icon(LucideIcons.menu),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Good ${DateTime.now().hour < 12 ? 'morning' : 'afternoon'}, $firstName',
-              style: const TextStyle(fontSize: 19),
-            ),
-            Text(
-              DateFormat('EEEE, d MMMM').format(DateTime.now()),
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
+        leading: MenuButton(onPressed: widget.onOpenMenu),
+        title: const T('Dashboard'),
         actions: [
-          IconButton(onPressed: load, icon: const Icon(LucideIcons.refreshCw)),
-          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => widget.onNavigate(AppPage.alerts),
+            icon: const Icon(LucideIcons.bell),
+          ),
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: loading ? null : load,
+            icon: const Icon(LucideIcons.refreshCw),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 350),
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: cardColors),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: cardColors[1].withValues(alpha: .24),
-                    blurRadius: 25,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(LucideIcons.mapPin, color: Colors.white70, size: 18),
-                      SizedBox(width: 7),
-                      T(
-                        'TODAY\'S ATTENDANCE',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          letterSpacing: 1.2,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    !hasCheckedIn
-                        ? 'Not checked in yet'
-                        : hasCheckedOut
-                        ? 'Shift completed'
-                        : 'You are checked in',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    !hasCheckedIn
-                        ? 'Mark attendance before starting field work'
-                        : hasCheckedOut
-                        ? '${_time(today?['checked_in_at'])} – ${_time(today?['checked_out_at'])}'
-                        : 'Checked in at ${_time(today?['checked_in_at'])}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 20),
-                  if (loading)
-                    const LinearProgressIndicator(color: Colors.white)
-                  else if (!hasCheckedIn)
-                    FilledButton.icon(
-                      onPressed: () => widget.onNavigate(2),
-                      style: _whiteButton(AppColors.primary),
-                      icon: const Icon(LucideIcons.camera, size: 18),
-                      label: const T('Check in now'),
-                    )
-                  else if (!hasCheckedOut)
-                    FilledButton.icon(
-                      onPressed: () => widget.onNavigate(2),
-                      style: _whiteButton(const Color(0xFF15803D)),
-                      icon: const Icon(LucideIcons.camera, size: 18),
-                      label: const T('Selfie & check out'),
-                    ),
-                ],
-              ),
+            _WelcomePanel(
+              greeting: greeting,
+              name: name,
+              designation: user['designation']?.toString(),
+              attendance: today,
+              loading: loading && today == null,
+              onAttendance: () => widget.onNavigate(AppPage.attendance),
             ),
-            const SizedBox(height: 24),
-            T(
-              'Today at a glance',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            Row(
+            if (failed) ...[
+              const SizedBox(height: 14),
+              const NoticeBox(
+                'Could not reach the server. Pull down to try again.',
+                icon: LucideIcons.cloudOff,
+              ),
+            ],
+            const SizedBox(height: 16),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.25,
               children: [
-                Expanded(
-                  child: _MetricCard(
-                    label: 'Active',
-                    value: activeTasks.length.toString(),
-                    icon: LucideIcons.clock3,
-                    color: AppColors.warning,
-                    soft: const Color(0xFFFFF7E6),
-                  ),
+                KpiTile(
+                  label: "Today's jobs",
+                  value: '${todayJobs.length}',
+                  icon: LucideIcons.wrench,
+                  onTap: () =>
+                      widget.onNavigate(AppPage.work, tab: WorkTab.jobs),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _MetricCard(
-                    label: 'Completed',
-                    value: closedCount.toString(),
-                    icon: LucideIcons.checkCircle2,
-                    color: AppColors.success,
-                    soft: const Color(0xFFEAF8EF),
-                  ),
+                KpiTile(
+                  label: 'Complaint visits',
+                  value: '${visits.length}',
+                  icon: LucideIcons.clipboardList,
+                  tone: Tone.purple,
+                  onTap: () =>
+                      widget.onNavigate(AppPage.work, tab: WorkTab.complaints),
+                ),
+                KpiTile(
+                  label: 'Pending workflow',
+                  value: '${workflow.length}',
+                  icon: LucideIcons.gitBranch,
+                  tone: Tone.warning,
+                  onTap: () =>
+                      widget.onNavigate(AppPage.work, tab: WorkTab.workflow),
+                ),
+                KpiTile(
+                  label: 'Overdue workflow',
+                  value: '$overdueCount',
+                  icon: LucideIcons.alarmClock,
+                  tone: overdueCount > 0 ? Tone.danger : Tone.success,
+                  onTap: () =>
+                      widget.onNavigate(AppPage.work, tab: WorkTab.workflow),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SectionLabel('Quick actions'),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                T(
-                  'Today’s service visits',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                _QuickAction(
+                  icon: LucideIcons.scanFace,
+                  label: 'Attendance',
+                  tone: Tone.success,
+                  onTap: () => widget.onNavigate(AppPage.attendance),
                 ),
-                TextButton(
-                  onPressed: () async {
-                    await Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ServiceJobsScreen(),
-                      ),
-                    );
-                    await load();
-                  },
-                  child: Text(
-                    todayServiceJobs.isEmpty
-                        ? 'View jobs'
-                        : '${todayServiceJobs.length} jobs',
-                  ),
+                _QuickAction(
+                  icon: LucideIcons.calendarPlus,
+                  label: 'Apply leave',
+                  tone: Tone.primary,
+                  onTap: () => widget.onOpenHr(HrTab.leave),
+                ),
+                _QuickAction(
+                  icon: LucideIcons.receiptIndianRupee,
+                  label: 'Expense',
+                  tone: Tone.orange,
+                  onTap: () => widget.onOpenHr(HrTab.vouchers),
+                ),
+                _QuickAction(
+                  icon: LucideIcons.walletCards,
+                  label: 'Payslips',
+                  tone: Tone.info,
+                  onTap: () => widget.onOpenHr(HrTab.payslips),
                 ),
               ],
             ),
-            if (todayServiceJobs.isEmpty)
-              Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () async {
-                    await Navigator.push<void>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ServiceJobsScreen(),
-                      ),
-                    );
-                    await load();
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.all(18),
-                    child: Row(
-                      children: [
-                        Icon(
-                          LucideIcons.briefcaseBusiness,
-                          color: AppColors.primary,
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: T(
-                            'No service visit scheduled today. Open all assigned jobs.',
-                            style: TextStyle(color: AppColors.muted),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, color: AppColors.primary),
-                      ],
-                    ),
-                  ),
-                ),
+            SectionLabel(
+              "Today's service visits",
+              action: 'All jobs',
+              onAction: () =>
+                  widget.onNavigate(AppPage.work, tab: WorkTab.jobs),
+            ),
+            if (todayJobs.isEmpty)
+              _EmptyCard(
+                icon: LucideIcons.calendarCheck2,
+                message: openJobs.isEmpty
+                    ? 'No service visit scheduled today.'
+                    : 'No visit today · ${openJobs.length} open job${openJobs.length == 1 ? '' : 's'} assigned',
               )
             else
-              _TodayServiceJob(
-                job: Map<String, dynamic>.from(todayServiceJobs.first),
-                remaining: todayServiceJobs.length - 1,
-                onTap: () async {
-                  await Navigator.push<void>(
+              ...todayJobs.take(3).map((raw) {
+                final job = Map<String, dynamic>.from(raw);
+                final scheduled = DateTime.tryParse(
+                  job['scheduled_at']?.toString() ?? '',
+                )?.toLocal();
+                return _WorkRow(
+                  icon: LucideIcons.airVent,
+                  tone: Tone.primary,
+                  title: job['customer']?['name']?.toString() ?? 'Customer',
+                  subtitle:
+                      job['complaint']?.toString() ??
+                      job['service_type']?['name']?.toString() ??
+                      'Service visit',
+                  meta: [
+                    job['job_no']?.toString(),
+                    if (scheduled != null)
+                      DateFormat('hh:mm a').format(scheduled),
+                  ].whereType<String>().join(' · '),
+                  pill: job['status_label']?.toString(),
+                  onTap: () => openPage(
+                    ServiceJobDetailScreen(serviceJobId: job['id'] as int),
+                  ),
+                );
+              }),
+            SectionLabel(
+              'Complaint visits',
+              action: 'View all',
+              onAction: () =>
+                  widget.onNavigate(AppPage.work, tab: WorkTab.complaints),
+            ),
+            if (visits.isEmpty)
+              const _EmptyCard(
+                icon: LucideIcons.clipboardCheck,
+                message: 'No open complaint visit assigned to you.',
+              )
+            else
+              ...visits.take(3).map((raw) {
+                final visit = Map<String, dynamic>.from(raw);
+                final complaint = Map<String, dynamic>.from(
+                  visit['complaint'] ?? {},
+                );
+                final appointment = DateTime.tryParse(
+                  visit['appointment_at']?.toString() ?? '',
+                )?.toLocal();
+                return _WorkRow(
+                  icon: LucideIcons.clipboardList,
+                  tone: Tone.purple,
+                  title: complaint['customer_name']?.toString() ?? 'Customer',
+                  subtitle:
+                      complaint['nature_of_complaint']?.toString() ??
+                      'Complaint visit',
+                  meta: [
+                    '${complaint['complaint_no'] ?? ''} ${visit['label'] ?? ''}'
+                        .trim(),
+                    if (appointment != null)
+                      DateFormat('d MMM, hh:mm a').format(appointment),
+                  ].where((value) => value.isNotEmpty).join(' · '),
+                  pill: visit['status_label']?.toString(),
+                  onTap: () => openPage(
+                    ComplaintVisitScreen(visitId: visit['id'] as int),
+                  ),
+                );
+              }),
+            SectionLabel(
+              'Priority workflow',
+              action: 'View all',
+              onAction: () =>
+                  widget.onNavigate(AppPage.work, tab: WorkTab.workflow),
+            ),
+            if (workflow.isEmpty)
+              const _EmptyCard(
+                icon: LucideIcons.partyPopper,
+                message: 'No pending workflow. You are all caught up.',
+              )
+            else
+              ...workflow.take(2).map((raw) {
+                final task = Map<String, dynamic>.from(raw);
+                final due = DateTime.tryParse(
+                  task['due_at']?.toString() ?? '',
+                )?.toLocal();
+                final overdue = due != null && due.isBefore(DateTime.now());
+                return _WorkRow(
+                  icon: LucideIcons.gitBranch,
+                  tone: overdue ? Tone.danger : Tone.warning,
+                  title: task['title']?.toString() ?? 'Untitled task',
+                  subtitle:
+                      task['customer']?['name']?.toString() ??
+                      'Internal workflow',
+                  meta: [
+                    task['task_no']?.toString(),
+                    if (due != null)
+                      'Due ${DateFormat('d MMM, hh:mm a').format(due)}',
+                  ].whereType<String>().join(' · '),
+                  pill: overdue
+                      ? 'Overdue'
+                      : (task['priority']?.toString() ?? 'normal').replaceAll(
+                          '_',
+                          ' ',
+                        ),
+                  pillTone: overdue ? Tone.danger : Tone.warning,
+                  onTap: () => showTaskDetails(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => ServiceJobDetailScreen(
-                        serviceJobId: todayServiceJobs.first['id'] as int,
-                      ),
-                    ),
-                  );
-                  await load();
-                },
-              ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                T(
-                  'Priority task',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    task['id'] as int,
+                    onUpdated: load,
                   ),
-                ),
-                TextButton(
-                  onPressed: () => widget.onNavigate(1),
-                  child: const T('View all'),
-                ),
-              ],
-            ),
-            if (priorityTask == null)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(22),
-                  child: T(
-                    'No active tasks. You are all caught up.',
-                    style: TextStyle(color: AppColors.muted),
-                  ),
-                ),
-              )
-            else
-              _PriorityTask(
-                task: priorityTask,
-                onTap: () => widget.onNavigate(1),
-              ),
+                );
+              }),
           ],
         ),
       ),
     );
   }
+}
 
-  ButtonStyle _whiteButton(Color foreground) => FilledButton.styleFrom(
-    backgroundColor: Colors.white,
-    foregroundColor: foreground,
-    minimumSize: const Size(0, 45),
-    padding: const EdgeInsets.symmetric(horizontal: 18),
-  );
+class _WelcomePanel extends StatelessWidget {
+  const _WelcomePanel({
+    required this.greeting,
+    required this.name,
+    required this.designation,
+    required this.attendance,
+    required this.loading,
+    required this.onAttendance,
+  });
+
+  final String greeting;
+  final String name;
+  final String? designation;
+  final Map<String, dynamic>? attendance;
+  final bool loading;
+  final VoidCallback onAttendance;
 
   static String _time(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '');
     return date == null ? '—' : DateFormat('hh:mm a').format(date.toLocal());
   }
-}
-
-class _TodayServiceJob extends StatelessWidget {
-  const _TodayServiceJob({
-    required this.job,
-    required this.remaining,
-    required this.onTap,
-  });
-
-  final Map<String, dynamic> job;
-  final int remaining;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheduledAt = DateTime.tryParse(
-      job['scheduled_at']?.toString() ?? '',
-    )?.toLocal();
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  LucideIcons.airVent,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      job['customer']?['name']?.toString() ?? 'Customer',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      scheduledAt == null
-                          ? job['status_label']?.toString() ?? 'Assigned'
-                          : '${DateFormat('hh:mm a').format(scheduledAt)} · ${job['status_label'] ?? 'Assigned'}',
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (remaining > 0) ...[
-                      const SizedBox(height: 4),
+    final checkedIn = attendance != null;
+    final checkedOut = attendance?['checked_out_at'] != null;
+    final statusTitle = !checkedIn
+        ? 'Not checked in yet'
+        : checkedOut
+        ? 'Shift completed'
+        : 'You are on duty';
+    final statusText = !checkedIn
+        ? 'Mark attendance before starting field work'
+        : checkedOut
+        ? '${_time(attendance?['checked_in_at'])} – ${_time(attendance?['checked_out_at'])}'
+        : 'Checked in at ${_time(attendance?['checked_in_at'])}';
+    final statusColor = !checkedIn
+        ? const Color(0xFFFBBF24)
+        : checkedOut
+        ? AppColors.navyText
+        : const Color(0xFF4ADE80);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.navy, AppColors.navy2, Color(0xFF1F3A6B)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Row(
+              children: [
+                AppAvatar(name: name, size: 46, dark: true),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '+$remaining more visit${remaining == 1 ? '' : 's'} today',
+                        '$greeting, ${name.split(' ').first}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 11,
+                          color: Colors.white,
+                          fontSize: 17,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${DateFormat('EEEE, d MMMM').format(DateTime.now())}${designation == null ? '' : ' · $designation'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.navyText,
+                          fontSize: 12.5,
+                        ),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.primary),
-            ],
+              ],
+            ),
           ),
-        ),
+          Container(
+            margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: Colors.white.withValues(alpha: .08)),
+            ),
+            child: loading
+                ? const LinearProgressIndicator(
+                    color: Colors.white,
+                    backgroundColor: Colors.white24,
+                  )
+                : Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            T(
+                              statusTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              statusText,
+                              style: const TextStyle(
+                                color: AppColors.navyText,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!checkedOut)
+                        FilledButton.icon(
+                          onPressed: onAttendance,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.navy,
+                            minimumSize: const Size(0, 38),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                          ),
+                          icon: Icon(
+                            checkedIn ? LucideIcons.logOut : LucideIcons.camera,
+                            size: 16,
+                          ),
+                          label: T(checkedIn ? 'Check out' : 'Check in'),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _PriorityTask extends StatelessWidget {
-  const _PriorityTask({required this.task, required this.onTap});
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.tone,
+    required this.onTap,
+  });
 
-  final Map<String, dynamic> task;
+  final IconData icon;
+  final String label;
+  final Tone tone;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget build(BuildContext context) => Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Card(
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+            child: Column(
               children: [
-                Badge(
-                  label: Text(
-                    (task['priority']?.toString() ?? 'normal').toUpperCase(),
+                IconTile(icon, tone: tone, size: 40),
+                const SizedBox(height: 8),
+                T(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
                   ),
-                  backgroundColor: AppColors.warning,
-                  textColor: Colors.white,
-                ),
-                const SizedBox(width: 8),
-                Badge(
-                  label: Text(
-                    task['task_type'] == 'ticket' ? 'TICKET' : 'WORKFLOW',
-                  ),
-                  backgroundColor: task['task_type'] == 'ticket'
-                      ? AppColors.secondary
-                      : AppColors.primary,
-                  textColor: Colors.white,
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            Text(
-              task['title']?.toString() ?? 'Untitled task',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              task['customer']?['name']?.toString() ?? 'Internal workflow',
-              style: const TextStyle(color: AppColors.muted),
-            ),
-          ],
+          ),
         ),
       ),
     ),
   );
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
+class _WorkRow extends StatelessWidget {
+  const _WorkRow({
     required this.icon,
-    required this.color,
-    required this.soft,
+    required this.tone,
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+    required this.onTap,
+    this.pill,
+    this.pillTone,
   });
-  final String label;
-  final String value;
+
   final IconData icon;
-  final Color color;
-  final Color soft;
+  final Tone tone;
+  final String title;
+  final String subtitle;
+  final String meta;
+  final String? pill;
+  final Tone? pillTone;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              IconTile(icon, tone: tone, size: 42),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: AppColors.heading,
+                            ),
+                          ),
+                        ),
+                        if (pill != null) ...[
+                          const SizedBox(width: 8),
+                          Pill(pill!, tone: pillTone ?? tone),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: AppColors.subtle,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
 
   @override
   Widget build(BuildContext context) => Card(
+    color: AppColors.surface2,
     child: Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: soft,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(icon, color: color, size: 21),
-          ),
+          Icon(icon, size: 20, color: AppColors.subtle),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
-              ),
-            ],
+          Expanded(
+            child: T(
+              message,
+              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
           ),
         ],
       ),

@@ -27,6 +27,7 @@ class ComplaintVisitAssignedNotification extends Notification
             'message' => $this->complaint->complaint_no.' · '.$this->complaint->customer?->name.' · '.$this->complaint->nature_of_complaint
                 .($this->visit->appointment_at ? ' · '.$this->visit->appointment_at->format('d M, h:i A') : ''),
             'complaint_id' => $this->complaint->id,
+            'complaint_visit_id' => $this->visit->id,
             'url' => route('complaints.show', $this->complaint),
             'type' => 'complaint_visit',
             'icon' => 'clipboard-list',

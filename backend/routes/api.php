@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ComplaintVisitController;
 use App\Http\Controllers\Api\HrSelfServiceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PremisesController;
@@ -35,6 +36,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/tasks/{task}/due-date', [App\Http\Controllers\TaskController::class, 'dueDate']);
         Route::get('/tasks/{task}/actions/{action}/attachments/{attachment}', [App\Http\Controllers\TaskController::class, 'attachment'])->whereNumber('attachment');
         Route::post('/tasks/{task}/action', [TaskController::class, 'action']);
+        Route::get('/complaint-visits', [ComplaintVisitController::class, 'index']);
+        Route::get('/complaint-visits/{visit}', [ComplaintVisitController::class, 'show']);
+        Route::post('/complaints/{complaint}/visits/{visit}/report', [ComplaintVisitController::class, 'report'])->scopeBindings();
         Route::get('/service-jobs', [ServiceJobController::class, 'index']);
         Route::get('/service-jobs/{service_job}', [ServiceJobController::class, 'show']);
         Route::post('/service-jobs/{service_job}/contact', [ServiceJobController::class, 'contact']);

@@ -20,6 +20,9 @@ All protected requests use `Authorization: Bearer <token>` and `Accept: applicat
 | GET | `tasks` | Assigned and observed tasks |
 | GET | `tasks/{id}` | Task detail and timeline |
 | POST | `tasks/{id}/action` | Close or reassign task |
+| GET | `complaint-visits` | Complaint visits the user is on as technician or assistant; `scope=open` (default) or `completed` (latest 50) |
+| GET | `complaint-visits/{id}` | Visit and complaint detail, previous visits, report form option lists and `can_report` |
+| POST | `complaints/{complaint}/visits/{visit}/report` | Save visit progress or submit the outcome (JSON or multipart with `attachments[]`) |
 | GET | `service-jobs` | Assigned service jobs; supports `scope=today` and `status` |
 | GET | `service-jobs/{id}` | Job detail, current primary action, masters and lifecycle data |
 | POST | `service-jobs/{id}/contact` | Confirm, reschedule, no-answer, decline or cancel outcome |
@@ -44,3 +47,5 @@ All protected requests use `Authorization: Bearer <token>` and `Accept: applicat
 `attendance/check-in` is multipart form data with `premises_id`, `latitude`, `longitude`, `selfie`, and optional `remark`. A remark becomes mandatory outside the configured premises radius.
 
 Photo, approval-signature, completion-signature and payment-proof requests use multipart form data. Estimate totals, catalog prices and taxes are always recalculated by the backend.
+
+The complaint visit report accepts partial updates: any field left out keeps the value saved on the visit (from the app or the web), so sending only `{"accepted_at": "2026-11-02T10:15:00"}` just stamps Accepted; a field sent as `null` is cleared. Times without an offset are read as app time (IST); times with an offset such as `Z` are converted. Fault category, root cause and pending reason / sub reason are sent as the master label (the `value` in the form lists).

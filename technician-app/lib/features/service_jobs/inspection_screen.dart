@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
-import 'service_job_detail_screen.dart';
+import '../../core/widgets/ui.dart';
 import '../../core/i18n/t.dart';
 
 class InspectionScreen extends StatefulWidget {
@@ -226,7 +226,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
     if (loading) {
       return Scaffold(
         appBar: AppBar(title: Text(title)),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const LoadingView(),
       );
     }
     final items = List<dynamic>.from(inspection?['items'] ?? []);
@@ -237,7 +237,13 @@ class _InspectionScreenState extends State<InspectionScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: inspection == null
-          ? Center(child: Text(error ?? 'Checklist is not available.'))
+          ? EmptyState(
+              icon: LucideIcons.clipboardX,
+              title: 'Checklist is not available',
+              message: error,
+              actionLabel: 'Retry',
+              onAction: load,
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(18, 8, 18, 110),
               children: [
@@ -253,7 +259,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
                               child: Text(
                                 '$completed of ${items.length} completed',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -263,7 +269,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
                                   : '${(completed / items.length * 100).round()}%',
                               style: const TextStyle(
                                 color: AppColors.primary,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
@@ -290,7 +296,7 @@ class _InspectionScreenState extends State<InspectionScreen> {
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 12),
-                  _ErrorCard(message: error!),
+                  NoticeBox(error!),
                 ],
                 const SizedBox(height: 14),
                 ...items.map((raw) {
@@ -310,34 +316,26 @@ class _InspectionScreenState extends State<InspectionScreen> {
                 }),
               ],
             ),
-      bottomSheet: inspection == null
+      bottomNavigationBar: inspection == null
           ? null
-          : SafeArea(
-              top: false,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-                ),
-                child: FilledButton.icon(
-                  onPressed:
-                      submitting ||
-                          pendingItemIds.isNotEmpty ||
-                          completed != items.length
-                      ? null
-                      : complete,
-                  icon: submitting
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(LucideIcons.clipboardCheck),
-                  label: Text(
-                    completed == items.length
-                        ? 'Complete checklist'
-                        : 'Complete all required checks',
-                  ),
+          : BottomActionBar(
+              child: FilledButton.icon(
+                onPressed:
+                    submitting ||
+                        pendingItemIds.isNotEmpty ||
+                        completed != items.length
+                    ? null
+                    : complete,
+                icon: submitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(LucideIcons.clipboardCheck),
+                label: Text(
+                  completed == items.length
+                      ? 'Complete checklist'
+                      : 'Complete all required checks',
                 ),
               ),
             ),
@@ -392,29 +390,18 @@ class _InspectionItemCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     item['label']?.toString() ?? 'Inspection item',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.heading,
+                    ),
                   ),
                 ),
                 if (definition['required'] == true)
-                  const T(
-                    'REQUIRED',
-                    style: TextStyle(
-                      color: AppColors.danger,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  const Pill('Required', tone: Tone.danger),
                 if (pending)
                   const Padding(
-                    padding: EdgeInsets.only(left: 7),
-                    child: T(
-                      'NOT SYNCED',
-                      style: TextStyle(
-                        color: AppColors.warning,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    padding: EdgeInsets.only(left: 6),
+                    child: Pill('Not synced', tone: Tone.warning),
                   ),
               ],
             ),
@@ -430,12 +417,10 @@ class _InspectionItemCard extends StatelessWidget {
                   onSelected: saving ? null : (_) => onCondition(condition),
                   label: Text(condition['name']?.toString() ?? ''),
                   selectedColor: color.withValues(alpha: .16),
-                  side: BorderSide(
-                    color: selected ? color : const Color(0xFFE2E8F0),
-                  ),
+                  side: BorderSide(color: selected ? color : AppColors.border),
                   labelStyle: TextStyle(
                     color: selected ? color : AppColors.ink,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 );
               }).toList(),
@@ -478,22 +463,6 @@ class _InspectionItemCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(13),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFEF2F2),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Text(message, style: const TextStyle(color: AppColors.danger)),
-  );
 }
 
 Color _conditionColor(String? color) => switch (color) {

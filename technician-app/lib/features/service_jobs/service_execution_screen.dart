@@ -10,7 +10,7 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import 'inspection_screen.dart';
-import 'service_job_detail_screen.dart';
+import '../../core/widgets/ui.dart';
 import 'signature_capture.dart';
 import '../../core/i18n/t.dart';
 
@@ -72,7 +72,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                   alignment: Alignment.centerLeft,
                   child: T(
                     'Add work performed',
-                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -91,7 +91,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
                       subtitle: Text(service['category']?.toString() ?? ''),
                       trailing: Text(
                         '₹${service['standard_price']}',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       onTap: () => Navigator.pop(context, service),
                     );
@@ -437,17 +437,7 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
           children: [
             if (loading) const LinearProgressIndicator(),
             if (error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(13),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  error!,
-                  style: const TextStyle(color: AppColors.danger),
-                ),
-              ),
+              NoticeBox(error!),
               const SizedBox(height: 12),
             ],
             _WorkSection(
@@ -534,25 +524,17 @@ class _ServiceExecutionScreenState extends State<ServiceExecutionScreen> {
           ],
         ),
       ),
-      bottomSheet: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-          ),
-          child: FilledButton.icon(
-            onPressed: submitting || !ready ? null : completeWork,
-            icon: submitting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(LucideIcons.badgeCheck),
-            label: Text(
-              ready ? 'Complete service work' : 'Finish all required steps',
-            ),
+      bottomNavigationBar: BottomActionBar(
+        child: FilledButton.icon(
+          onPressed: submitting || !ready ? null : completeWork,
+          icon: submitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(LucideIcons.badgeCheck),
+          label: Text(
+            ready ? 'Complete service work' : 'Finish all required steps',
           ),
         ),
       ),
@@ -592,7 +574,7 @@ class _WorkSection extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
               if (complete)
@@ -698,7 +680,7 @@ class _StepCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
               if (complete)
@@ -766,7 +748,7 @@ class _ActionCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 3),
                 Text(
