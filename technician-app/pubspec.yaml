@@ -48,6 +48,8 @@ dependencies:
   lucide_icons_flutter: ^3.1.21
   url_launcher: ^6.3.3
   onesignal_flutter: ^5.7.0
+  flutter_widget_from_html_core: ^0.17.4
+  html: ^0.15.7
 
 dev_dependencies:
   flutter_test:

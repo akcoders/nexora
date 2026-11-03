@@ -80,6 +80,11 @@ class AppLayoutComposer
                 ['label' => 'Service checklists', 'icon' => 'clipboard-check', 'url' => route('checklists.index'), 'active' => request()->routeIs('checklists.*')],
                 ['label' => 'Service masters', 'icon' => 'sliders-horizontal', 'url' => route('service-masters.index'), 'active' => request()->routeIs('service-masters.*'), 'show' => $can('checklists.read')],
             ]],
+            ['key' => 'knowledge', 'label' => 'Knowledge', 'items' => [
+                ['label' => 'Library', 'icon' => 'book-open', 'url' => route('library.index'), 'active' => request()->routeIs('library.index', 'library.show'), 'show' => $can('library.read')],
+                ['label' => 'Manage guides', 'icon' => 'notebook-pen', 'url' => route('library.manage'), 'active' => request()->routeIs('library.manage', 'library.create', 'library.edit'), 'show' => $can('library.create', 'library.update', 'library.delete')],
+                ['label' => 'Library settings', 'icon' => 'library', 'url' => route('library.settings'), 'active' => request()->routeIs('library.settings'), 'show' => $can('library.manage')],
+            ]],
             ['key' => 'work', 'label' => 'Work management', 'items' => [
                 ['label' => 'Internal workflows', 'icon' => 'git-branch', 'url' => route('workflows.index', ['scope' => 'open']), 'active' => $isWorkflow && ! request()->routeIs('workflows.board', 'tasks.board')],
                 ['label' => 'Workflow board', 'icon' => 'square-kanban', 'url' => route('workflows.board'), 'active' => request()->routeIs('workflows.board', 'tasks.board')],

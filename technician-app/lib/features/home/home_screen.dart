@@ -20,12 +20,14 @@ class HomeScreen extends StatefulWidget {
     required this.onNavigate,
     required this.onOpenMenu,
     required this.onOpenHr,
+    required this.onOpenLibrary,
     required this.refreshKey,
   });
 
   final void Function(int page, {int? tab}) onNavigate;
   final VoidCallback onOpenMenu;
   final Future<void> Function(int tab) onOpenHr;
+  final Future<void> Function() onOpenLibrary;
   final int refreshKey;
 
   @override
@@ -243,6 +245,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            _LibraryEntry(onTap: widget.onOpenLibrary),
             SectionLabel(
               "Today's service visits",
               action: 'All jobs',
@@ -571,6 +575,56 @@ class _QuickAction extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Entry card for the how-to library.
+class _LibraryEntry extends StatelessWidget {
+  const _LibraryEntry({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(left: BorderSide(color: AppColors.info, width: 3)),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+        child: const Row(
+          children: [
+            IconTile(LucideIcons.bookOpen, tone: Tone.info, size: 42),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  T(
+                    'How-to library',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: AppColors.heading,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  T(
+                    'Guides, videos and manuals by device and brand',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 4),
+            Icon(LucideIcons.chevronRight, size: 18, color: AppColors.subtle),
+          ],
         ),
       ),
     ),

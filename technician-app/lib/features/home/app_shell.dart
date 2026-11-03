@@ -11,6 +11,7 @@ import '../attendance/attendance_screen.dart';
 import '../auth/auth_controller.dart';
 import '../auth/sign_out.dart';
 import '../hr/hr_self_service_screen.dart';
+import '../library/library_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -98,6 +99,13 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  Future<void> openLibrary() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const LibraryScreen()),
+    );
+  }
+
   MenuDestination get _selectedDestination => switch (index) {
     AppPage.work => switch (workTab) {
       WorkTab.complaints => MenuDestination.complaints,
@@ -126,6 +134,8 @@ class _AppShellState extends State<AppShell> {
         navigate(AppPage.work, tab: WorkTab.workflow);
       case MenuDestination.completedWork:
         navigate(AppPage.work, tab: WorkTab.completed);
+      case MenuDestination.library:
+        await openLibrary();
       case MenuDestination.attendance:
         navigate(AppPage.attendance);
       case MenuDestination.hrOverview:
@@ -224,6 +234,7 @@ class _AppShellState extends State<AppShell> {
               onNavigate: navigate,
               onOpenMenu: openMenu,
               onOpenHr: openHr,
+              onOpenLibrary: openLibrary,
               refreshKey: homeRefresh,
             ),
             TasksScreen(initialTab: workTab, onOpenMenu: openMenu),

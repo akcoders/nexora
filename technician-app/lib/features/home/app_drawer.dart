@@ -14,6 +14,7 @@ enum MenuDestination {
   complaints,
   workflow,
   completedWork,
+  library,
   attendance,
   hrOverview,
   leave,
@@ -190,6 +191,11 @@ class AppDrawer extends StatelessWidget {
                     MenuDestination.completedWork,
                     LucideIcons.circleCheckBig,
                     'Completed work',
+                  ),
+                  _item(
+                    MenuDestination.library,
+                    LucideIcons.bookOpen,
+                    'How-to library',
                   ),
                   const _Section('Attendance'),
                   _item(
