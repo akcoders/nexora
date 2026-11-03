@@ -14,6 +14,8 @@ use App\Http\Controllers\DemoDataController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\HrController;
+use App\Http\Controllers\LibraryController;
+use App\Http\Controllers\LibrarySettingsController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PayrollController;
@@ -105,6 +107,27 @@ Route::middleware('auth')->group(function () {
         Route::get('/complaints/{complaint}/visits/{visit}/report', [ComplaintVisitController::class, 'edit'])->name('complaints.visits.edit');
         Route::put('/complaints/{complaint}/visits/{visit}', [ComplaintVisitController::class, 'update'])->name('complaints.visits.update');
         Route::post('/complaints/{complaint}/visits/{visit}/cancel', [ComplaintVisitController::class, 'cancel'])->name('complaints.visits.cancel');
+    });
+    Route::prefix('library')->name('library.')->controller(LibraryController::class)->group(function (): void {
+        Route::get('/', 'index')->name('index');
+        Route::get('/manage', 'manage')->name('manage');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::post('/uploads/image', 'uploadImage')->middleware('throttle:60,1')->name('uploads.image');
+        Route::get('/{article}', 'show')->whereNumber('article')->name('show');
+        Route::get('/{article}/edit', 'edit')->whereNumber('article')->name('edit');
+        Route::put('/{article}', 'update')->whereNumber('article')->name('update');
+        Route::delete('/{article}', 'destroy')->whereNumber('article')->name('destroy');
+        Route::get('/{article}/files/{resource}', 'file')->whereNumber(['article', 'resource'])->scopeBindings()->name('files.show');
+    });
+    Route::prefix('library/settings')->name('library.')->controller(LibrarySettingsController::class)->group(function (): void {
+        Route::get('/', 'index')->name('settings');
+        Route::post('/categories', 'storeCategory')->name('categories.store');
+        Route::put('/categories/{category}', 'updateCategory')->whereNumber('category')->name('categories.update');
+        Route::patch('/categories/{category}/toggle', 'toggleCategory')->whereNumber('category')->name('categories.toggle');
+        Route::post('/masters', 'storeMaster')->name('masters.store');
+        Route::put('/masters/{option}', 'updateMaster')->whereNumber('option')->name('masters.update');
+        Route::patch('/masters/{option}/toggle', 'toggleMaster')->whereNumber('option')->name('masters.toggle');
     });
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');

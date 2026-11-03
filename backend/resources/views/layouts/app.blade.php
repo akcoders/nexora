@@ -11,7 +11,8 @@
         @php
             $nxOldModal = old('_modal');
             $nxOldInput = $nxOldModal ? \Illuminate\Support\Arr::except(session()->getOldInput(), ['_token', '_method', 'password', 'password_confirmation', 'current_password', 'temporary_password']) : null;
-            $nxCrumbs = collect(explode('/', (string) ($breadcrumb ?? '')))->map(fn ($part) => trim($part))->filter()->values();
+            // Crumbs are separated by " / " so values that contain a slash (complaint numbers) stay whole.
+            $nxCrumbs = collect(preg_split('/\s+\/\s+/', trim((string) ($breadcrumb ?? ''))))->map(fn ($part) => html_entity_decode(trim($part), ENT_QUOTES | ENT_HTML5, 'UTF-8'))->filter()->values();
         @endphp
         <script>
             window.nxLanguage = @json($nxLanguageConfig);

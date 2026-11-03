@@ -216,7 +216,7 @@ function init(root) {
         return `<article class="${classes}" data-id="${task.id}" aria-label="${esc(task.task_no)}: ${esc(task.title)}">
             <div class="nx-kc-top">
                 <span class="nx-kc-no">${esc(task.task_no)}</span>
-                <span class="badge rounded-pill badge-soft-primary">${task.parent ? 'Subtask' : 'Workflow'}</span>
+                ${task.parent ? '<span class="badge rounded-pill badge-soft-primary">Subtask</span>' : ''}
                 ${task.status !== 'closed' ? `<span class="nx-kc-prio prio-${task.priority}">${esc(PRIORITY_LABEL[task.priority] ?? task.priority)}</span>` : ''}
                 <div class="dropdown ms-auto">
                     <button class="nx-kc-menu" type="button" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Actions for ${esc(task.task_no)}"><i data-lucide="ellipsis"></i></button>

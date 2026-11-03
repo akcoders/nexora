@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
-import 'service_job_detail_screen.dart';
+import '../../core/widgets/ui.dart';
 import 'signature_capture.dart';
 import '../../core/i18n/t.dart';
 
@@ -150,7 +150,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
                           'Service estimate',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -274,10 +274,7 @@ class _CustomerApprovalScreenState extends State<CustomerApprovalScreen> {
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 12),
-                    Text(
-                      error!,
-                      style: const TextStyle(color: AppColors.danger),
-                    ),
+                    NoticeBox(error!),
                   ],
                   const SizedBox(height: 16),
                   FilledButton.icon(
@@ -350,7 +347,7 @@ class _AmountRow extends StatelessWidget {
             label,
             style: TextStyle(
               color: total ? AppColors.ink : AppColors.muted,
-              fontWeight: total ? FontWeight.w800 : FontWeight.w500,
+              fontWeight: total ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
         ),
@@ -358,7 +355,7 @@ class _AmountRow extends StatelessWidget {
           value,
           style: TextStyle(
             fontSize: total ? 20 : 14,
-            fontWeight: total ? FontWeight.w900 : FontWeight.w700,
+            fontWeight: total ? FontWeight.w700 : FontWeight.w700,
           ),
         ),
       ],

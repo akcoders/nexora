@@ -3,7 +3,10 @@
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ComplaintVisitController;
 use App\Http\Controllers\Api\HrSelfServiceController;
+use App\Http\Controllers\Api\LibraryController;
+use App\Http\Controllers\Api\LibraryFileController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PremisesController;
 use App\Http\Controllers\Api\ServiceJobController;
@@ -13,6 +16,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('/app-config', AppConfigController::class);
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    // Library documents open in the app's viewer from the temporary signed URL in the guide detail.
+    Route::get('/library/files/{resource}', LibraryFileController::class)->middleware('signed')->whereNumber('resource')->name('api.library.files');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -35,6 +40,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/tasks/{task}/due-date', [App\Http\Controllers\TaskController::class, 'dueDate']);
         Route::get('/tasks/{task}/actions/{action}/attachments/{attachment}', [App\Http\Controllers\TaskController::class, 'attachment'])->whereNumber('attachment');
         Route::post('/tasks/{task}/action', [TaskController::class, 'action']);
+        Route::get('/complaint-visits', [ComplaintVisitController::class, 'index']);
+        Route::get('/complaint-visits/{visit}', [ComplaintVisitController::class, 'show']);
+        Route::post('/complaints/{complaint}/visits/{visit}/report', [ComplaintVisitController::class, 'report'])->scopeBindings();
+        Route::get('/library/filters', [LibraryController::class, 'filters']);
+        Route::get('/library', [LibraryController::class, 'index']);
+        Route::get('/library/{article}', [LibraryController::class, 'show'])->whereNumber('article');
         Route::get('/service-jobs', [ServiceJobController::class, 'index']);
         Route::get('/service-jobs/{service_job}', [ServiceJobController::class, 'show']);
         Route::post('/service-jobs/{service_job}/contact', [ServiceJobController::class, 'contact']);

@@ -39,13 +39,14 @@ class ComplaintService
         'follow_up_date', 'expected_material_date', 'target_date', 'delay_reason', 'escalation_point',
     ];
 
-    private const VISIT_REPORT_FIELDS = [
+    /** Visit columns saved from the technician report (the API fills omitted ones from the saved visit). */
+    public const VISIT_REPORT_FIELDS = [
         'accepted_at', 'en_route_at', 'arrived_at', 'started_at', 'ended_at', 'travel_minutes', 'labour_hours', 'abnormality_found',
         'observation', 'initial_diagnosis', 'fault_category', 'fault_code', 'root_cause', 'problem_diagnosis', 'work_performed',
         'final_result', 'customer_signed_name', 'customer_remarks', 'customer_rating', 'technician_remarks', 'supervisor_remarks', 'store_remarks',
     ];
 
-    private const PART_FIELDS = [
+    public const PART_FIELDS = [
         'product_id', 'part_code', 'part_name', 'category', 'make', 'quantity', 'uom', 'source', 'part_type', 'part_warranty',
         'stock_location', 'available_in_stock', 'estimated_cost', 'billable_rate', 'oem_warranty', 'old_part_returned', 'old_part_no',
         'additional_parts', 'recommended_action', 'customer_approval_required', 'quotation_given', 'customer_approval_status',
@@ -135,7 +136,7 @@ class ComplaintService
         return DB::transaction(function () use ($visit, $data, $attachments, $signaturePng, $actor): ComplaintVisit {
             $complaint = $visit->complaint;
             $report = Arr::only($data, self::VISIT_REPORT_FIELDS);
-            $report['checks'] = Arr::only($data['checks'] ?? [], ['unit_checked_before', 'photo_taken', 'informed_customer', 'informed_back_office', 'unit_checked_after', 'equipment_working_normally', 'customer_confirmation']);
+            $report['checks'] = Arr::only($data['checks'] ?? [], array_keys(ComplaintOptions::VISIT_CHECKS));
             $report['diagnosis'] = array_filter($data['diagnosis'] ?? [], fn ($value) => $value !== null && $value !== '');
             if (blank($report['labour_hours'] ?? null) && filled($report['started_at'] ?? null) && filled($report['ended_at'] ?? null)) {
                 $report['labour_hours'] = round(Carbon::parse($report['started_at'])->diffInMinutes(Carbon::parse($report['ended_at'])) / 60, 2);
@@ -551,6 +552,6 @@ class ComplaintService
             return;
         }
         $visit->technician->notify(new ComplaintVisitAssignedNotification($complaint, $visit));
-        $this->oneSignal->sendToUser($visit->technician, 'New complaint visit '.$visit->label(), $complaint->complaint_no.' · '.$complaint->customer?->name, ['type' => 'complaint_visit', 'complaint_id' => $complaint->id]);
+        $this->oneSignal->sendToUser($visit->technician, 'New complaint visit '.$visit->label(), $complaint->complaint_no.' · '.$complaint->customer?->name, ['type' => 'complaint_visit', 'complaint_id' => $complaint->id, 'complaint_visit_id' => $visit->id]);
     }
 }

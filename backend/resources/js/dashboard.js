@@ -6,10 +6,11 @@ import { PALETTE, renderResult } from './report-chart.js';
 const data = JSON.parse(document.getElementById('dashboardData')?.textContent || '{}');
 const urls = data.urls || {};
 
+/** Dashboard widgets hide the ApexCharts download menu; the report builder keeps it. */
 function draw(selector, result, options = {}) {
     const el = document.querySelector(selector);
     if (!el || !result) return;
-    renderResult(el, result, options);
+    renderResult(el, result, { toolbar: false, ...options });
 }
 
 function initCharts() {
@@ -42,7 +43,7 @@ async function loadPinnedReports() {
             const payload = await response.json();
             const meta = payload.result.meta || {};
             card.querySelector('[data-report-meta]').textContent = [meta.period, meta.measure, meta.filters?.length ? `${meta.filters.length} filter(s)` : null].filter(Boolean).join(' · ');
-            renderResult(body, payload.result, { height: 280 });
+            renderResult(body, payload.result, { height: 280, toolbar: false });
         } catch {
             body.innerHTML = '<div class="nx-empty py-4">This report could not be loaded.</div>';
         }

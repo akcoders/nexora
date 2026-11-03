@@ -1,16 +1,20 @@
 <x-app-layout>
     <x-slot name="title">Notifications</x-slot>
     <x-slot name="pageTitle">Notifications</x-slot>
-    <x-slot name="breadcrumb">Main / Notifications</x-slot>
+    <x-slot name="breadcrumb">Notifications</x-slot>
 
     <div class="nx-page-header">
-        <div><div class="nx-page-kicker">Main</div><h2>Notification centre</h2><p>Assignments, complaint visits, approvals and system activity.</p></div>
+        <div><div class="nx-page-kicker">Inbox</div><h2>Notifications</h2><p>Assignments, complaint visits, approvals and system activity.</p></div>
         <div class="nx-page-actions"><form method="POST" action="{{ route('notifications.read') }}">@csrf<button class="btn btn-light border"><i data-lucide="check-check"></i>Mark all read</button></form></div>
     </div>
 
     <div class="row g-3">
         <div class="col-xl-8">
             <section class="nx-card nx-datatable-card">
+                <div class="nx-card-header">
+                    <div><h3 class="nx-card-title"><i data-lucide="bell"></i>My notifications</h3><p class="nx-card-subtitle">Newest first</p></div>
+                    <span class="nx-count">{{ $notifications->count() }}</span>
+                </div>
                 <table class="table nx-table" data-datatable data-dt-title="Notifications" data-dt-order='[[3,"desc"]]' data-dt-empty="No personal notifications yet.">
                     <thead><tr><th data-priority="1">Notification</th><th>Details</th><th>Status</th><th>Received</th><th class="no-export no-sort text-end" data-orderable="false"></th></tr></thead>
                     <tbody>
@@ -30,15 +34,17 @@
         </div>
         <div class="col-xl-4">
             <section class="nx-card">
-                <div class="nx-card-header"><h3 class="nx-card-title"><i data-lucide="activity"></i>Recent system activity</h3></div>
+                <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="activity"></i>Recent system activity</h3><p class="nx-card-subtitle">Latest 20 events in the workspace</p></div></div>
                 <div class="nx-card-body">
-                    <ol class="nx-tl">
-                        @forelse($activities as $activity)
-                            <li><span class="nx-tl-icon tone-secondary"><i data-lucide="dot"></i></span><div class="nx-tl-head"><span class="nx-tl-title">{{ str($activity->event)->replace('.', ' ')->headline() }}</span><span class="nx-tl-meta">{{ $activity->created_at->diffForHumans() }}</span></div></li>
-                        @empty
-                            <li class="text-secondary small">No recent activity.</li>
-                        @endforelse
-                    </ol>
+                    @if($activities->isEmpty())
+                        <div class="nx-empty py-4"><i data-lucide="activity"></i><div>No recent activity.</div></div>
+                    @else
+                        <ol class="nx-tl">
+                            @foreach($activities as $activity)
+                                <li><span class="nx-tl-icon tone-secondary"><i data-lucide="dot"></i></span><div class="nx-tl-head"><span class="nx-tl-title">{{ str($activity->event)->replace('.', ' ')->headline() }}</span><span class="nx-tl-meta">{{ $activity->created_at->diffForHumans() }}</span></div></li>
+                            @endforeach
+                        </ol>
+                    @endif
                 </div>
             </section>
         </div>

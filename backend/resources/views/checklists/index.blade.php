@@ -11,18 +11,17 @@
 
     <section class="nx-card nx-datatable-card">
         <table class="table nx-table" data-datatable data-dt-title="Service checklists" data-dt-empty="No service checklists created.">
-            <thead><tr><th data-priority="1">Checklist</th><th>Service / category</th><th>Equipment</th><th>Phase</th><th>Frequency</th><th>Duration</th><th>Checks</th><th>Sample items</th><th>Status</th><th class="no-export no-sort text-end" data-orderable="false"></th></tr></thead>
+            <thead><tr><th data-priority="1">Checklist</th><th data-priority="3">Service / category</th><th>Equipment</th><th data-priority="4">Phase</th><th data-priority="5">Frequency</th><th data-priority="6">Duration</th><th data-priority="7">Checks</th><th data-priority="2">Status</th><th class="all no-export no-sort text-end" data-orderable="false" data-priority="1"></th></tr></thead>
             <tbody>
                 @foreach($checklists as $checklist)
                     <tr>
-                        <td class="nx-row-title" style="min-width:180px">{{ $checklist->name }}</td>
+                        <td style="min-width:min(200px, 45vw)"><span class="nx-row-title">{{ $checklist->name }}</span> <span class="nx-row-sub text-truncate" style="max-width:min(260px, 45vw)" title="{{ $checklist->items->pluck('label')->join(' · ') }}">{{ $checklist->items->take(3)->pluck('label')->join(' · ') }}{{ $checklist->items->count() > 3 ? ' …' : '' }}</span></td>
                         <td>{{ $checklist->serviceType?->name ?? $checklist->category?->name ?? 'All services' }}</td>
                         <td>{{ $checklist->equipment_type ?: '—' }}</td>
                         <td><span class="badge badge-soft-primary text-uppercase">{{ $checklist->phase }}</span></td>
                         <td>{{ $checklist->frequency ?: 'On demand' }}</td>
                         <td class="notranslate" data-order="{{ (int) $checklist->estimated_minutes }}">{{ $checklist->estimated_minutes ?: 0 }} min</td>
                         <td class="notranslate">{{ $checklist->items->count() }}</td>
-                        <td style="min-width:220px"><span class="nx-row-sub text-body">{{ $checklist->items->take(3)->pluck('label')->join(' · ') }}{{ $checklist->items->count() > 3 ? ' …' : '' }}</span></td>
                         <td><x-pill :tone="$checklist->active ? 'success' : 'secondary'" :label="$checklist->active ? 'Active' : 'Inactive'" /></td>
                         <td class="text-end text-nowrap">
                             @can('checklists.update')<button class="btn btn-sm btn-light border btn-icon" type="button" data-bs-toggle="modal" data-bs-target="#editChecklist{{ $checklist->id }}" aria-label="Edit {{ $checklist->name }}" title="Edit"><i data-lucide="pencil"></i></button>@endcan

@@ -5,7 +5,7 @@
         <label class="form-label" for="revisedDuePreview">Revised due date</label>
         <input class="form-control mb-2" id="revisedDuePreview" data-revision-preview readonly aria-describedby="revisionHelp">
         <div class="form-text mb-2" id="revisionHelp">Matches the next follow-up. Each revision is saved as a reason for delay.</div>
-        <label class="form-label" for="taskDelayReason">Reason for delay *</label>
+        <label class="form-label" for="taskDelayReason">Reason for delay <span class="text-danger">*</span></label>
         <textarea class="form-control" name="delay_reason" id="taskDelayReason" rows="2" required maxlength="3000">{{ old('delay_reason') }}</textarea>
     </fieldset>
 </div>

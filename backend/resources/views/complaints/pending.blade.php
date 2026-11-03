@@ -61,7 +61,7 @@
             <section class="nx-card h-100">
                 <div class="nx-card-header"><h3 class="nx-card-title"><i data-lucide="user-round-cog"></i>By pending owner</h3></div>
                 <div class="nx-card-body py-2">
-                    <ul class="nx-mini-list" style="columns:2;column-gap:18px">
+                    <ul class="nx-mini-list" style="columns:2;column-gap:32px;column-rule:1px solid #f0f3f7">
                         @foreach(ComplaintOptions::options('pending_owners') as $key => $label)
                             <li style="break-inside:avoid"><a class="{{ ($filters['owner'] ?? null) === $key ? 'fw-bold' : '' }}" href="{{ route('complaints.pending', $query(['owner' => ($filters['owner'] ?? null) === $key ? null : $key])) }}">{{ $label }}</a><span class="nx-count notranslate">{{ (int) ($ownerCounts[$key] ?? 0) }}</span></li>
                         @endforeach
@@ -90,17 +90,17 @@
                 <tr>
                     <th data-priority="1">Complaint no</th>
                     <th data-priority="2">Customer</th>
-                    <th>Problem</th>
-                    <th>Reason for pending</th>
-                    <th data-priority="3">Age</th>
+                    <th data-priority="9">Problem</th>
+                    <th data-priority="6">Reason for pending</th>
+                    <th data-priority="3" data-class-name="dt-left">Age</th>
                     <th>Pending owner</th>
                     <th>Responsible</th>
-                    <th>Next action</th>
-                    <th>Follow-up</th>
-                    <th>Expected material</th>
-                    <th>Target date</th>
+                    <th data-priority="5">Next action</th>
+                    <th data-priority="4" data-class-name="dt-left">Follow-up</th>
+                    <th data-class-name="dt-left">Expected material</th>
+                    <th data-class-name="dt-left">Target date</th>
                     <th>Reason for delay</th>
-                    <th class="no-export no-sort" data-orderable="false"></th>
+                    <th class="no-export no-sort all text-end" data-orderable="false"></th>
                 </tr>
             </thead>
             <tbody>
@@ -120,7 +120,7 @@
                         <td data-order="{{ $complaint->target_date?->timestamp ?? 0 }}" class="text-nowrap {{ $complaint->target_date?->lt($today) ? 'text-danger' : '' }}">{{ $complaint->target_date?->format('d M Y') ?? '—' }}</td>
                         <td>{{ ComplaintOptions::label('delay_reasons', $complaint->delay_reason) ?? '—' }}</td>
                         <td class="text-end text-nowrap">
-                            @can('update', $complaint)<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#quickFollowUp" data-follow-url="{{ route('complaints.follow-ups.store', $complaint) }}" data-follow-no="{{ $complaint->complaint_no }}" data-follow-action="{{ $complaint->next_action }}" data-follow-target="{{ $complaint->target_date?->toDateString() }}"><i data-lucide="phone-forwarded"></i>Follow-up</button>@endcan
+                            @can('update', $complaint)<button class="btn btn-sm btn-light border" data-bs-toggle="modal" data-bs-target="#quickFollowUp" data-follow-url="{{ route('complaints.follow-ups.store', $complaint) }}" data-follow-no="{{ $complaint->complaint_no }}" data-follow-action="{{ $complaint->next_action }}" data-follow-target="{{ $complaint->target_date?->toDateString() }}" aria-label="Record follow-up"><i data-lucide="phone-forwarded"></i><span class="d-none d-md-inline">Follow-up</span></button>@endcan
                         </td>
                     </tr>
                 @endforeach
@@ -135,9 +135,9 @@
                 <div class="modal-header"><div><h5 class="modal-title" id="quickFollowTitle">Record follow-up</h5><small class="text-secondary notranslate" data-quick-follow-no></small></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12"><label class="form-label">What happened? *</label><textarea class="form-control" name="remarks" rows="3" required maxlength="2000"></textarea></div>
+                        <div class="col-12"><label class="form-label">What happened? <span class="text-danger">*</span></label><textarea class="form-control" name="remarks" rows="3" required maxlength="2000"></textarea></div>
                         <div class="col-12"><label class="form-label">Next action</label><input class="form-control" name="next_action" maxlength="255" data-quick-follow-action></div>
-                        <div class="col-md-6"><label class="form-label">Next follow-up date *</label><input type="date" class="form-control" name="follow_up_date" min="{{ today()->toDateString() }}" value="{{ today()->addDay()->toDateString() }}" required></div>
+                        <div class="col-md-6"><label class="form-label">Next follow-up date <span class="text-danger">*</span></label><input type="date" class="form-control" name="follow_up_date" min="{{ today()->toDateString() }}" value="{{ today()->addDay()->toDateString() }}" required></div>
                         <div class="col-md-6"><label class="form-label">Targeted closing date</label><input type="date" class="form-control" name="target_date" data-quick-follow-target data-v="after_or_equal:follow_up_date"></div>
                         <div class="col-md-6"><label class="form-label">Expected material date</label><input type="date" class="form-control" name="expected_material_date"></div>
                         <div class="col-md-6"><label class="form-label">Reason for delay</label><select class="form-select" name="delay_reason"><option value="">Keep current</option>@foreach(ComplaintOptions::options('delay_reasons') as $value => $text)<option value="{{ $value }}">{{ $text }}</option>@endforeach</select></div>

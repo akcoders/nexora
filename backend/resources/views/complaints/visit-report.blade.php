@@ -110,13 +110,13 @@
                 <div class="row g-3">
                     <div class="col-md-6"><label class="form-label" for="problem">Problem diagnosis — what exactly was wrong</label><textarea class="form-control" id="problem" name="problem_diagnosis" rows="3" maxlength="3000" data-outcome-required>{{ $v('problem_diagnosis') }}</textarea></div>
                     <div class="col-md-6"><label class="form-label" for="work">Work performed — what the technician actually did</label><textarea class="form-control" id="work" name="work_performed" rows="3" maxlength="3000" data-outcome-required>{{ $v('work_performed') }}</textarea></div>
-                    <div class="col-md-5">
+                    <div class="col-md-6">
                         <label class="form-label d-block">Final result</label>
                         <div class="nx-segment"><input type="radio" id="frOk" name="final_result" value="working" @checked($finalResult === 'working')><label for="frOk"><i data-lucide="circle-check"></i>Unit working OK</label><input type="radio" id="frNo" name="final_result" value="not_working" @checked($finalResult === 'not_working')><label for="frNo"><i data-lucide="circle-x"></i>Not working</label></div>
                     </div>
-                    <div class="col-md-7">
+                    <div class="col-md-6">
                         @foreach($afterChecks as $key => $text)
-                            <div class="d-flex align-items-center justify-content-between gap-3 py-1"><span class="small">{{ $text }}</span><div class="nx-yesno"><input type="radio" id="c_{{ $key }}_y" name="checks[{{ $key }}]" value="yes" @checked($check($key) === 'yes')><label for="c_{{ $key }}_y">Yes</label><input type="radio" id="c_{{ $key }}_n" name="checks[{{ $key }}]" value="no" @checked($check($key) === 'no')><label for="c_{{ $key }}_n">No</label></div></div>
+                            <div @class(['d-flex align-items-center justify-content-between gap-3 py-2', 'border-bottom' => ! $loop->last])><span>{{ $text }}</span><div class="nx-yesno"><input type="radio" id="c_{{ $key }}_y" name="checks[{{ $key }}]" value="yes" @checked($check($key) === 'yes')><label for="c_{{ $key }}_y">Yes</label><input type="radio" id="c_{{ $key }}_n" name="checks[{{ $key }}]" value="no" @checked($check($key) === 'no')><label for="c_{{ $key }}_n">No</label></div></div>
                         @endforeach
                     </div>
                 </div>
@@ -178,7 +178,7 @@
                 </fieldset>
                 <fieldset class="mt-3 {{ $outcome === 'observation' ? '' : 'd-none' }}" data-outcome-panel="observation" @disabled($outcome !== 'observation')>
                     <div class="row g-3">
-                        <div class="col-md-4"><label class="form-label" for="obsDate">Check again on *</label><input type="date" class="form-control" id="obsDate" name="observation_follow_up_date" value="{{ old('observation_follow_up_date', now()->addDays(2)->toDateString()) }}" min="{{ today()->toDateString() }}" required></div>
+                        <div class="col-md-4"><label class="form-label" for="obsDate">Check again on <span class="text-danger">*</span></label><input type="date" class="form-control" id="obsDate" name="observation_follow_up_date" value="{{ old('observation_follow_up_date', now()->addDays(2)->toDateString()) }}" min="{{ today()->toDateString() }}" required></div>
                         <div class="col-md-8"><label class="form-label" for="obsAction">What to check</label><input class="form-control" id="obsAction" name="observation_next_action" value="{{ old('observation_next_action') }}" maxlength="255" placeholder="e.g. Check temperature log after 48 hours"></div>
                     </div>
                 </fieldset>

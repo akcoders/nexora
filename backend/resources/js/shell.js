@@ -1,6 +1,6 @@
 /**
  * Application shell: collapsible sidebar (remembered per browser), collapsible menu
- * sections, menu search, mobile drawer and the global search box (Ctrl / Cmd + K).
+ * sections, menu search, mobile drawer, scrolling tab strips and the global search box (Ctrl / Cmd + K).
  */
 const store = {
     get(key) {
@@ -79,7 +79,29 @@ function initSidebar() {
         empty.style.display = visible ? 'none' : 'block';
     });
 
-    sidebar.querySelector('.nx-nav-link.active')?.scrollIntoView({ block: 'nearest' });
+    // After the icons render, so the menu has its final height.
+    requestAnimationFrame(() => centerInScroller(sidebar.querySelector('.nx-nav'), sidebar.querySelector('.nx-nav-link.active'), 'y'));
+}
+
+/**
+ * Scrolls only the given container (never the page, unlike scrollIntoView) so the item sits in its middle.
+ */
+function centerInScroller(scroller, item, axis, behavior = 'auto') {
+    if (!scroller || !item) return;
+    const box = scroller.getBoundingClientRect();
+    const rect = item.getBoundingClientRect();
+    if (axis === 'x') scroller.scrollBy({ left: rect.left - box.left - (box.width - rect.width) / 2, behavior });
+    else scroller.scrollBy({ top: rect.top - box.top - (box.height - rect.height) / 2, behavior });
+}
+
+/** Tab strips that scroll sideways on phones keep the active tab in view (e.g. ?tab=closure). */
+function initTabStrips() {
+    const center = (strip, behavior) => centerInScroller(strip, strip.querySelector('.nav-link.active'), 'x', behavior);
+    requestAnimationFrame(() => document.querySelectorAll('.nx-tabs-scroll').forEach((strip) => center(strip)));
+    document.addEventListener('shown.bs.tab', (event) => {
+        const strip = event.target.closest?.('.nx-tabs-scroll');
+        if (strip) center(strip, 'smooth');
+    });
 }
 
 function escapeHtml(value) {
@@ -190,6 +212,7 @@ function initConfirmations() {
 
 document.addEventListener('DOMContentLoaded', () => {
     initSidebar();
+    initTabStrips();
     initGlobalSearch();
     initConfirmations();
 });

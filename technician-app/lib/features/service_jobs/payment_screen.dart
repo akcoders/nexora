@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
-import 'service_job_detail_screen.dart';
+import '../../core/widgets/ui.dart';
 import '../../core/i18n/t.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -127,9 +127,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF1E3A8A), AppColors.primary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.navy, AppColors.navy2, Color(0xFF1F3A6B)],
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,9 +139,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 const T(
                   'AMOUNT DUE',
                   style: TextStyle(
-                    color: Colors.white70,
+                    color: AppColors.navyText,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -147,14 +150,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   money.format(pending),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 31,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'Service total ${money.format(total)}  •  Paid ${money.format(paid)}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppColors.navyText,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -162,7 +168,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 18),
           const T(
             'Payment method',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -217,10 +223,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             maxLines: 3,
             decoration: const InputDecoration(labelText: 'Notes (optional)'),
           ),
-          if (error != null) ...[
-            const SizedBox(height: 12),
-            Text(error!, style: const TextStyle(color: AppColors.danger)),
-          ],
+          if (error != null) ...[const SizedBox(height: 12), NoticeBox(error!)],
           const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: submitting ? null : submit,

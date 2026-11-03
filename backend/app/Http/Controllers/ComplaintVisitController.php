@@ -49,14 +49,8 @@ class ComplaintVisitController extends Controller
     public function update(ComplaintVisitReportRequest $request, Complaint $complaint, ComplaintVisit $visit): RedirectResponse
     {
         $this->complaints->recordVisitReport($visit, $request->safe()->except(['attachments', 'signature_data']), $request->file('attachments', []), $request->signaturePng(), $request->user());
-        $message = match ($request->input('outcome')) {
-            'resolved' => $visit->label().' completed. The complaint is ready for closure checks.',
-            'pending' => $visit->label().' completed. Complaint is pending: '.$request->input('pending.pending_reason').'.',
-            'observation' => $visit->label().' completed. Complaint is under observation.',
-            default => $visit->label().' progress saved.',
-        };
 
-        return redirect()->route('complaints.show', [$complaint, 'tab' => 'visits'])->with('success', $message);
+        return redirect()->route('complaints.show', [$complaint, 'tab' => 'visits'])->with('success', $request->resultMessage($visit));
     }
 
     public function cancel(Request $request, Complaint $complaint, ComplaintVisit $visit): RedirectResponse

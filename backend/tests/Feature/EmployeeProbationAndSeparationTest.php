@@ -57,7 +57,7 @@ class EmployeeProbationAndSeparationTest extends TestCase
 
         $this->actingAs($this->admin)->get(route('employees.edit', $employee))->assertOk()
             ->assertSee('name="work_email" value="neha.patil@classic.test"', false)
-            ->assertSee('Permanent email *', false);
+            ->assertSee('Permanent email <span class="text-danger">*</span>', false);
     }
 
     public function test_second_emergency_contact_and_dependents_are_validated_and_stored(): void

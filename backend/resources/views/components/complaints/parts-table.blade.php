@@ -9,7 +9,7 @@
         <table class="table nx-table nx-repeat-table mb-2">
             <thead>
                 <tr>
-                    <th style="min-width:200px">Part name *</th><th style="min-width:110px">Part code</th><th style="min-width:110px">Category</th><th style="min-width:100px">Make</th>
+                    <th style="min-width:200px">Part name <span class="text-danger">*</span></th><th style="min-width:110px">Part code</th><th style="min-width:110px">Category</th><th style="min-width:100px">Make</th>
                     <th style="width:80px">Qty</th><th style="width:90px">UOM</th><th style="min-width:120px">Part type</th>
                     @if($isUsed)<th style="min-width:120px">Source</th><th style="min-width:110px">Part warranty</th><th style="min-width:110px">Stock location</th><th style="width:110px">Est. cost</th><th style="width:110px">Billable rate</th><th>OEM warranty</th><th>Old part returned</th><th style="min-width:110px">Old part no</th>
                     @else<th style="min-width:160px">Recommended action</th><th>In stock</th><th style="min-width:110px">Stock location</th><th style="width:110px">Est. cost</th><th style="width:110px">Billable rate</th><th>Customer approval req.</th><th>Quotation given</th><th style="min-width:120px">Customer approval</th><th>Manager approval req.</th><th>Higher approval req.</th><th style="min-width:120px">Approval status</th><th style="min-width:130px">Purchase status</th><th style="width:90px">Est. days</th><th style="min-width:110px">Old part no</th>

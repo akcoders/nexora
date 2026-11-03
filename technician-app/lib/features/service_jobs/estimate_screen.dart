@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
-import 'service_job_detail_screen.dart';
+import '../../core/widgets/ui.dart';
 import '../../core/i18n/t.dart';
 
 class EstimateScreen extends StatefulWidget {
@@ -112,7 +112,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
         children: [
           const T(
             'Select work required',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 5),
           const T(
@@ -176,7 +176,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
                                 quantity.toStringAsFixed(0),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -213,58 +213,47 @@ class _EstimateScreenState extends State<EstimateScreen> {
               labelText: 'Estimate notes (optional)',
             ),
           ),
-          if (error != null) ...[
-            const SizedBox(height: 12),
-            Text(error!, style: const TextStyle(color: AppColors.danger)),
-          ],
+          if (error != null) ...[const SizedBox(height: 12), NoticeBox(error!)],
         ],
       ),
-      bottomSheet: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const T(
-                      'ESTIMATED TOTAL',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
+      bottomNavigationBar: BottomActionBar(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const T(
+                    'ESTIMATED TOTAL',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
                     ),
-                    Text(
-                      format.format(finalAmount),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  ),
+                  Text(
+                    format.format(finalAmount),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              FilledButton.icon(
-                onPressed: submitting ? null : submit,
-                style: FilledButton.styleFrom(minimumSize: const Size(165, 52)),
-                icon: submitting
-                    ? const SizedBox.square(
-                        dimension: 17,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(LucideIcons.send, size: 18),
-                label: Text(submitting ? 'Sending…' : 'Send for approval'),
-              ),
-            ],
-          ),
+            ),
+            FilledButton.icon(
+              onPressed: submitting ? null : submit,
+              style: FilledButton.styleFrom(minimumSize: const Size(165, 52)),
+              icon: submitting
+                  ? const SizedBox.square(
+                      dimension: 17,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(LucideIcons.send, size: 18),
+              label: Text(submitting ? 'Sending…' : 'Send for approval'),
+            ),
+          ],
         ),
       ),
     );

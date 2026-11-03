@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/config/app_info.dart';
+import '../../core/i18n/t.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/auth_controller.dart';
-import '../../core/i18n/t.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -31,106 +33,100 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    value: AppTheme.overlay.copyWith(
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: AppColors.navy,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+    child: Scaffold(
       body: Container(
+        width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0F2C72), AppColors.primary, Color(0xFF0369A1)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.navy, AppColors.navy2],
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -120,
-              right: -100,
-              child: Container(
-                width: 310,
-                height: 310,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: .10),
-                    width: 40,
+        child: SafeArea(
+          child: Column(
+            children: [
+              const Spacer(flex: 3),
+              Container(
+                    width: 88,
+                    height: 88,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.navyActive.withValues(alpha: .25),
+                          blurRadius: 36,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        'assets/images/classic-app-icon.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(duration: 500.ms)
+                  .scale(
+                    begin: const Offset(.85, .85),
+                    curve: Curves.easeOutBack,
                   ),
+              const SizedBox(height: 26),
+              const Text(
+                'NEXORA',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 4,
+                ),
+              ).animate().fadeIn(delay: 200.ms).slideY(begin: .3),
+              const SizedBox(height: 6),
+              const T(
+                'FIELD SERVICE',
+                style: TextStyle(
+                  color: AppColors.navyText,
+                  fontSize: 12,
+                  letterSpacing: 2.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ).animate().fadeIn(delay: 350.ms),
+              const Spacer(flex: 2),
+              const SizedBox(
+                width: 140,
+                child: LinearProgressIndicator(
+                  color: AppColors.navyActive,
+                  backgroundColor: Colors.white12,
+                  minHeight: 3,
                 ),
               ),
-            ),
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                        width: 92,
-                        height: 92,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withValues(alpha: .35),
-                              blurRadius: 40,
-                              spreadRadius: 8,
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: Image.asset(
-                            'assets/images/classic-app-icon.png',
-                          ),
-                        ),
-                      )
-                      .animate()
-                      .fadeIn(duration: 600.ms)
-                      .scale(
-                        begin: const Offset(.75, .75),
-                        curve: Curves.easeOutBack,
-                      ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'NEXORA',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 3,
-                    ),
-                  ).animate().fadeIn(delay: 250.ms).slideY(begin: .35),
-                  const SizedBox(height: 8),
-                  Text(
-                    'FIELD SERVICE',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Colors.white70,
-                      letterSpacing: 1.8,
-                    ),
-                  ).animate().fadeIn(delay: 450.ms),
-                  const SizedBox(height: 46),
-                  const SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 36,
-              child: T(
+              const SizedBox(height: 28),
+              const T(
                 'Reliable service, connected teams',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 12),
+                style: TextStyle(color: AppColors.navyMuted, fontSize: 12),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              const Text(
+                'v${AppInfo.version}',
+                style: TextStyle(color: AppColors.navyMuted, fontSize: 11),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

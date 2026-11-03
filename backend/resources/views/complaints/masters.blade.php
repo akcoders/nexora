@@ -27,18 +27,18 @@
         <div class="tab-content">
             @foreach($groups as $key => $group)
                 <div class="tab-pane fade {{ $tab === $key ? 'show active' : '' }}" id="master-{{ $key }}" role="tabpanel">
-                    <div class="px-3 pt-3 small text-secondary">{{ $group['hint'] }}.</div>
+                    <div class="nx-datatable-filters py-2 small text-secondary">{{ $group['hint'] }}.</div>
                     <table class="table nx-table" data-datatable data-dt-title="{{ $group['label'] }}" data-dt-page-length="50" data-dt-empty="No entries yet.">
-                        <thead><tr><th>Label</th>@if(in_array($key, ['pending_reason', 'pending_sub_reason'], true))<th>{{ $key === 'pending_reason' ? 'Pending group' : 'Under reason' }}</th>@endif<th>Code</th><th>Status</th><th class="no-export no-sort" data-orderable="false"></th></tr></thead>
+                        <thead><tr><th style="width:36%" data-priority="1">Label</th>@if(in_array($key, ['pending_reason', 'pending_sub_reason'], true))<th>{{ $key === 'pending_reason' ? 'Pending group' : 'Under reason' }}</th>@endif<th>Code</th><th style="width:150px" data-priority="3">Status</th><th class="no-export no-sort text-end" style="width:120px" data-orderable="false"></th></tr></thead>
                         <tbody>
                             @foreach($items[$key] ?? [] as $item)
                                 <tr>
-                                    <td class="fw-semibold">{{ $item->label }}</td>
+                                    <td class="fw-semibold" style="min-width:210px">{{ $item->label }}</td>
                                     @if($key === 'pending_reason')<td>{{ $pendingGroups[data_get($item->metadata, 'group')] ?? '—' }}</td>@endif
                                     @if($key === 'pending_sub_reason')<td>{{ $pendingReasons[data_get($item->metadata, 'reason')] ?? '—' }}</td>@endif
                                     <td class="nx-code notranslate">{{ $item->code }}</td>
                                     <td><x-pill :tone="$item->active ? 'success' : 'secondary'" :label="$item->active ? 'Active' : 'Inactive'" /></td>
-                                    <td class="text-end">@if($canManage)<form method="POST" action="{{ route('complaint-masters.toggle', $item) }}">@csrf @method('PATCH')<button class="btn btn-sm btn-light border">{{ $item->active ? 'Deactivate' : 'Activate' }}</button></form>@endif</td>
+                                    <td class="text-end">@if($canManage)<form method="POST" action="{{ route('complaint-masters.toggle', $item) }}">@csrf @method('PATCH')<button class="btn btn-sm {{ $item->active ? 'btn-outline-secondary' : 'btn-outline-primary' }}">{{ $item->active ? 'Deactivate' : 'Activate' }}</button></form>@endif</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -56,10 +56,10 @@
                 <div class="modal-header"><h5 class="modal-title" id="masterTitle">Add master entry</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12"><label class="form-label" for="mType">List *</label><select class="form-select" id="mType" name="type" required data-master-type>@foreach($groups as $key => $group)<option value="{{ $key }}" @selected(old('type', $tab) === $key)>{{ $group['label'] }}</option>@endforeach</select></div>
-                        <div class="col-12"><label class="form-label" for="mLabel">Label *</label><input class="form-control" id="mLabel" name="label" value="{{ old('label') }}" required maxlength="120"></div>
-                        <div class="col-12" data-master-extra="pending_reason"><label class="form-label" for="mGroup">Pending group *</label><select class="form-select" id="mGroup" name="group"><option value="">Select group</option>@foreach($pendingGroups as $key => $label)<option value="{{ $key }}" @selected(old('group') === $key)>{{ $label }}</option>@endforeach</select></div>
-                        <div class="col-12" data-master-extra="pending_sub_reason"><label class="form-label" for="mReason">Pending reason *</label><select class="form-select" id="mReason" name="reason"><option value="">Select reason</option>@foreach($pendingReasons as $code => $label)<option value="{{ $code }}" @selected(old('reason') === $code)>{{ $label }}</option>@endforeach</select></div>
+                        <div class="col-12"><label class="form-label" for="mType">List <span class="text-danger">*</span></label><select class="form-select" id="mType" name="type" required data-master-type>@foreach($groups as $key => $group)<option value="{{ $key }}" @selected(old('type', $tab) === $key)>{{ $group['label'] }}</option>@endforeach</select></div>
+                        <div class="col-12"><label class="form-label" for="mLabel">Label <span class="text-danger">*</span></label><input class="form-control" id="mLabel" name="label" value="{{ old('label') }}" required maxlength="120"></div>
+                        <div class="col-12" data-master-extra="pending_reason"><label class="form-label" for="mGroup">Pending group <span class="text-danger">*</span></label><select class="form-select" id="mGroup" name="group"><option value="">Select group</option>@foreach($pendingGroups as $key => $label)<option value="{{ $key }}" @selected(old('group') === $key)>{{ $label }}</option>@endforeach</select></div>
+                        <div class="col-12" data-master-extra="pending_sub_reason"><label class="form-label" for="mReason">Pending reason <span class="text-danger">*</span></label><select class="form-select" id="mReason" name="reason"><option value="">Select reason</option>@foreach($pendingReasons as $code => $label)<option value="{{ $code }}" @selected(old('reason') === $code)>{{ $label }}</option>@endforeach</select></div>
                     </div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i data-lucide="save"></i>Save</button></div>

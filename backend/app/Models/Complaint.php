@@ -259,12 +259,18 @@ class Complaint extends Model
 
     public function equipmentSummary(): string
     {
+        return $this->equipmentLabel() ?? 'Equipment not recorded';
+    }
+
+    /** Equipment type, make, model and capacity, or null when none were recorded. */
+    public function equipmentLabel(): ?string
+    {
         return collect([
             ComplaintOptions::label('equipment_types', $this->equipment_type),
             $this->make,
             $this->model,
             $this->capacity,
-        ])->filter()->join(' · ') ?: 'Equipment not recorded';
+        ])->filter()->join(' · ') ?: null;
     }
 
     public function chargesSubtotal(): float

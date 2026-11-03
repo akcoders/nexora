@@ -1,6 +1,10 @@
 {
-  "_report-chart-D9zZlu-I.js": {
-    "file": "assets/report-chart-D9zZlu-I.js",
+  "_library-layout-Pa91PKbB.js": {
+    "file": "assets/library-layout-Pa91PKbB.js",
+    "name": "library-layout"
+  },
+  "_report-chart-Bfjntbss.js": {
+    "file": "assets/report-chart-Bfjntbss.js",
     "name": "report-chart"
   },
   "_rolldown-runtime-Dd_uD5pT.js": {
@@ -26,7 +30,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-C9X7wNKA.css",
+    "file": "assets/app-DLFkLefi.css",
     "name": "app",
     "names": [
       "app.css"
@@ -34,8 +38,17 @@
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/css/library.css": {
+    "file": "assets/library-Dsy3F8wS.css",
+    "name": "library",
+    "names": [
+      "library.css"
+    ],
+    "src": "resources/css/library.css",
+    "isEntry": true
+  },
   "resources/css/theme.css": {
-    "file": "assets/theme-BcnBGPhc.css",
+    "file": "assets/theme-ChZ10Q0N.css",
     "name": "theme",
     "names": [
       "theme.css"
@@ -44,7 +57,7 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-B9cfdnG1.js",
+    "file": "assets/app-C26ZuC2f.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -61,16 +74,16 @@
     "isEntry": true
   },
   "resources/js/dashboard.js": {
-    "file": "assets/dashboard-fKyZ76BG.js",
+    "file": "assets/dashboard-5b8dCJ2Z.js",
     "name": "dashboard",
     "src": "resources/js/dashboard.js",
     "isEntry": true,
     "imports": [
-      "_report-chart-D9zZlu-I.js"
+      "_report-chart-Bfjntbss.js"
     ]
   },
   "resources/js/datatables.js": {
-    "file": "assets/datatables-B6cLwCf7.js",
+    "file": "assets/datatables-CjH_8e_z.js",
     "name": "datatables",
     "src": "resources/js/datatables.js",
     "isEntry": true,
@@ -83,18 +96,40 @@
     ]
   },
   "resources/js/kanban-board.js": {
-    "file": "assets/kanban-board-DWja2Tuu.js",
+    "file": "assets/kanban-board-BlqE_lXg.js",
     "name": "kanban-board",
     "src": "resources/js/kanban-board.js",
     "isEntry": true
   },
+  "resources/js/library-editor.js": {
+    "file": "assets/library-editor-DjfUxCxP.js",
+    "name": "library-editor",
+    "src": "resources/js/library-editor.js",
+    "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-Dd_uD5pT.js",
+      "_library-layout-Pa91PKbB.js"
+    ],
+    "css": [
+      "assets/library-editor-DVB7LGv8.css"
+    ]
+  },
+  "resources/js/library.js": {
+    "file": "assets/library-COddmiah.js",
+    "name": "library",
+    "src": "resources/js/library.js",
+    "isEntry": true,
+    "imports": [
+      "_library-layout-Pa91PKbB.js"
+    ]
+  },
   "resources/js/report-builder.js": {
-    "file": "assets/report-builder-CstCAoaT.js",
+    "file": "assets/report-builder-11QH4-qh.js",
     "name": "report-builder",
     "src": "resources/js/report-builder.js",
     "isEntry": true,
     "imports": [
-      "_report-chart-D9zZlu-I.js"
+      "_report-chart-Bfjntbss.js"
     ]
   },
   "resources/js/validation.js": {

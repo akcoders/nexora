@@ -1,17 +1,14 @@
 <x-guest-layout>
     <main class="nx-login">
-        <section class="nx-login-art" aria-label="Nexora operations overview">
-            <div class="nx-login-glow nx-login-glow-one"></div>
-            <div class="nx-login-glow nx-login-glow-two"></div>
-
+        <section class="nx-login-art" aria-label="CLASSIC Service ERP overview">
             <div class="d-flex align-items-center gap-3 position-relative z-1">
                 <span class="nx-logo-large p-0 overflow-hidden bg-white"><img src="{{ asset('images/brand/classic-app-icon.png') }}" class="w-100 h-100 object-fit-cover" alt="Classic Cooling"></span>
-                <div><div class="h4 mb-0 fw-bold">NEXORA</div><small class="text-white-50">by Classic Cooling</small></div>
+                <div><div class="h4 mb-0 fw-bold text-white notranslate" style="letter-spacing:.12em">CLASSIC</div><small class="text-white-50">Service ERP</small></div>
             </div>
 
             <div class="position-relative z-1 nx-login-story">
                 <span class="nx-login-eyebrow"><i data-lucide="sparkles"></i>Service operations, connected</span>
-                <h1>From the first call to the final service report.</h1>
+                <h1 class="text-white">From the first call to the final service report.</h1>
                 <p>Keep customers, teams and field work moving together from one secure workspace.</p>
                 <div class="nx-login-preview" aria-hidden="true">
                     <div class="nx-login-preview-top"><span><i data-lucide="activity"></i>Live operations</span><span class="nx-live-dot">Online</span></div>
@@ -28,7 +25,7 @@
 
         <section class="nx-login-form">
             <div class="nx-login-panel">
-                <div class="d-lg-none d-flex align-items-center gap-3 mb-5"><span class="nx-brand-mark p-0 overflow-hidden"><img src="{{ asset('images/brand/classic-app-icon.png') }}" class="w-100 h-100 object-fit-cover" alt="Classic Cooling"></span><div><strong class="h5 mb-0 d-block">Nexora</strong><small class="text-secondary">Classic Cooling workspace</small></div></div>
+                <div class="d-lg-none d-flex align-items-center gap-3 mb-5"><span class="nx-brand-mark p-0 overflow-hidden"><img src="{{ asset('images/brand/classic-app-icon.png') }}" class="w-100 h-100 object-fit-cover" alt="Classic Cooling"></span><div><strong class="h5 mb-0 d-block notranslate" style="letter-spacing:.12em">CLASSIC</strong><small class="text-secondary">Service ERP</small></div></div>
 
                 <div class="nx-login-welcome"><span class="nx-login-status"><span></span>Secure staff portal</span><h2>Welcome back</h2><p>Sign in with your work account to continue.</p></div>
 
