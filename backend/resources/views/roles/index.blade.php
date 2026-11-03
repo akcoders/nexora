@@ -25,7 +25,7 @@
             </div>
             <div class="nx-access-role-picker">
                 <div class="nx-access-select-wrap">
-                    <label for="roleSelector">1. Select a role</label>
+                    <label for="roleSelector" class="d-flex align-items-center gap-2"><span class="nx-access-step">1</span> Select a role</label>
                     <select id="roleSelector" class="form-select" data-role-select>
                         @foreach($roles as $role)
                             <option value="{{ route('roles.index', ['role' => $role->id]) }}" @selected($selectedRole?->is($role))>{{ $role->name }} · {{ $role->users_count }} {{ \Illuminate\Support\Str::plural('user', $role->users_count) }}</option>
@@ -79,7 +79,16 @@
                                                 $extras = $permissions[$module]->filter(fn ($permission) => ! in_array(str($permission->name)->after('.')->toString(), array_keys($actions), true));
                                             @endphp
                                             <tr data-permission-row data-module="{{ $module }}">
-                                                <th scope="row"><span class="nx-access-module-name">{{ $label }}</span><span class="nx-access-module-key">{{ $module }}</span></th>
+                                                <th scope="row">
+                                                    <span class="nx-access-module-name">{{ $label }}</span><span class="nx-access-module-key">{{ $module }}</span>
+                                                    @if($extras->isNotEmpty())
+                                                        <details class="nx-access-extra"><summary><i data-lucide="sliders-horizontal"></i> More actions <span>{{ $extras->count() }}</span></summary><div class="nx-access-extra-options">
+                                                            @foreach($extras as $permission)
+                                                                <label class="nx-access-extra-option"><input class="form-check-input" type="checkbox" name="permissions[]" value="{{ $permission->name }}" data-permission-input data-module="{{ $module }}" @checked($granted->contains($permission->name)) @disabled(! $canEdit)><span>{{ str($permission->name)->after('.')->replace('_', ' ')->headline() }}</span></label>
+                                                            @endforeach
+                                                        </div></details>
+                                                    @endif
+                                                </th>
                                                 @foreach($actions as $action => $actionLabel)
                                                     @php $key = $module.'.'.$action; @endphp
                                                     <td>
@@ -92,13 +101,6 @@
                                                 @endforeach
                                                 <td><label class="nx-access-check nx-access-row-all" title="Select all {{ $label }} permissions"><input class="form-check-input" type="checkbox" data-row-all @disabled(! $canEdit) aria-label="Select all {{ $label }} permissions"></label></td>
                                             </tr>
-                                            @if($extras->isNotEmpty())
-                                                <tr class="nx-access-extra-row"><td colspan="7"><details class="nx-access-extra"><summary><i data-lucide="sliders-horizontal"></i> More {{ $label }} actions <span>{{ $extras->count() }}</span></summary><div class="nx-access-extra-options">
-                                                    @foreach($extras as $permission)
-                                                        <label class="nx-access-extra-option"><input class="form-check-input" type="checkbox" name="permissions[]" value="{{ $permission->name }}" data-permission-input data-module="{{ $module }}" @checked($granted->contains($permission->name)) @disabled(! $canEdit)><span>{{ str($permission->name)->after('.')->replace('_', ' ')->headline() }}</span></label>
-                                                    @endforeach
-                                                </div></details></td></tr>
-                                            @endif
                                         @endforeach
                                     </tbody>
                                 </table>

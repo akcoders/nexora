@@ -28,7 +28,7 @@
     </div>
 
     <section class="nx-card mb-3">
-        <div class="nx-card-header"><h3 class="nx-card-title"><i data-lucide="files"></i>Standard reports</h3><span class="small text-secondary">Open, filter and export to Excel, CSV, PDF or print</span></div>
+        <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="files"></i>Standard reports</h3><p class="nx-card-subtitle">Open, filter and export to Excel, CSV, PDF or print</p></div></div>
         <div class="nx-card-body">
             <div class="row g-2">
                 @foreach($standard as [$label, $hint, $icon, $url])
@@ -47,7 +47,7 @@
         <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="hard-hat"></i>Technician summary</h3><p class="nx-card-subtitle">Attendance records and assigned workload</p></div></div>
         <table class="table nx-table" data-datatable data-dt-title="Technician summary" data-dt-page-length="10" data-dt-empty="No technician data.">
             <thead><tr><th>Technician</th><th>Code</th><th>Department</th><th>Attendance records</th><th>Assigned workflows</th></tr></thead>
-            <tbody>@foreach($technicianStats as $technician)<tr><td class="nx-row-title notranslate">{{ $technician->name }}</td><td class="nx-code notranslate">{{ $technician->employee_code }}</td><td>{{ $technician->department ?: '—' }}</td><td class="notranslate">{{ $technician->attendances_count }}</td><td class="notranslate">{{ $technician->assigned_tasks_count }}</td></tr>@endforeach</tbody>
+            <tbody>@foreach($technicianStats as $technician)<tr><td class="nx-row-title notranslate">{{ $technician->name }}</td><td class="notranslate"><span class="nx-code">{{ $technician->employee_code }}</span></td><td>{{ $technician->department ?: '—' }}</td><td class="notranslate">{{ $technician->attendances_count }}</td><td class="notranslate">{{ $technician->assigned_tasks_count }}</td></tr>@endforeach</tbody>
         </table>
     </section>
 
@@ -66,7 +66,8 @@
     @push('scripts')<script>
         document.addEventListener('DOMContentLoaded', () => {
             const palette = ['#1f5fbf', '#0f8b8d'];
-            new ApexCharts(document.querySelector('#operationsChart'), { chart: { type: 'area', height: 320, toolbar: { show: false }, fontFamily: 'Inter' }, series: [{ name: 'Attendance', data: @json($attendanceSeries) }, { name: 'New workflows', data: @json($taskSeries) }], xaxis: { categories: @json($labels), labels: { rotate: -45, hideOverlappingLabels: true } }, colors: palette, stroke: { curve: 'smooth', width: 3 }, fill: { type: 'gradient', gradient: { opacityFrom: .28, opacityTo: .03 } }, dataLabels: { enabled: false }, grid: { borderColor: '#edf0f5', strokeDashArray: 4 }, legend: { position: 'bottom' } }).render();
+            const operations = document.querySelector('#operationsChart');
+            new ApexCharts(operations, { chart: { type: 'area', height: 320, toolbar: { show: false }, fontFamily: 'Inter' }, series: [{ name: 'Attendance', data: @json($attendanceSeries) }, { name: 'New workflows', data: @json($taskSeries) }], xaxis: { categories: @json($labels), tickAmount: Math.max(2, Math.min(8, Math.floor(operations.clientWidth / 80))), labels: { rotate: 0, hideOverlappingLabels: true } }, colors: palette, stroke: { curve: 'smooth', width: 3 }, fill: { type: 'gradient', gradient: { opacityFrom: .28, opacityTo: .03 } }, dataLabels: { enabled: false }, grid: { borderColor: '#edf0f5', strokeDashArray: 4 }, legend: { position: 'bottom' } }).render();
             new ApexCharts(document.querySelector('#completionChart'), { chart: { type: 'radialBar', height: 320, fontFamily: 'Inter' }, series: [{{ $summary['completion'] }}], colors: ['#15803d'], plotOptions: { radialBar: { hollow: { size: '64%' }, dataLabels: { name: { show: true, offsetY: 22 }, value: { fontSize: '30px', fontWeight: 700, offsetY: -14 } } } }, labels: ['Completed'] }).render();
         });
     </script>@endpush

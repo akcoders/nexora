@@ -64,38 +64,38 @@
         <table class="table nx-table" data-datatable data-dt-title="Complaint register" data-dt-order='[]' data-dt-empty="No complaints match these filters.">
             <thead>
                 <tr>
-                    <th data-priority="1">Complaint</th>
-                    <th>Registered</th>
+                    <th data-priority="1" data-class-name="dt-left">Complaint</th>
+                    <th data-priority="7" data-class-name="dt-left">Registered</th>
                     <th data-priority="2">Customer / site</th>
-                    <th>Call type</th>
-                    <th>Nature of complaint</th>
-                    <th>Equipment</th>
-                    <th>Priority</th>
+                    <th data-priority="9" data-visible="false">Call type</th>
+                    <th data-priority="8" data-visible="false">Nature of complaint</th>
+                    <th data-priority="10" data-visible="false">Equipment</th>
+                    <th data-priority="4" data-class-name="dt-left">Priority</th>
                     <th data-priority="3">Status</th>
-                    <th>Technician</th>
-                    <th>Visits</th>
-                    <th>SLA</th>
-                    <th>Pending age</th>
-                    <th>Follow-up</th>
+                    <th data-priority="5">Technician</th>
+                    <th data-priority="11" data-visible="false">Visits</th>
+                    <th data-priority="6" data-class-name="dt-left">SLA</th>
+                    <th data-class-name="dt-left">Pending age</th>
+                    <th data-class-name="dt-left">Follow-up</th>
                     <th class="no-export no-sort text-end" data-orderable="false"></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($complaints as $complaint)
-                    @php $meta = $complaint->statusMeta(); $sla = $complaint->slaState(); $bucket = in_array($complaint->status, ['pending', 'under_observation'], true) ? $complaint->pendingBucket() : null; @endphp
+                    @php $meta = $complaint->statusMeta(); $sla = $complaint->slaState(); $bucket = in_array($complaint->status, ['pending', 'under_observation'], true) ? $complaint->pendingBucket() : null; $equipment = $complaint->equipmentLabel(); @endphp
                     <tr class="{{ $sla['key'] === 'breached' ? 'nx-overdue-row' : '' }}">
-                        <td data-order="{{ $complaint->registered_at->timestamp }}"><a class="nx-row-title nx-code notranslate" href="{{ route('complaints.show', $complaint) }}">{{ $complaint->complaint_no }}</a><span class="nx-row-sub">{{ $complaint->callTaker?->name ? 'By '.$complaint->callTaker->name : '' }}</span></td>
+                        <td data-order="{{ $complaint->registered_at->timestamp }}"><a class="nx-row-title nx-code notranslate" href="{{ route('complaints.show', $complaint) }}">{{ $complaint->complaint_no }}</a><span class="nx-row-sub">{{ $complaint->callTaker?->name ? 'By '.$complaint->callTaker->name : '' }}</span><x-pill class="d-md-none mt-1" :tone="$meta['tone']" :label="$meta['label']" /></td>
                         <td data-order="{{ $complaint->registered_at->timestamp }}" class="text-nowrap">{{ $complaint->registered_at->format('d M Y') }}<span class="nx-row-sub">{{ $complaint->registered_at->format('h:i A') }}</span></td>
-                        <td style="min-width:200px"><span class="nx-row-title notranslate">{{ $complaint->customer?->name }}</span><span class="nx-row-sub">{{ collect([$complaint->branch?->name, $complaint->site_location])->filter()->unique()->join(' · ') ?: ($complaint->customer?->code) }}</span></td>
+                        <td><span class="nx-row-title notranslate">{{ $complaint->customer?->name }}</span><span class="nx-row-sub">{{ collect([$complaint->branch?->name, $complaint->site_location])->filter()->unique()->join(' · ') ?: ($complaint->customer?->code) }}</span></td>
                         <td class="text-nowrap">{{ $complaint->callTypeLabel() }}</td>
-                        <td style="min-width:180px">{{ $complaint->nature_of_complaint }}</td>
-                        <td style="min-width:160px"><span class="nx-row-sub text-body">{{ $complaint->equipmentSummary() }}</span></td>
+                        <td>{{ $complaint->nature_of_complaint }}</td>
+                        <td>@if($equipment){{ $equipment }}@else<span class="text-secondary">—</span>@endif</td>
                         <td data-order="{{ array_search($complaint->priority, array_keys(ComplaintOptions::PRIORITIES)) }}"><x-pill :tone="$complaint->priorityTone()" :label="$complaint->priorityLabel()" /></td>
                         <td><x-pill :tone="$meta['tone']" :label="$meta['label']" /></td>
                         <td class="text-nowrap">{{ $complaint->technician?->name ?? '—' }}</td>
                         <td class="text-center notranslate">{{ $complaint->visits_count }}</td>
-                        <td data-order="{{ $complaint->resolution_due_at?->timestamp }}"><span class="badge badge-soft-{{ $sla['tone'] }}" title="Resolve by {{ $complaint->resolution_due_at?->format('d M Y, h:i A') }}">{{ $sla['label'] }}</span></td>
-                        <td data-order="{{ $bucket ? $complaint->pendingAgeInDays() : -1 }}">@if($bucket)<span class="badge badge-soft-{{ $bucket['tone'] === 'orange' ? 'orange' : $bucket['tone'] }}">{{ $complaint->pendingAgeInDays() }}d · {{ $bucket['label'] }}</span>@else<span class="text-secondary">—</span>@endif</td>
+                        <td data-order="{{ $complaint->resolution_due_at?->timestamp }}"><x-pill :tone="$sla['tone']" :label="$sla['label']" :title="'Resolve by '.$complaint->resolution_due_at?->format('d M Y, h:i A')" /></td>
+                        <td data-order="{{ $bucket ? $complaint->pendingAgeInDays() : -1 }}">@if($bucket)<x-pill :tone="$bucket['tone']" :label="$complaint->pendingAgeInDays().'d · '.$bucket['label']" />@else<span class="text-secondary">—</span>@endif</td>
                         <td data-order="{{ $complaint->follow_up_date?->timestamp ?? 0 }}" class="text-nowrap {{ $complaint->follow_up_date && $complaint->follow_up_date->lte(today()) ? 'text-danger fw-semibold' : '' }}">{{ $complaint->follow_up_date?->format('d M Y') ?? '—' }}</td>
                         <td class="text-end"><a class="btn btn-sm btn-light border" href="{{ route('complaints.show', $complaint) }}">Open</a></td>
                     </tr>

@@ -13,12 +13,12 @@
             <div class="modal-body">
                 <div class="row g-3">
 
-                    <div class="col-12"><label class="form-label">Title *</label><input class="form-control" name="title" value="{{ old('title') }}" placeholder="Clear action-oriented title" required maxlength="255"></div>
+                    <div class="col-12"><label class="form-label">Title <span class="text-danger">*</span></label><input class="form-control" name="title" value="{{ old('title') }}" placeholder="Clear action-oriented title" required maxlength="255"></div>
                     <div class="col-12"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="3" placeholder="Expected outcome, context and hand-off notes">{{ old('description') }}</textarea></div>
                     <input type="hidden" name="category" value="Internal">
-                    <div class="col-md-6"><label class="form-label">Priority *</label><select class="form-select" name="priority" required><option value="normal" @selected(old('priority') === 'normal')>Normal</option><option value="high" @selected(old('priority') === 'high')>High</option><option value="very_high" @selected(old('priority') === 'very_high')>Very high</option></select></div>
-                    <div class="col-md-6"><x-date-time-picker :value="old('due_at')" id="createDueDate" /></div>
-                    <div class="col-md-6"><label class="form-label">Responsible Person *</label><select class="form-select" name="assigned_to" required><option value="">Select responsible person</option>@foreach($users as $user)<option value="{{ $user->id }}" @selected(old('assigned_to') == $user->id)>{{ $user->name }} · {{ $user->designation }}</option>@endforeach</select></div>
+                    <div class="col-md-6"><label class="form-label">Responsible Person <span class="text-danger">*</span></label><select class="form-select" name="assigned_to" required><option value="">Select responsible person</option>@foreach($users as $user)<option value="{{ $user->id }}" @selected(old('assigned_to') == $user->id)>{{ $user->name }} · {{ $user->designation }}</option>@endforeach</select></div>
+                    <div class="col-md-6"><label class="form-label">Priority <span class="text-danger">*</span></label><select class="form-select" name="priority" required><option value="normal" @selected(old('priority') === 'normal')>Normal</option><option value="high" @selected(old('priority') === 'high')>High</option><option value="very_high" @selected(old('priority') === 'very_high')>Very high</option></select></div>
+                    <div class="col-12"><x-date-time-picker :value="old('due_at')" id="createDueDate" /></div>
                     <div class="col-12">
                         @if($creatingSubtask)
                             @php $inheritedObservers = $parentWorkflow->members->where('role', 'observer')->filter(fn ($member) => $member->user)->unique('user_id'); @endphp

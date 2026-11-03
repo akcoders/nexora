@@ -3,12 +3,12 @@
     @csrf
     @method('patch')
     <div class="col-12">
-        <label class="form-label" for="name">Full name *</label>
+        <label class="form-label" for="name">Full name <span class="text-danger">*</span></label>
         <input id="name" name="name" type="text" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $user->name) }}" required autocomplete="name" data-v="person_name" maxlength="255">
         @error('name')<div class="nx-error">{{ $message }}</div>@enderror
     </div>
     <div class="col-12">
-        <label class="form-label" for="email">Email *</label>
+        <label class="form-label" for="email">Email <span class="text-danger">*</span></label>
         <input id="email" name="email" type="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $user->email) }}" required autocomplete="username">
         @error('email')<div class="nx-error">{{ $message }}</div>@enderror
         @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())

@@ -34,11 +34,14 @@
         <div class="nx-card"><div class="nx-empty"><i data-lucide="lock"></i><strong>No data sources available</strong><div>Your role does not have access to any reportable module.</div></div></div>
     @else
     <div class="nx-card mb-3">
-        <div class="nx-card-body py-2 d-flex flex-wrap align-items-center gap-2">
-            <span class="small fw-semibold text-secondary me-1">Quick start:</span>
-            @foreach($templates as $index => $template)
-                <button type="button" class="btn btn-sm btn-light border" data-template="{{ $index }}"><i data-lucide="{{ $template['icon'] }}"></i>{{ $template['label'] }}</button>
-            @endforeach
+        <div class="nx-card-body py-2 d-flex align-items-start gap-2">
+            <span class="small fw-semibold text-secondary text-nowrap pt-1">Quick start:</span>
+            {{-- Wraps under the first chip on desktop; one swipeable row on phones. --}}
+            <div class="d-flex flex-nowrap flex-md-wrap gap-2 min-w-0 flex-grow-1 overflow-auto">
+                @foreach($templates as $index => $template)
+                    <button type="button" class="btn btn-sm btn-light border flex-shrink-0" data-template="{{ $index }}"><i data-lucide="{{ $template['icon'] }}"></i>{{ $template['label'] }}</button>
+                @endforeach
+            </div>
         </div>
     </div>
 
@@ -60,7 +63,7 @@
                 <label class="form-label">Split by <span class="text-secondary fw-normal">(optional)</span></label>
                 <select class="form-select mb-2" data-cfg="split_by"></select>
                 <label class="form-label">Measure</label>
-                <div class="d-flex gap-2 mb-2"><select class="form-select" style="max-width:130px" data-cfg="measure">@foreach($ui['measures'] as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select><select class="form-select d-none" data-cfg="measure_field"></select></div>
+                <div class="d-flex gap-2 mb-2"><select class="form-select" data-cfg="measure">@foreach($ui['measures'] as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select><select class="form-select d-none" data-cfg="measure_field"></select></div>
                 <div class="row g-2">
                     <div class="col-7"><label class="form-label">Sort</label><select class="form-select" data-cfg="sort"><option value="value_desc">Highest first</option><option value="value_asc">Lowest first</option><option value="label_asc">A → Z / oldest first</option><option value="label_desc">Z → A / newest first</option></select></div>
                     <div class="col-5"><label class="form-label">Show top</label><select class="form-select" data-cfg="limit">@foreach([5, 10, 20, 50, 100] as $limit)<option value="{{ $limit }}" @selected($limit === 20)>{{ $limit }}</option>@endforeach</select></div>
@@ -117,12 +120,12 @@
                 </div>
             </section>
             <section class="nx-card nx-datatable-card mb-3">
-                <div class="nx-card-header"><h3 class="nx-card-title"><i data-lucide="table"></i>Data</h3><span class="small text-secondary" data-report-count></span></div>
+                <div class="nx-card-header"><h3 class="nx-card-title"><i data-lucide="table"></i>Data</h3><span class="badge badge-soft-secondary" data-report-count></span></div>
                 <div data-report-table><div class="nx-empty py-4">Run a report to see the rows. You can export them to Excel, CSV, PDF or print.</div></div>
             </section>
 
             <section class="nx-card nx-datatable-card">
-                <div class="nx-card-header"><h3 class="nx-card-title"><i data-lucide="folder-open"></i>Saved reports</h3><span class="small text-secondary">Your reports and reports shared with everyone</span></div>
+                <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="folder-open"></i>Saved reports</h3><p class="nx-card-subtitle">Your reports and reports shared with everyone</p></div></div>
                 <table class="table nx-table" data-datatable data-dt-title="Saved reports" data-dt-page-length="10" data-dt-empty="No saved reports yet. Build one above and press Save.">
                     <thead><tr><th>Report</th><th>Data source</th><th>Owner</th><th>Shared</th><th>On dashboard</th><th>Updated</th><th class="no-export no-sort" data-orderable="false"></th></tr></thead>
                     <tbody>
@@ -155,7 +158,7 @@
                 <div class="modal-header"><h5 class="modal-title" id="saveReportTitle">Save report</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
                     <div class="alert alert-danger d-none" data-save-error></div>
-                    <div class="mb-3"><label class="form-label" for="reportName">Report name *</label><input class="form-control" id="reportName" name="name" required maxlength="120" placeholder="e.g. Pending complaints by reason"></div>
+                    <div class="mb-3"><label class="form-label" for="reportName">Report name <span class="text-danger">*</span></label><input class="form-control" id="reportName" name="name" required maxlength="120" placeholder="e.g. Pending complaints by reason"></div>
                     <div class="mb-3"><label class="form-label" for="reportDescription">Description</label><input class="form-control" id="reportDescription" name="description" maxlength="500"></div>
                     <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="reportShared" name="is_shared" value="1"><label class="form-check-label" for="reportShared">Share with everyone who can see this data</label></div>
                     <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="reportPinned" name="pinned" value="1"><label class="form-check-label" for="reportPinned">Pin to my dashboard</label></div>

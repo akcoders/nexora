@@ -10,12 +10,13 @@
         $greeting = now()->hour < 12 ? 'Good morning' : (now()->hour < 17 ? 'Good afternoon' : 'Good evening');
     @endphp
 
-    <div class="nx-dash-toolbar">
+    <div class="nx-page-header">
         <div>
-            <h2 class="h5 mb-1">{{ $greeting }}, <span class="notranslate">{{ $firstName }}</span></h2>
-            <div class="small text-secondary"><i data-lucide="calendar-days" style="width:14px"></i> {{ now()->format('l, d F Y') }} · Showing {{ strtolower($periods[$period]) }} ({{ $from->format('d M') }} – {{ $to->format('d M Y') }})</div>
+            <div class="nx-page-kicker">Overview</div>
+            <h2>{{ $greeting }}, <span class="notranslate">{{ $firstName }}</span></h2>
+            <p><i data-lucide="calendar-days" class="me-1" style="width:14px"></i>{{ now()->format('l, d F Y') }} · Showing {{ strtolower($periods[$period]) }} ({{ $from->format('d M') }} – {{ $to->format('d M Y') }})</p>
         </div>
-        <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="nx-page-actions">
             <nav class="nx-filter-pills" aria-label="Period">
                 @foreach($periods as $key => $label)<a class="{{ $period === $key ? 'active' : '' }}" href="{{ route('dashboard', ['period' => $key]) }}">{{ $label }}</a>@endforeach
             </nav>
@@ -26,18 +27,20 @@
 
     {{-- KPIs --}}
     <div {!! $w('kpis') !!}>
+        @if($canComplaints)
         <div class="row g-3 mb-3">
-            @if($canComplaints)
-                <div class="col-6 col-md-4 col-xl-3"><x-kpi label="Active complaints" :value="$metrics['active']" icon="clipboard-list" tone="primary" :href="route('complaints.index')" :foot="$metrics['registered'].' registered in period'" /></div>
-                <div class="col-6 col-md-4 col-xl-3"><x-kpi label="Pending complaints" :value="$metrics['pending']" icon="hourglass" tone="danger" :href="route('complaints.pending')" :foot="$pendingTotal.' incl. observation'" /></div>
-                <div class="col-6 col-md-4 col-xl-3"><x-kpi label="Follow-ups due" :value="$metrics['followUps']" icon="phone-forwarded" tone="warning" :href="route('complaints.pending', ['follow_up' => 'overdue'])" foot="Today and overdue" /></div>
-                <div class="col-6 col-md-4 col-xl-3"><x-kpi label="SLA breached (open)" :value="$metrics['breached']" icon="alarm-clock-off" tone="orange" :href="route('complaints.index', ['flag' => 'sla_breached'])" foot="Past resolution time" /></div>
-                <div class="col-6 col-md-4 col-xl-3"><x-kpi label="Closed in period" :value="$metrics['closed']" icon="circle-check-big" tone="success" :href="route('complaints.index', ['status' => 'closed', 'from' => $from->toDateString()])" :foot="$metrics['slaMet'] !== null ? $metrics['slaMet'].'% within SLA' : 'No closures yet'" /></div>
-                <div class="col-6 col-md-4 col-xl-3"><x-kpi label="Avg. resolution time" :value="$metrics['avgResolution'] !== null ? $metrics['avgResolution'].' days' : '—'" icon="timer" tone="info" foot="Registration to closure" /></div>
-            @endif
-            @if($metrics['serviceJobsToday'] !== null)<div class="col-6 col-md-4 col-xl-3"><x-kpi label="Service jobs today" :value="$metrics['serviceJobsToday']" icon="wrench" tone="purple" :href="route('service-jobs.index')" /></div>@endif
-            @if($canAttendance)<div class="col-6 col-md-4 col-xl-3"><x-kpi label="Present today" :value="$metrics['present'].' / '.$metrics['technicians']" icon="user-check" tone="secondary" :href="route('attendance.index')" :foot="max(0, $metrics['technicians'] - $metrics['present']).' technicians not checked in'" /></div>@endif
-            <div class="col-6 col-md-4 col-xl-3"><x-kpi label="Open workflows" :value="$metrics['pendingTasks']" icon="git-branch" tone="dark" :href="route('workflows.index', ['scope' => 'open'])" :foot="$metrics['overdueTasks'].' overdue'" /></div>
+                <div class="col-6 col-md-4 col-xxl-2"><x-kpi label="Active complaints" :value="$metrics['active']" icon="clipboard-list" tone="primary" :href="route('complaints.index')" :foot="$metrics['registered'].' registered in period'" /></div>
+                <div class="col-6 col-md-4 col-xxl-2"><x-kpi label="Pending complaints" :value="$metrics['pending']" icon="hourglass" tone="danger" :href="route('complaints.pending')" :foot="$pendingTotal.' incl. observation'" /></div>
+                <div class="col-6 col-md-4 col-xxl-2"><x-kpi label="Follow-ups due" :value="$metrics['followUps']" icon="phone-forwarded" tone="warning" :href="route('complaints.pending', ['follow_up' => 'overdue'])" foot="Today and overdue" /></div>
+                <div class="col-6 col-md-4 col-xxl-2"><x-kpi label="SLA breached (open)" :value="$metrics['breached']" icon="alarm-clock-off" tone="orange" :href="route('complaints.index', ['flag' => 'sla_breached'])" foot="Past resolution time" /></div>
+                <div class="col-6 col-md-4 col-xxl-2"><x-kpi label="Closed in period" :value="$metrics['closed']" icon="circle-check-big" tone="success" :href="route('complaints.index', ['status' => 'closed', 'from' => $from->toDateString()])" :foot="$metrics['slaMet'] !== null ? $metrics['slaMet'].'% within SLA' : 'No closures yet'" /></div>
+                <div class="col-6 col-md-4 col-xxl-2"><x-kpi label="Avg. resolution time" :value="$metrics['avgResolution'] !== null ? $metrics['avgResolution'].' days' : '—'" icon="timer" tone="info" foot="Registration to closure" /></div>
+        </div>
+        @endif
+        <div class="row g-3 mb-3">
+            @if($metrics['serviceJobsToday'] !== null)<div class="col-12 col-md"><x-kpi label="Service jobs today" :value="$metrics['serviceJobsToday']" icon="wrench" tone="purple" :href="route('service-jobs.index')" /></div>@endif
+            @if($canAttendance)<div class="col-12 col-md"><x-kpi label="Present today" :value="$metrics['present'].' / '.$metrics['technicians']" icon="user-check" tone="secondary" :href="route('attendance.index')" :foot="max(0, $metrics['technicians'] - $metrics['present']).' technicians not checked in'" /></div>@endif
+            <div class="col-12 col-md"><x-kpi label="Open workflows" :value="$metrics['pendingTasks']" icon="git-branch" tone="dark" :href="route('workflows.index', ['scope' => 'open'])" :foot="$metrics['overdueTasks'].' overdue'" /></div>
         </div>
     </div>
 
@@ -48,12 +51,12 @@
                 <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="phone-forwarded"></i>Today's follow-ups</h3><p class="nx-card-subtitle">Pending complaints due for follow-up today or earlier</p></div><a class="btn btn-sm btn-light border" href="{{ route('complaints.pending', ['follow_up' => 'overdue']) }}">Pending board</a></div>
                 <div class="table-responsive">
                     <table class="table nx-table nx-table-sm mb-0">
-                        <thead><tr><th class="ps-4">Complaint</th><th>Customer</th><th>Reason / next action</th><th>Responsible</th><th class="pe-4">Due</th></tr></thead>
+                        <thead><tr><th class="ps-4">Complaint</th><th>Reason<span class="d-none d-md-inline"> / next action</span></th><th class="d-none d-md-table-cell">Responsible</th><th class="pe-4">Due</th></tr></thead>
                         <tbody>
                             @forelse($followUps as $complaint)
-                                <tr><td class="ps-4"><a class="nx-code notranslate" href="{{ route('complaints.show', [$complaint, 'tab' => 'pending']) }}">{{ $complaint->complaint_no }}</a></td><td class="notranslate">{{ $complaint->customer?->name }}</td><td style="min-width:180px"><span class="nx-row-title">{{ $complaint->pending_reason ?? ComplaintOptions::status($complaint->status)['label'] }}</span><span class="nx-row-sub">{{ $complaint->next_action }}</span></td><td>{{ $complaint->responsibleUser?->name ?? ComplaintOptions::label('pending_owners', $complaint->pending_owner) ?? '—' }}</td><td class="pe-4 text-nowrap {{ $complaint->follow_up_date->isToday() ? 'text-warning' : 'text-danger' }} fw-semibold">{{ $complaint->follow_up_date->isToday() ? 'Today' : $complaint->follow_up_date->format('d M') }}</td></tr>
+                                <tr><td class="ps-4"><a class="nx-code notranslate" href="{{ route('complaints.show', [$complaint, 'tab' => 'pending']) }}">{{ $complaint->complaint_no }}</a><span class="nx-row-sub notranslate">{{ $complaint->customer?->name }}</span></td><td><span class="nx-row-title">{{ $complaint->pending_reason ?? ComplaintOptions::status($complaint->status)['label'] }}</span><span class="nx-row-sub">{{ $complaint->next_action }}</span></td><td class="d-none d-md-table-cell">{{ $complaint->responsibleUser?->name ?? ComplaintOptions::label('pending_owners', $complaint->pending_owner) ?? '—' }}</td><td class="pe-4 text-nowrap {{ $complaint->follow_up_date->isToday() ? 'text-warning' : 'text-danger' }} fw-semibold">{{ $complaint->follow_up_date->isToday() ? 'Today' : $complaint->follow_up_date->format('d M') }}</td></tr>
                             @empty
-                                <tr><td colspan="5"><div class="nx-empty py-4"><i data-lucide="party-popper"></i><strong>No follow-ups due</strong><div>Every pending complaint is on schedule.</div></div></td></tr>
+                                <tr><td colspan="4"><div class="nx-empty py-4"><i data-lucide="party-popper"></i><strong>No follow-ups due</strong><div>Every pending complaint is on schedule.</div></div></td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -118,19 +121,24 @@
     @endif
 
     <div {!! $w('my_reports') !!}>
-        <div class="nx-section-head mt-1"><h3 class="h6 mb-0 d-flex align-items-center gap-2"><i data-lucide="pin" style="width:16px"></i>My pinned reports</h3><a class="small fw-semibold" href="{{ route('reports.builder') }}">Report builder →</a></div>
-        <div class="row g-3 mb-3">
-            @forelse($pinnedReports as $report)
-                <div class="col-xl-6">
-                    <section class="nx-card nx-widget" data-pinned-report data-url="{{ route('reports.saved.data', $report) }}">
-                        <div class="nx-card-header"><div class="min-w-0"><h3 class="nx-card-title text-truncate"><i data-lucide="chart-bar"></i>{{ $report->name }}</h3><p class="nx-card-subtitle" data-report-meta>Loading…</p></div><a class="btn btn-sm btn-light border" href="{{ route('reports.builder', ['report' => $report->id]) }}">Open</a></div>
-                        <div class="nx-card-body"><div data-report-body class="nx-chart"><div class="nx-empty py-5"><span class="spinner-border spinner-border-sm text-primary"></span></div></div></div>
-                    </section>
-                </div>
-            @empty
-                <div class="col-12"><div class="nx-card"><div class="nx-empty"><i data-lucide="chart-no-axes-combined"></i><strong>Make this dashboard yours</strong><div>Build any report — complaints by technician, pending by reason, parts by month — and pin it here.</div><a class="btn btn-primary btn-sm mt-3" href="{{ route('reports.builder') }}"><i data-lucide="plus"></i>Create a report</a></div></div></div>
-            @endforelse
-        </div>
+        @if($pinnedReports->isNotEmpty())
+            <div class="nx-section-head mt-1"><h3 class="h6 mb-0 d-flex align-items-center gap-2"><i data-lucide="pin" style="width:16px"></i>My pinned reports</h3><a class="btn btn-sm btn-light border" href="{{ route('reports.builder') }}">Report builder</a></div>
+            <div class="row g-3 mb-3">
+                @foreach($pinnedReports as $report)
+                    <div class="col-xl-6">
+                        <section class="nx-card nx-widget" data-pinned-report data-url="{{ route('reports.saved.data', $report) }}">
+                            <div class="nx-card-header"><div class="min-w-0"><h3 class="nx-card-title text-truncate"><i data-lucide="chart-bar"></i>{{ $report->name }}</h3><p class="nx-card-subtitle" data-report-meta>Loading…</p></div><a class="btn btn-sm btn-light border" href="{{ route('reports.builder', ['report' => $report->id]) }}">Open</a></div>
+                            <div class="nx-card-body"><div data-report-body class="nx-chart"><div class="nx-empty py-5"><span class="spinner-border spinner-border-sm text-primary"></span></div></div></div>
+                        </section>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <section class="nx-card mb-3">
+                <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="pin"></i>My pinned reports</h3><p class="nx-card-subtitle">Reports you pin in the builder appear here</p></div><a class="btn btn-sm btn-light border" href="{{ route('reports.builder') }}">Report builder</a></div>
+                <div class="nx-empty"><i data-lucide="chart-no-axes-combined"></i><strong>Make this dashboard yours</strong><div>Build any report — complaints by technician, pending by reason, parts by month — and pin it here.</div><a class="btn btn-primary btn-sm mt-3" href="{{ route('reports.builder') }}"><i data-lucide="plus"></i>Create a report</a></div>
+            </section>
+        @endif
     </div>
 
     <div class="row g-3">
@@ -144,10 +152,10 @@
                 <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="git-branch"></i>Recent workflows</h3><p class="nx-card-subtitle">Latest internal work items you can see</p></div><a class="btn btn-sm btn-light border" href="{{ route('workflows.index', ['scope' => 'open']) }}">All workflows</a></div>
                 <div class="table-responsive">
                     <table class="table nx-table nx-table-sm mb-0">
-                        <thead><tr><th class="ps-4">Workflow</th><th>Responsible</th><th>Due</th><th class="pe-4">Status</th></tr></thead>
+                        <thead><tr><th class="ps-4">Workflow</th><th class="d-none d-md-table-cell">Responsible</th><th class="d-none d-md-table-cell">Due</th><th class="pe-4">Status</th></tr></thead>
                         <tbody>
                             @forelse($recentTasks as $task)
-                                <tr><td class="ps-4"><a class="nx-row-title" href="{{ route('tasks.show', $task) }}">{{ $task->title }}</a><span class="nx-row-sub notranslate">{{ $task->task_no }}</span></td><td>{{ $task->assignee?->name ?? '—' }}</td><td class="small {{ $task->isOverdue() ? 'text-danger fw-semibold' : '' }}">{{ $task->due_at?->format('d M, h:i A') ?? '—' }}</td><td class="pe-4"><x-pill :tone="$task->isClosed() ? 'success' : ($task->isOverdue() ? 'danger' : 'warning')" :label="$task->isClosed() ? 'Completed' : ($task->isOverdue() ? 'Overdue' : 'Pending')" /></td></tr>
+                                <tr><td class="ps-4"><a class="nx-row-title" href="{{ route('tasks.show', $task) }}">{{ $task->title }}</a><span class="nx-row-sub notranslate">{{ $task->task_no }}</span><span class="nx-row-sub d-md-none {{ $task->isOverdue() ? 'text-danger fw-semibold' : '' }}">Due {{ $task->due_at?->format('d M, h:i A') ?? '—' }}</span></td><td class="d-none d-md-table-cell">{{ $task->assignee?->name ?? '—' }}</td><td class="d-none d-md-table-cell small text-nowrap {{ $task->isOverdue() ? 'text-danger fw-semibold' : '' }}">{{ $task->due_at?->format('d M, h:i A') ?? '—' }}</td><td class="pe-4"><x-pill :tone="$task->isClosed() ? 'success' : ($task->isOverdue() ? 'danger' : 'warning')" :label="$task->isClosed() ? 'Completed' : ($task->isOverdue() ? 'Overdue' : 'Pending')" /></td></tr>
                             @empty
                                 <tr><td colspan="4" class="text-center text-secondary py-4">No workflows yet.</td></tr>
                             @endforelse

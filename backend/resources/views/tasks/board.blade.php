@@ -16,9 +16,11 @@
 
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 ms-lg-auto">
-                    <div class="input-group nx-kanban-search"><span class="input-group-text bg-white border-end-0"><i data-lucide="search" style="width:16px"></i></span><input class="form-control border-start-0 ps-0" type="search" data-search-input placeholder="Search number, title, customer, owner" value="{{ request('search') }}" aria-label="Search cards"></div>
-                    <a class="btn btn-light border" href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}" title="List view"><i data-lucide="list" style="width:17px"></i><span class="d-none d-xl-inline ms-1">List</span></a>
-                    @if(auth()->user()->can('tasks.create') || auth()->user()->can('tasks.assign'))<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#taskModal"><i data-lucide="plus" style="width:17px"></i> New workflow</button>@endif
+                    <label class="nx-input-icon nx-kanban-search mb-0"><i data-lucide="search"></i><input class="form-control" type="search" data-search-input placeholder="Search number, title or owner" value="{{ request('search') }}" aria-label="Search cards"></label>
+                    <div class="nx-page-actions">
+                        <a class="btn btn-light border" href="{{ route($moduleRoute.'.index', ['scope' => 'open']) }}" title="List view"><i data-lucide="list" style="width:17px"></i><span class="d-sm-none d-xl-inline">List</span></a>
+                        @if(auth()->user()->can('tasks.create') || auth()->user()->can('tasks.assign'))<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#taskModal"><i data-lucide="plus" style="width:17px"></i> New workflow</button>@endif
+                    </div>
                 </div>
             </div>
             <div class="nx-kanban-toolbar-row border-top pt-3 mt-3">
@@ -28,8 +30,10 @@
                     <button type="button" class="nx-kanban-chip" data-quick="created"><i data-lucide="pen-line"></i>Created by me</button>
                     <button type="button" class="nx-kanban-chip danger" data-quick="overdue"><i data-lucide="alarm-clock"></i>Overdue</button>
                 </div>
-                <div class="nx-kanban-stats ms-lg-auto" data-stats aria-live="polite"></div>
-                <button type="button" class="nx-icon-btn" data-refresh title="Refresh board" aria-label="Refresh board"><i data-lucide="refresh-cw" style="width:16px"></i></button>
+                <div class="d-flex align-items-center gap-2 ms-lg-auto">
+                    <div class="nx-kanban-stats flex-grow-1" data-stats aria-live="polite"></div>
+                    <button type="button" class="nx-icon-btn flex-shrink-0" data-refresh title="Refresh board" aria-label="Refresh board"><i data-lucide="refresh-cw" style="width:16px"></i></button>
+                </div>
             </div>
         </div>
 

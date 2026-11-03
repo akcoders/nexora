@@ -16,21 +16,23 @@ const BASE = {
 
 const number = (value) => (typeof value === 'number' ? value.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : value);
 
-export function chartOptions(result, { height = 300, onClick = null } = {}) {
+export function chartOptions(result, { height = 300, width = 0, onClick = null, toolbar = true } = {}) {
     const type = result.chart || 'bar';
     const labels = result.labels || [];
     const series = result.series || [];
     const events = onClick ? { dataPointSelection: (event, ctx, config) => onClick(config.dataPointIndex, config.seriesIndex) } : {};
+    const chart = { ...BASE.chart, toolbar: { ...BASE.chart.toolbar, show: toolbar }, height, events };
 
     if (type === 'pie' || type === 'donut') {
         const first = series[0]?.data || [];
         return {
             ...BASE,
-            chart: { ...BASE.chart, type, height, events },
+            chart: { ...chart, type },
             series: first,
             labels,
-            legend: { ...BASE.legend, position: 'right' },
-            plotOptions: { pie: { donut: { size: '62%', labels: { show: type === 'donut', total: { show: true, label: 'Total', formatter: (w) => number(w.globals.seriesTotals.reduce((a, b) => a + b, 0)) } } } } },
+            legend: { ...BASE.legend, position: 'bottom', horizontalAlign: 'center' },
+            // Thin slices keep their percentage in the tooltip instead of an overlapping label.
+            plotOptions: { pie: { dataLabels: { minAngleToShowLabel: 25 }, donut: { size: '68%', labels: { show: type === 'donut', total: { show: true, label: 'Total', formatter: (w) => number(w.globals.seriesTotals.reduce((a, b) => a + b, 0)) } } } } },
             dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(0)}%`, dropShadow: { enabled: false } },
             tooltip: { y: { formatter: number } },
         };
@@ -40,18 +42,44 @@ export function chartOptions(result, { height = 300, onClick = null } = {}) {
     const stacked = type === 'stacked';
     const apexType = type === 'line' ? 'line' : type === 'area' ? 'area' : 'bar';
 
+    // Counts get whole-number ticks (no "0.5 visits"); small counts step by one.
+    const values = series.flatMap((serie) => serie.data || []).map(Number);
+    const whole = values.every(Number.isInteger);
+    const totals = stacked ? labels.map((_, index) => series.reduce((sum, serie) => sum + (Number(serie.data?.[index]) || 0), 0)) : values;
+    const max = Math.max(0, ...totals);
+    const stepSize = whole && max <= 5 ? 1 : undefined;
+    const tick = (val) => (whole && typeof val === 'number' ? number(Math.round(val)) : number(val));
+    // Long date series show level labels about every 80px instead of a rotated fringe.
+    const dense = !horizontal && labels.length > 12;
+    const tickAmount = dense ? Math.max(2, Math.min(8, Math.floor((width || 640) / 80))) : undefined;
+    // Bars keep a steady thickness: one or two categories get slim bars, not blocks filling the plot.
+    const slot = (horizontal ? height - 60 : (width || 640) - 70) / Math.max(1, labels.length);
+    const groups = stacked ? 1 : Math.max(1, series.length);
+    const barSize = (target, cap) => `${Math.round(Math.max(4, Math.min(cap, (target * groups * 100) / Math.max(1, slot))))}%`;
+    // Weekday labels ("Wed 28") that don't fit side by side (phones) show the day number; the tooltip keeps the full label.
+    const dayOnly = !horizontal && !dense && slot < 46 && labels.length > 0 && labels.every((label) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2}$/.test(label));
+    const dayLabels = dayOnly ? { formatter: (val) => String(val).slice(4) } : {};
+
     return {
         ...BASE,
-        chart: { ...BASE.chart, type: apexType, height, stacked, events },
+        chart: { ...chart, type: apexType, stacked },
         series: series.map((serie) => ({ name: serie.name, data: serie.data })),
-        xaxis: { categories: labels, labels: { trim: true, hideOverlappingLabels: true, style: { fontSize: '11px' } }, axisBorder: { show: false }, axisTicks: { show: false } },
-        yaxis: { labels: { formatter: (val) => (horizontal ? val : number(val)), style: { fontSize: '11px' }, maxWidth: 180 } },
-        plotOptions: { bar: { horizontal, borderRadius: 3, columnWidth: '55%', barHeight: '62%', distributed: !stacked && series.length === 1 && labels.length <= 12 && horizontal } },
+        xaxis: {
+            categories: labels,
+            tickAmount,
+            stepSize: horizontal ? stepSize : undefined,
+            // Full category names: rotated when they collide rather than cut to "Under observat…".
+            labels: { trim: false, hideOverlappingLabels: true, rotate: -45, ...(dense ? { rotate: 0, rotateAlways: false } : {}), ...(horizontal ? { formatter: tick } : dayLabels), style: { fontSize: '11px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+        },
+        yaxis: { stepSize: horizontal ? undefined : stepSize, labels: { formatter: (val) => (horizontal ? val : tick(val)), style: { fontSize: '11px' }, maxWidth: 180 } },
+        plotOptions: { bar: { horizontal, borderRadius: 3, columnWidth: barSize(32, 55), barHeight: barSize(20, 62), distributed: false } },
         stroke: { curve: 'smooth', width: apexType === 'bar' ? 0 : 3 },
         fill: apexType === 'area' ? { type: 'gradient', gradient: { opacityFrom: 0.3, opacityTo: 0.03 } } : { opacity: 1 },
         markers: { size: apexType === 'line' ? 4 : 0 },
         legend: { ...BASE.legend, show: series.length > 1 },
-        tooltip: { y: { formatter: number } },
+        tooltip: { y: { formatter: number }, ...(dayOnly ? { x: { formatter: (val, { dataPointIndex } = {}) => labels[dataPointIndex] ?? val } } : {}) },
     };
 }
 
@@ -69,7 +97,7 @@ export function renderResult(container, result, options = {}) {
         renderTable(container, result);
         return null;
     }
-    const chart = new window.ApexCharts(container, chartOptions(result, options));
+    const chart = new window.ApexCharts(container, chartOptions(result, { width: container.clientWidth, ...options }));
     chart.render();
     container._nxChart = chart;
     return chart;

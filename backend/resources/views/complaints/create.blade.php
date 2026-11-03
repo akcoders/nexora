@@ -26,7 +26,8 @@
 
     <form method="POST" action="{{ route('complaints.store') }}" id="complaintForm" data-complaint-form data-context-url="{{ route('complaints.customer-context', ['customer' => '__ID__']) }}" data-sla='@json(ComplaintOptions::PRIORITIES)' novalidate>
         @csrf
-        <div class="row g-3">
+        {{-- Cards carry their own mb-3, so the stacked columns need no extra row gap below xl. --}}
+        <div class="row gx-3 gy-0">
             <div class="col-xl-8">
                 {{-- 1. Customer & site --}}
                 <section class="nx-card mb-3">
@@ -40,15 +41,15 @@
                     <div class="nx-card-body">
                         <fieldset data-mode-panel="existing" @disabled($mode !== 'existing')>
                             <div class="row g-3">
-                                <div class="col-md-8"><label class="form-label" for="customerId">Customer *</label><select class="form-select" id="customerId" name="customer_id" required data-searchable data-placeholder="Search by name, code or city">{!! $opt($customers->mapWithKeys(fn ($customer) => [$customer->id => $customer->name.' · '.$customer->code.($customer->city ? ' · '.$customer->city : '')])->all(), $customerId, 'Search by name, code or city') !!}</select></div>
+                                <div class="col-md-8"><label class="form-label nx-required" for="customerId">Customer</label><select class="form-select" id="customerId" name="customer_id" required data-searchable data-placeholder="Search by name, code or city">{!! $opt($customers->mapWithKeys(fn ($customer) => [$customer->id => $customer->name.' · '.$customer->code.($customer->city ? ' · '.$customer->city : '')])->all(), $customerId, 'Search by name, code or city') !!}</select></div>
                                 <div class="col-md-4"><label class="form-label">Customer ID</label><input class="form-control notranslate" data-fill="customer_code" readonly placeholder="Auto"></div>
                             </div>
                             <div class="alert alert-warning mt-3 mb-0 d-none" data-open-complaints></div>
                         </fieldset>
                         <fieldset data-mode-panel="new" @disabled($mode !== 'new') class="{{ $mode === 'new' ? '' : 'd-none' }}">
                             <div class="row g-3">
-                                <div class="col-md-6"><label class="form-label" for="ncName">Customer name *</label><input class="form-control" id="ncName" name="new_customer[name]" value="{{ old('new_customer.name') }}" required maxlength="255"></div>
-                                <div class="col-md-3"><label class="form-label" for="ncPhone">Phone *</label><input class="form-control" id="ncPhone" name="new_customer[phone]" value="{{ old('new_customer.phone') }}" required data-v="phone" inputmode="tel"></div>
+                                <div class="col-md-6"><label class="form-label nx-required" for="ncName">Customer name</label><input class="form-control" id="ncName" name="new_customer[name]" value="{{ old('new_customer.name') }}" required maxlength="255"></div>
+                                <div class="col-md-3"><label class="form-label nx-required" for="ncPhone">Phone</label><input class="form-control" id="ncPhone" name="new_customer[phone]" value="{{ old('new_customer.phone') }}" required data-v="phone" inputmode="tel"></div>
                                 <div class="col-md-3"><label class="form-label" for="ncType">Type</label><select class="form-select" id="ncType" name="new_customer[type]">{!! $opt(['individual' => 'Individual', 'corporate' => 'Corporate'], old('new_customer.type', 'individual'), null) !!}</select></div>
                                 <div class="col-md-4"><label class="form-label" for="ncEmail">Email</label><input type="email" class="form-control" id="ncEmail" name="new_customer[email]" value="{{ old('new_customer.email') }}" data-v="email"></div>
                                 <div class="col-md-3"><label class="form-label" for="ncCity">City</label><input class="form-control" id="ncCity" name="new_customer[city]" value="{{ old('new_customer.city') }}" maxlength="120"></div>
@@ -62,8 +63,8 @@
                             <div class="col-md-4"><label class="form-label" for="siteLocation">Site / location</label><input class="form-control" id="siteLocation" name="site_location" value="{{ old('site_location') }}" maxlength="255" placeholder="Building, wing or plant"></div>
                             <div class="col-md-4"><label class="form-label" for="unitLocation">Unit location</label><input class="form-control" id="unitLocation" name="unit_location" value="{{ old('unit_location') }}" maxlength="255" placeholder="e.g. Office no. 3"></div>
                             <div class="col-12"><label class="form-label" for="address">Address</label><textarea class="form-control" id="address" name="address" rows="2" maxlength="1000">{{ old('address') }}</textarea></div>
-                            <div class="col-md-4"><label class="form-label" for="contactPerson">Contact person *</label><input class="form-control" id="contactPerson" name="contact_person" value="{{ old('contact_person') }}" required maxlength="120" list="contactList" autocomplete="off"><datalist id="contactList"></datalist></div>
-                            <div class="col-md-4"><label class="form-label" for="contactNo">Contact no *</label><input class="form-control" id="contactNo" name="contact_no" value="{{ old('contact_no') }}" required data-v="phone" inputmode="tel"></div>
+                            <div class="col-md-4"><label class="form-label nx-required" for="contactPerson">Contact person</label><input class="form-control" id="contactPerson" name="contact_person" value="{{ old('contact_person') }}" required maxlength="120" list="contactList" autocomplete="off"><datalist id="contactList"></datalist></div>
+                            <div class="col-md-4"><label class="form-label nx-required" for="contactNo">Contact no</label><input class="form-control" id="contactNo" name="contact_no" value="{{ old('contact_no') }}" required data-v="phone" inputmode="tel"></div>
                             <div class="col-md-4"><label class="form-label" for="alternateNo">Alternate no</label><input class="form-control" id="alternateNo" name="alternate_no" value="{{ old('alternate_no') }}" data-v="phone|different:contact_no" inputmode="tel"></div>
                         </div>
                     </div>
@@ -73,20 +74,20 @@
                 <section class="nx-card mb-3">
                     <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="phone-incoming"></i>Call details</h3><p class="nx-card-subtitle">Who called, how, and which team should handle it.</p></div></div>
                     <div class="nx-card-body">
-                        <label class="form-label">Type of call *</label>
+                        <label class="form-label nx-required">Type of call</label>
                         <div class="nx-option-cards mb-3" role="radiogroup" aria-label="Type of call">
                             @foreach(ComplaintOptions::CALL_TYPES as $key => $type)
                                 <label class="nx-option-card"><input type="radio" name="call_type" value="{{ $key }}" @checked($callType === $key) required><span><i data-lucide="{{ $type['icon'] }}"></i><span><strong>{{ $type['label'] }}</strong><small>{{ $type['description'] }}</small></span></span></label>
                             @endforeach
                         </div>
-                        <label class="form-label">Mode of call *</label>
+                        <label class="form-label nx-required">Mode of call</label>
                         <div class="nx-segment mb-3" role="radiogroup" aria-label="Mode of call">
                             @foreach(ComplaintOptions::options('call_modes') as $key => $label)
                                 <input type="radio" name="call_mode" id="mode_{{ $key }}" value="{{ $key }}" @checked($callMode === $key)><label for="mode_{{ $key }}"><i data-lucide="{{ $modeIcons[$key] ?? 'circle' }}"></i>{{ $label }}</label>
                             @endforeach
                         </div>
                         <div class="row g-3">
-                            <div class="col-md-4"><label class="form-label" for="source">Complaint source *</label><select class="form-select" id="source" name="complaint_source" required>{!! $opt(ComplaintOptions::options('sources'), old('complaint_source', 'customer'), null) !!}</select></div>
+                            <div class="col-md-4"><label class="form-label nx-required" for="source">Complaint source</label><select class="form-select" id="source" name="complaint_source" required>{!! $opt(ComplaintOptions::options('sources'), old('complaint_source', 'customer'), null) !!}</select></div>
                             <div class="col-md-4"><label class="form-label" for="givenBy">Complaint given by</label><input class="form-control" id="givenBy" name="complaint_given_by" value="{{ old('complaint_given_by') }}" maxlength="120" placeholder="Name of caller"></div>
                             <div class="col-md-4"><label class="form-label" for="takenBy">Call taken by</label><select class="form-select" id="takenBy" name="call_taken_by">{!! $opt($staff->pluck('name', 'id')->all(), old('call_taken_by', auth()->id()), null) !!}</select></div>
                         </div>
@@ -98,11 +99,13 @@
                     <div class="nx-card-header"><div><h3 class="nx-card-title"><i data-lucide="message-square-warning"></i>Complaint & priority</h3><p class="nx-card-subtitle">Pick from the complaint master or type your own. Priority sets the SLA.</p></div></div>
                     <div class="nx-card-body">
                         <div class="row g-3">
-                            <div class="col-md-6"><label class="form-label" for="nature">Nature of complaint *</label><input class="form-control" id="nature" name="nature_of_complaint" value="{{ old('nature_of_complaint') }}" list="natureList" required maxlength="120" autocomplete="off" placeholder="Start typing or choose"><datalist id="natureList">@foreach($natures as $label)<option value="{{ $label }}">@endforeach</datalist></div>
-                            <div class="col-md-6"><label class="form-label">Quick pick</label><div class="d-flex flex-wrap gap-1">@foreach(array_slice($natures, 0, 6) as $label)<button type="button" class="btn btn-sm btn-light border" data-nature-pick="{{ $label }}">{{ $label }}</button>@endforeach</div></div>
+                            <div class="col-12">
+                                <label class="form-label nx-required" for="nature">Nature of complaint</label><input class="form-control" id="nature" name="nature_of_complaint" value="{{ old('nature_of_complaint') }}" list="natureList" required maxlength="120" autocomplete="off" placeholder="Start typing or choose"><datalist id="natureList">@foreach($natures as $label)<option value="{{ $label }}">@endforeach</datalist>
+                                @if($natures)<div class="d-flex flex-wrap align-items-center gap-2 mt-2"><span class="form-text m-0">Quick pick:</span>@foreach(array_slice($natures, 0, 6) as $label)<button type="button" class="btn btn-sm btn-light border rounded-pill" data-nature-pick="{{ $label }}">{{ $label }}</button>@endforeach</div>@endif
+                            </div>
                             <div class="col-12"><label class="form-label" for="description">Customer's description</label><textarea class="form-control" id="description" name="description" rows="3" maxlength="5000" placeholder="What exactly is the problem? Since when? Any error code?">{{ old('description') }}</textarea></div>
                         </div>
-                        <label class="form-label mt-3">Priority *</label>
+                        <label class="form-label nx-required mt-3">Priority</label>
                         <div class="nx-option-cards mb-3" role="radiogroup" aria-label="Priority">
                             @foreach(ComplaintOptions::PRIORITIES as $key => $level)
                                 <label class="nx-option-card tone-{{ $level['tone'] }}"><input type="radio" name="priority" value="{{ $key }}" @checked($priority === $key) required><span><i data-lucide="{{ ['critical' => 'flame', 'high' => 'arrow-up', 'medium' => 'minus', 'low' => 'arrow-down'][$key] }}"></i><span><strong>{{ $level['label'] }}</strong><small>Respond in {{ $level['response'] }}h · resolve in {{ $level['resolution'] >= 48 ? ($level['resolution'] / 24).' days' : $level['resolution'].'h' }}</small></span></span></label>
@@ -131,7 +134,7 @@
                             <div class="col-md-4"><label class="form-label" for="criticality">Equipment criticality</label><select class="form-select" id="criticality" name="equipment_criticality">{!! $opt(ComplaintOptions::options('criticality'), old('equipment_criticality', 'normal'), null) !!}</select></div>
                         </div>
                         <details class="mt-3" @if(old('refrigerant') || old('compressor_type') || old('technology')) open @endif>
-                            <summary class="small fw-semibold text-primary" style="cursor:pointer">Technical details & service history</summary>
+                            <summary class="d-inline-flex align-items-center gap-1 small fw-semibold text-primary" style="cursor:pointer;list-style:none"><i data-lucide="chevron-right" style="width:14px;height:14px"></i>Technical details & service history</summary>
                             <div class="row g-3 mt-1">
                                 <div class="col-md-3"><label class="form-label" for="refrigerant">Refrigerant</label><select class="form-select" id="refrigerant" name="refrigerant">{!! $opt(ComplaintOptions::options('refrigerants'), old('refrigerant')) !!}</select></div>
                                 <div class="col-md-3"><label class="form-label" for="compressor">Compressor type</label><select class="form-select" id="compressor" name="compressor_type">{!! $opt(ComplaintOptions::options('compressor_types'), old('compressor_type')) !!}</select></div>
@@ -166,7 +169,7 @@
                     </div>
                     <fieldset class="nx-card-body {{ old('assign.technician_id') ? '' : 'd-none' }}" data-assign-panel @disabled(! old('assign.technician_id'))>
                         <div class="row g-3">
-                            <div class="col-md-4"><label class="form-label" for="aTech">Technician *</label><select class="form-select" id="aTech" name="assign[technician_id]" required data-searchable data-placeholder="Select technician">{!! $opt($technicians->mapWithKeys(fn ($user) => [$user->id => $user->name.($user->designation ? ' · '.$user->designation : '')])->all(), old('assign.technician_id'), 'Select technician') !!}</select></div>
+                            <div class="col-md-4"><label class="form-label nx-required" for="aTech">Technician</label><select class="form-select" id="aTech" name="assign[technician_id]" required data-searchable data-placeholder="Select technician">{!! $opt($technicians->mapWithKeys(fn ($user) => [$user->id => $user->name.($user->designation ? ' · '.$user->designation : '')])->all(), old('assign.technician_id'), 'Select technician') !!}</select></div>
                             <div class="col-md-4"><label class="form-label" for="aOne">Assistant 1</label><select class="form-select" id="aOne" name="assign[assistant_one_id]" data-v="different:technician_id">{!! $opt($technicians->pluck('name', 'id')->all(), old('assign.assistant_one_id'), 'None') !!}</select></div>
                             <div class="col-md-4"><label class="form-label" for="aTwo">Assistant 2</label><select class="form-select" id="aTwo" name="assign[assistant_two_id]">{!! $opt($technicians->pluck('name', 'id')->all(), old('assign.assistant_two_id'), 'None') !!}</select></div>
                             <div class="col-md-4"><label class="form-label" for="aAt">Appointment date & time</label><input type="datetime-local" class="form-control" id="aAt" name="assign[appointment_at]" value="{{ old('assign.appointment_at') }}"></div>
